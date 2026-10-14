@@ -72,3 +72,9 @@ main:not(.chat-room)>footer{margin-top:auto;flex:none}
 @media(max-width:700px){.report-select{min-width:0;width:100%}.report-filter-note{margin:0 0 12px;line-height:1.45;align-items:flex-start}.report-filter-note span{white-space:normal}.report-filters .report-select:first-child{grid-column:1/-1}}
 
 .empty-materials{margin:0 16px 16px;padding:28px 16px;border:1px dashed #c9d9ed;border-radius:9px;background:#fbfdff;color:#7388a7;font-size:11px;text-align:center}
+
+/* Use the workspace width efficiently on desktop and when the sidebar is collapsed. */
+@media(min-width:1025px){
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{width:100%;max-width:none!important;margin:0;padding-left:clamp(18px,1.75vw,36px);padding-right:clamp(18px,1.75vw,36px)}
+  .chat-page{width:100%;max-width:none!important;margin:0;padding-left:clamp(12px,1.25vw,28px);padding-right:clamp(12px,1.25vw,28px)}
+}
