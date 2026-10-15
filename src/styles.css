@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
 
-:root { font-family: 'Be Vietnam Pro', Arial, sans-serif; color: #16254a; background: #f5f8fc; font-synthesis: none; }
-* { box-sizing: border-box; } body { margin: 0; min-width: 320px; } button { font: inherit; border: 0; cursor: pointer; } .app-shell { min-height: 100vh; display: flex; }
+:root { --sidebar-w: 250px; --topbar-h: 76px; font-family: 'Be Vietnam Pro', Arial, sans-serif; color: #16254a; background: #f5f8fc; font-synthesis: none; }
+* { box-sizing: border-box; } html { overflow-x: hidden; } body { margin: 0; min-width: 320px; overflow-x: hidden; } button { font: inherit; border: 0; cursor: pointer; } .app-shell { min-height: 100vh; display: flex; }
 .mock-toast{position:fixed;z-index:20;right:25px;bottom:24px;display:flex;align-items:center;gap:8px;max-width:360px;padding:12px 15px;border-radius:9px;background:#173968;color:#fff;font-size:11px;box-shadow:0 12px 30px #102c5960;animation:toast-in .2s ease-out}.mock-toast svg{color:#52da9a;flex:none}@keyframes toast-in{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
-.sidebar { position: fixed; z-index: 4; inset: 0 auto 0 0; width: 250px; background: #102f63; color: #d8e6fc; padding: 26px 14px 18px; display: flex; flex-direction: column; }
+.sidebar { position: fixed; z-index: 4; inset: 0 auto 0 0; width: var(--sidebar-w); background: #102f63; color: #d8e6fc; padding: 26px 14px 18px; display: flex; flex-direction: column; }
 .sidebar-top { display: flex; justify-content: space-between; align-items: center; padding: 0 11px 26px; } .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 19px; font-weight: 800; letter-spacing: -.6px; }.brand-mark { width: 32px; height: 32px; border-radius: 9px; display:grid; place-items:center; background: linear-gradient(135deg,#49a1ff,#2367d9); color: white; font-size: 16px; font-weight:800; box-shadow:0 5px 14px #071c3d77 }.brand-mark span { color:#a9d5ff; margin-left:-3px }.mobile-close { display:none; background:transparent; color:#fff }.workspace { border-top: 1px solid #345181; padding: 20px 12px 13px; color:#83a4d6; font-size:10px; letter-spacing:.75px; font-weight:700; }.workspace-dot { display:inline-block;width:6px;height:6px;background:#55d69f;border-radius:50%;margin:0 8px 1px 1px; } nav { display:grid; gap:4px; }.nav-item { width:100%; display:flex; align-items:center; gap:13px; border-radius:9px; padding:12px 13px; color:#c7d8f2; background:transparent; text-align:left; font-size:14px; font-weight:500; position:relative; }.nav-item:hover { background:#1c437f; color:#fff; }.nav-item.active { color:#fff; background:#2672df; box-shadow:0 6px 18px #0b214980; }.sidebar-bottom { margin-top:auto; display:grid; gap:4px; }.notify-dot { position:absolute; right:14px; width:6px;height:6px;border-radius:50%;background:#66e0a2; }.support-card { border-radius:11px; padding:13px 9px; margin:13px 0 0; background:#173b74; display:flex;align-items:center;gap:9px; color:#c7d8f2; }.support-card>div:nth-child(2) { display:grid; gap:3px; flex:1; }.support-card strong { color:#f2f6ff;font-size:11px }.support-card span { font-size:9px; color:#9cb8df }.support-icon { width:33px;height:33px;display:grid;place-items:center;border-radius:8px;background:#2a65bc;color:#94c5ff }.support-card>svg { color:#8aabd9; }
-main { width: calc(100% - 250px); margin-left:250px; min-height:100vh; }.topbar { height:76px; padding: 0 34px; display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,.94); border-bottom:1px solid #e6ecf5; }.crumb { display:flex; align-items:center; gap:9px; font-size:12px; color:#9aabc5; }.crumb strong { color:#41526f; }.top-actions { display:flex;align-items:center;gap:23px; }.date-picker,.subtle-select { display:flex;align-items:center;gap:9px;background:#fff;color:#4a5d7d;border:1px solid #dce5f0;border-radius:8px;padding:10px 12px;font-size:12px; }.date-picker svg:first-child {color:#2474df}.bell { position:relative; color:#345477;background:transparent; display:grid;place-items:center }.bell b { position:absolute; right:-7px;top:-8px;background:#ed5058;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;display:grid;place-items:center;border:2px solid #fff }.profile { display:flex;align-items:center;gap:9px;border-left:1px solid #e5eaf1;padding-left:22px;color:#344766 }.profile>div:nth-child(2) { display:grid;gap:2px;line-height:1.15 }.profile strong {font-size:12px}.profile span {font-size:10px;color:#8fa0b9}.avatar { display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#dceafa;color:#1763c7;font-size:11px;font-weight:800 }.profile>svg{color:#6b85aa}.menu-button { display:none; }
+main { width: calc(100% - var(--sidebar-w)); margin-left: var(--sidebar-w); min-height: 100vh; }.topbar { height: var(--topbar-h); padding: 0 34px; display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,.94); border-bottom:1px solid #e6ecf5; }.crumb { display:flex; align-items:center; gap:9px; font-size:12px; color:#9aabc5; }.crumb strong { color:#41526f; }.top-actions { display:flex;align-items:center;gap:23px; }.date-picker,.subtle-select { display:flex;align-items:center;gap:9px;background:#fff;color:#4a5d7d;border:1px solid #dce5f0;border-radius:8px;padding:10px 12px;font-size:12px; }.date-picker svg:first-child {color:#2474df}.bell { position:relative; color:#345477;background:transparent; display:grid;place-items:center }.bell b { position:absolute; right:-7px;top:-8px;background:#ed5058;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;display:grid;place-items:center;border:2px solid #fff }.profile { display:flex;align-items:center;gap:9px;border-left:1px solid #e5eaf1;padding-left:22px;color:#344766 }.profile>div:nth-child(2) { display:grid;gap:2px;line-height:1.15 }.profile strong {font-size:12px}.profile span {font-size:10px;color:#8fa0b9}.avatar { display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#dceafa;color:#1763c7;font-size:11px;font-weight:800 }.profile>svg{color:#6b85aa}.menu-button { display:none; }
 .content { max-width: 1480px; padding: 27px 34px 32px; margin:auto; }.page-title { display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:25px; }.page-title p { margin:0 0 5px;color:#6d7f9c;font-size:13px }.page-title h1 { margin:0;color:#172c57;font-size:25px;letter-spacing:-.7px }.help { display:flex; align-items:center;gap:7px;background:transparent;color:#6380a9;font-size:12px;padding:7px 0 }.section-caption { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }.section-caption h2 { font-size:14px;margin:0;color:#263b61 }.section-caption span {font-size:10px;color:#9babc3}.summary-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:14px }.summary-card { min-width:0; position:relative; padding:17px 14px; border:1px solid #e4eaf2; border-radius:11px;background:#fff;display:flex;align-items:flex-start;gap:12px;box-shadow:0 3px 8px #173b742b }.card-icon { flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#e8f2ff;color:#2575df }.summary-card.teal .card-icon {background:#e4faf4;color:#0bad79}.summary-card.rose .card-icon {background:#fff0f1;color:#e45a63}.summary-card p{font-size:11px;color:#7686a0;margin:1px 0 5px;white-space:nowrap}.summary-card strong{font-size:20px;letter-spacing:-.5px;color:#1e3562;display:block}.summary-card small{font-size:9px;color:#32ab7b;display:block;margin-top:6px}.summary-card small.down{color:#e2656b}.summary-card>button{position:absolute;right:8px;top:10px;color:#9caac0;background:transparent}.panel { margin-top:21px; padding:20px; background:#fff;border:1px solid #e6edf5;border-radius:12px;box-shadow:0 3px 11px #1e47810a }.panel-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:17px}.eyebrow{font-size:10px;color:#2876dd;font-weight:800;letter-spacing:1px;margin:0 0 5px}.panel h2{font-size:17px;color:#1d3561;margin:0;letter-spacing:-.3px}.subtle-select{border-color:transparent;background:#f5f8fc;padding:8px 10px;font-size:11px;color:#647895}.chart-wrap { height:245px;position:relative;padding-left:40px }.chart-wrap svg{width:100%;height:207px;overflow:visible}.grid line{stroke:#e7edf5;stroke-width:.7;vector-effect:non-scaling-stroke}.chart-wrap text{fill:#4171b3;font-size:4.8px;font-family:'Be Vietnam Pro';font-weight:600}.y-labels{position:absolute;left:0;top:0;height:207px;display:flex;flex-direction:column;justify-content:space-between;color:#8294af;font-size:10px}.x-labels{display:flex;justify-content:space-between;padding:9px 1% 0 0;color:#8294af;font-size:10px}.metric-grid{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #e8eef6;border-radius:9px;overflow:hidden}.metric{display:flex;gap:10px;align-items:center;padding:15px 13px;border-right:1px solid #e8eef6}.metric:last-child{border:0}.metric-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#e8f2ff;color:#2575df}.metric:nth-child(3) .metric-icon{background:#e5f9f0;color:#14a573}.metric:nth-child(4) .metric-icon{background:#fff4df;color:#e19721}.metric:nth-child(5) .metric-icon{background:#edf4ff;color:#377ce2}.metric div:nth-child(2){display:grid;gap:4px}.metric span{font-size:10px;color:#7d8ca4;white-space:nowrap}.metric strong{font-size:16px;color:#263b63;white-space:nowrap}.table-wrap{margin-top:16px;overflow:auto}table{width:100%;border-collapse:collapse;min-width:800px}th{background:#f7f9fc;color:#6c7e99;font-weight:600;font-size:10px;padding:10px;border-top:1px solid #e6edf5;border-bottom:1px solid #e6edf5;text-align:center}td{padding:11px 10px;border-bottom:1px solid #edf1f6;text-align:center;color:#455b81;font-size:11px}tbody tr:last-child td{border-bottom:0}.closed{display:inline-grid;place-items:center;min-width:22px;padding:2px 6px;border-radius:6px;background:#e7f6ef;color:#16835c;font-weight:700}.rate{font-weight:700;color:#2f71ca}footer{height:46px;display:flex;justify-content:space-between;align-items:center;padding:0 34px;border-top:1px solid #e6edf5;font-size:10px;color:#94a3ba;background:#fff}footer span:first-child{color:#50a987}footer i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#37d391;margin-right:6px}.overlay{display:none}
 @media (max-width: 1100px) {.summary-grid{grid-template-columns:repeat(2,1fr)}.metric-grid{grid-template-columns:repeat(3,1fr)}.metric:nth-child(3){border-right:0}.metric:nth-child(n+4){border-top:1px solid #e8eef6}.metric:nth-child(4){border-right:1px solid #e8eef6}}
 @media (max-width: 800px) {.sidebar{transform:translateX(-100%);transition:transform .22s}.sidebar.is-open{transform:translateX(0)}.mobile-close{display:block}.overlay.show{display:block;position:fixed;z-index:3;inset:0;background:#0a1d3d70}main{margin-left:0;width:100%}.menu-button{display:grid;place-items:center;background:transparent;color:#2d527f;padding:4px}.topbar{height:64px;padding:0 18px}.crumb{display:none}.date-picker span,.profile>div:nth-child(2),.profile>svg{display:none}.top-actions{gap:17px}.profile{padding-left:15px}.content{padding:22px 17px}.page-title h1{font-size:21px}.help{display:none}.summary-grid{grid-template-columns:1fr}.chart-panel{padding:16px 11px}.panel{padding:16px}.metric-grid{grid-template-columns:1fr 1fr}.metric{border-right:1px solid #e8eef6!important;border-top:1px solid #e8eef6}.metric:nth-child(1),.metric:nth-child(2){border-top:0}.metric:nth-child(even){border-right:0!important}.metric:last-child{border-bottom:0}.panel-heading h2{font-size:16px}.subtle-select{font-size:10px}.chart-wrap{height:214px}.chart-wrap svg{height:178px}.y-labels{height:178px}.x-labels{font-size:8px}footer{padding:0 17px}footer span:last-child{display:none}}
@@ -31,7 +31,7 @@ main { width: calc(100% - 250px); margin-left:250px; min-height:100vh; }.topbar 
 @media(max-width:1050px){.report-main-grid{grid-template-columns:1fr}.report-metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.reports-content{padding-left:13px;padding-right:13px}.report-title{align-items:flex-start}.report-filters{width:100%;display:grid;grid-template-columns:1fr 1fr;margin-top:14px}.report-filters button:first-child{grid-column:1/-1}.report-filters .apply{justify-content:center}.report-metrics{grid-template-columns:1fr 1fr}.report-metric{padding:11px;gap:8px}.report-metric strong{font-size:17px}.report-icon{width:37px;height:37px}.chart-legend{gap:9px;font-size:9px}.report-chart .call-panel-heading{align-items:flex-start}.upcoming-bottom{grid-template-columns:1fr}.report-chart-area{height:223px}.report-chart-area svg{height:185px}.report-y{height:185px}}
 
 /* Internal chat */
-.chat-page{height:calc(100vh - 76px);padding:0 17px 12px;background:#f5f8fc;max-width:1550px;margin:auto}.chat-title{height:78px;display:flex;align-items:center}.chat-title p{margin:0 0 5px;color:#70819d;font-size:12px}.chat-title p span{color:#9dabc0;margin-left:7px}.chat-title h1{margin:0;color:#1e3868;font-size:25px;letter-spacing:-.7px}.chat-layout{height:calc(100% - 78px);display:grid;grid-template-columns:330px minmax(430px,1fr) 330px;gap:0;border:1px solid #e3eaf3;border-radius:12px;background:#fff;box-shadow:0 4px 14px #1d478b0d;overflow:hidden}.chat-list,.chat-info{border-right:1px solid #e8edf4;overflow:auto}.chat-list-head{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 12px}.chat-list h2,.chat-info h2{font-size:17px;color:#294269;margin:0}.chat-list-head button{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;background:#2776df;color:#fff}.chat-search{margin:0 16px 12px;height:38px;border:1px solid #e2e9f2;border-radius:7px;background:#f7f9fc;display:flex;align-items:center;gap:8px;padding:0 10px;color:#5a75a0}.chat-search input{border:0;background:transparent;outline:0;width:100%;font:inherit;font-size:11px}.chat-filter{display:grid;grid-template-columns:1fr 1fr;margin:0 16px 17px;border:1px solid #e2e9f2;border-radius:7px;overflow:hidden}.chat-filter button{padding:9px;background:#fff;color:#617795;font-size:10px}.chat-filter button.active{background:#e4f0ff;color:#2674d9;font-weight:700}.chat-section{padding:0 16px;margin:0 0 7px;font-size:9px;font-weight:800;letter-spacing:.6px;color:#8291a6}.chat-section.private{margin-top:17px}.contact{width:100%;background:#fff;display:grid;grid-template-columns:49px 1fr 35px;gap:8px;text-align:left;padding:10px 13px;align-items:center}.contact.active{background:#edf5ff}.contact:hover{background:#f6f9fd}.contact-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#e0efff;color:#2777df;font-size:12px;font-weight:700;position:relative}.contact-avatar.group{border-radius:9px;background:#eaf3ff;color:#2876da}.contact-avatar.green{background:#e9faf1;color:#179a70}.contact-avatar.amber{background:#fff4e5;color:#e7911d}.contact-avatar.rose{background:#fff0f2;color:#e35e6a}.contact-avatar.purple{background:#f1edff;color:#7857c8}.contact-avatar i,.message-avatar i{position:absolute;width:8px;height:8px;border-radius:50%;background:#18bd77;border:1px solid #fff;right:0;bottom:1px}.contact>div:nth-child(2){display:grid;gap:4px;min-width:0}.contact strong{font-size:11px;color:#304973}.contact span{font-size:9px;color:#7c8da4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.contact time{align-self:start;font-size:9px;color:#70829e;text-align:right}.contact time b{display:grid;place-items:center;margin:7px 0 0 auto;width:18px;height:18px;border-radius:50%;background:#e84a58;color:#fff;font-size:9px}.chat-room{display:grid;grid-template-rows:76px 42px 1fr 61px;min-width:0}.chat-room-head{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid #e9eef5}.chat-room-head>div:nth-child(2){display:grid;gap:4px}.chat-room-head h2{margin:0;color:#29436d;font-size:15px}.chat-room-head p{margin:0;font-size:10px;color:#7889a1}.chat-room-head p i{display:inline-block;width:6px;height:6px;background:#19af75;border-radius:50%;margin:0 3px}.chat-room-head>span{flex:1}.chat-room-head button{width:36px;height:36px;border:1px solid #e3eaf2;background:#fff;border-radius:7px;color:#4e6e99;display:grid;place-items:center}.pinned-message{display:flex;align-items:center;gap:6px;padding:0 16px;color:#507198;background:#f2f7ff;border-bottom:1px solid #deebfb;font-size:10px}.pinned-message svg{color:#2676dc}.pinned-message b{color:#355a89}.pinned-message svg:last-child{margin-left:auto}.messages{padding:16px;overflow:auto;background:linear-gradient(#fff,#fbfcfe)}.date-divider{text-align:center;margin:0 0 14px;border-top:1px solid #edf1f5;height:0}.date-divider span{display:inline-block;transform:translateY(-50%);padding:5px 12px;border-radius:14px;background:#f3f6fa;color:#7c8ca4;font-size:9px}.message{display:flex;gap:9px;margin:12px 0;align-items:flex-start}.message-avatar{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:#e0efff;color:#2877db;position:relative}.message-avatar.rose{background:#ffedf3;color:#d95c77}.message-avatar.purple{background:#f0edff;color:#7654c5}.message-avatar.manager{background:#2776de;color:#fff}.message>div:nth-child(2),.message.outgoing>div:first-child{max-width:75%}.message p{margin:0 0 5px;color:#4f668a;font-size:10px}.message p b{color:#334b74;font-size:10px}.message p time{font-weight:400;color:#8290a5;margin-left:8px}.message span:not(.shared-file span){display:block;background:#f3f6fa;border-radius:3px 10px 10px 10px;padding:10px 11px;color:#3f587f;font-size:11px;line-height:1.4}.message.outgoing{justify-content:flex-end}.message.outgoing p{text-align:right}.message.outgoing span:not(.shared-file span){background:#e5f0ff;border-radius:10px 3px 10px 10px}.shared-file{width:270px;border:1px solid #e0e7f0;border-radius:9px;padding:10px;display:flex;align-items:center;gap:9px;color:#ef4e58;background:#fff}.shared-file span{display:grid;gap:4px;flex:1;color:#4e668b}.shared-file b{font-size:10px}.shared-file small{font-size:9px;color:#8593a8}.shared-file>svg:last-child{color:#2877db}.seen{display:block;text-align:right;color:#6f85a3;font-size:9px;margin-top:4px}.message-input{border-top:1px solid #e8eef5;padding:10px;display:flex;align-items:center;gap:8px}.message-input input{height:39px;min-width:0;flex:1;border:1px solid #dde6f0;border-radius:7px;outline:0;padding:0 10px;font:inherit;font-size:11px}.message-input>button{background:transparent;color:#4e709d;display:grid;place-items:center}.message-input .send-button{height:39px;padding:0 17px;border-radius:7px;background:#2676de;color:#fff;font-size:11px;font-weight:700}.chat-info{border-right:0;border-left:1px solid #e8edf4}.chat-info>h2{padding:20px 16px}.chat-group-info{display:flex;gap:11px;align-items:center;padding:0 16px 16px;border-bottom:1px solid #e8edf4}.chat-group-info>div:nth-child(2){display:grid;gap:4px}.chat-group-info strong{font-size:14px;color:#304973}.chat-group-info span{font-size:10px;color:#8290a4}.chat-info section{padding:17px 16px;border-bottom:1px solid #e8edf4}.info-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}.info-heading h3,.chat-info section>h3{margin:0;color:#324b76;font-size:13px}.info-heading button{display:flex;align-items:center;gap:4px;background:transparent;color:#2877db;font-size:9px}.member{display:flex;align-items:center;gap:9px;margin:11px 0}.member .message-avatar{width:34px;height:34px;font-size:10px}.member span{color:#40577b;font-size:11px;flex:1}.member b{background:#e8f2ff;color:#2874d4;border-radius:5px;padding:5px 7px;font-size:8px}.pinned-info p{background:#f1f7ff;margin:10px 0 0;padding:10px;border-radius:7px;color:#496b96;font-size:10px;display:flex;gap:7px;align-items:center}.pinned-info svg{color:#2777dd}.info-file{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #edf1f5;color:#ee4c57}.info-file span{display:grid;gap:3px;flex:1;min-width:0}.info-file b{font-size:10px;color:#456087;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.info-file small{font-size:8px;color:#8997aa;line-height:1.4}.info-file>svg:last-child{color:#2877db}
+.chat-page{height:calc(100vh - var(--topbar-h));padding:0 17px 12px;background:#f5f8fc;max-width:1550px;margin:auto}.chat-title{height:78px;display:flex;align-items:center}.chat-title p{margin:0 0 5px;color:#70819d;font-size:12px}.chat-title p span{color:#9dabc0;margin-left:7px}.chat-title h1{margin:0;color:#1e3868;font-size:25px;letter-spacing:-.7px}.chat-layout{height:calc(100% - 78px);display:grid;grid-template-columns:330px minmax(430px,1fr) 330px;gap:0;border:1px solid #e3eaf3;border-radius:12px;background:#fff;box-shadow:0 4px 14px #1d478b0d;overflow:hidden}.chat-list,.chat-info{border-right:1px solid #e8edf4;overflow:auto}.chat-list-head{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 12px}.chat-list h2,.chat-info h2{font-size:17px;color:#294269;margin:0}.chat-list-head button{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;background:#2776df;color:#fff}.chat-search{margin:0 16px 12px;height:38px;border:1px solid #e2e9f2;border-radius:7px;background:#f7f9fc;display:flex;align-items:center;gap:8px;padding:0 10px;color:#5a75a0}.chat-search input{border:0;background:transparent;outline:0;width:100%;font:inherit;font-size:11px}.chat-filter{display:grid;grid-template-columns:1fr 1fr;margin:0 16px 17px;border:1px solid #e2e9f2;border-radius:7px;overflow:hidden}.chat-filter button{padding:9px;background:#fff;color:#617795;font-size:10px}.chat-filter button.active{background:#e4f0ff;color:#2674d9;font-weight:700}.chat-section{padding:0 16px;margin:0 0 7px;font-size:9px;font-weight:800;letter-spacing:.6px;color:#8291a6}.chat-section.private{margin-top:17px}.contact{width:100%;background:#fff;display:grid;grid-template-columns:49px 1fr 35px;gap:8px;text-align:left;padding:10px 13px;align-items:center}.contact.active{background:#edf5ff}.contact:hover{background:#f6f9fd}.contact-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#e0efff;color:#2777df;font-size:12px;font-weight:700;position:relative}.contact-avatar.group{border-radius:9px;background:#eaf3ff;color:#2876da}.contact-avatar.green{background:#e9faf1;color:#179a70}.contact-avatar.amber{background:#fff4e5;color:#e7911d}.contact-avatar.rose{background:#fff0f2;color:#e35e6a}.contact-avatar.purple{background:#f1edff;color:#7857c8}.contact-avatar i,.message-avatar i{position:absolute;width:8px;height:8px;border-radius:50%;background:#18bd77;border:1px solid #fff;right:0;bottom:1px}.contact>div:nth-child(2){display:grid;gap:4px;min-width:0}.contact strong{font-size:11px;color:#304973}.contact span{font-size:9px;color:#7c8da4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.contact time{align-self:start;font-size:9px;color:#70829e;text-align:right}.contact time b{display:grid;place-items:center;margin:7px 0 0 auto;width:18px;height:18px;border-radius:50%;background:#e84a58;color:#fff;font-size:9px}.chat-room{display:grid;grid-template-rows:76px 42px 1fr 61px;min-width:0}.chat-room-head{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid #e9eef5}.chat-room-head>div:nth-child(2){display:grid;gap:4px}.chat-room-head h2{margin:0;color:#29436d;font-size:15px}.chat-room-head p{margin:0;font-size:10px;color:#7889a1}.chat-room-head p i{display:inline-block;width:6px;height:6px;background:#19af75;border-radius:50%;margin:0 3px}.chat-room-head>span{flex:1}.chat-room-head button{width:36px;height:36px;border:1px solid #e3eaf2;background:#fff;border-radius:7px;color:#4e6e99;display:grid;place-items:center}.pinned-message{display:flex;align-items:center;gap:6px;padding:0 16px;color:#507198;background:#f2f7ff;border-bottom:1px solid #deebfb;font-size:10px}.pinned-message svg{color:#2676dc}.pinned-message b{color:#355a89}.pinned-message svg:last-child{margin-left:auto}.messages{padding:16px;overflow:auto;background:linear-gradient(#fff,#fbfcfe)}.date-divider{text-align:center;margin:0 0 14px;border-top:1px solid #edf1f5;height:0}.date-divider span{display:inline-block;transform:translateY(-50%);padding:5px 12px;border-radius:14px;background:#f3f6fa;color:#7c8ca4;font-size:9px}.message{display:flex;gap:9px;margin:12px 0;align-items:flex-start}.message-avatar{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:#e0efff;color:#2877db;position:relative}.message-avatar.rose{background:#ffedf3;color:#d95c77}.message-avatar.purple{background:#f0edff;color:#7654c5}.message-avatar.manager{background:#2776de;color:#fff}.message>div:nth-child(2),.message.outgoing>div:first-child{max-width:75%}.message p{margin:0 0 5px;color:#4f668a;font-size:10px}.message p b{color:#334b74;font-size:10px}.message p time{font-weight:400;color:#8290a5;margin-left:8px}.message span:not(.shared-file span){display:block;background:#f3f6fa;border-radius:3px 10px 10px 10px;padding:10px 11px;color:#3f587f;font-size:11px;line-height:1.4}.message.outgoing{justify-content:flex-end}.message.outgoing p{text-align:right}.message.outgoing span:not(.shared-file span){background:#e5f0ff;border-radius:10px 3px 10px 10px}.shared-file{width:270px;border:1px solid #e0e7f0;border-radius:9px;padding:10px;display:flex;align-items:center;gap:9px;color:#ef4e58;background:#fff}.shared-file span{display:grid;gap:4px;flex:1;color:#4e668b}.shared-file b{font-size:10px}.shared-file small{font-size:9px;color:#8593a8}.shared-file>svg:last-child{color:#2877db}.seen{display:block;text-align:right;color:#6f85a3;font-size:9px;margin-top:4px}.message-input{border-top:1px solid #e8eef5;padding:10px;display:flex;align-items:center;gap:8px}.message-input input{height:39px;min-width:0;flex:1;border:1px solid #dde6f0;border-radius:7px;outline:0;padding:0 10px;font:inherit;font-size:11px}.message-input>button{background:transparent;color:#4e709d;display:grid;place-items:center}.message-input .send-button{height:39px;padding:0 17px;border-radius:7px;background:#2676de;color:#fff;font-size:11px;font-weight:700}.chat-info{border-right:0;border-left:1px solid #e8edf4}.chat-info>h2{padding:20px 16px}.chat-group-info{display:flex;gap:11px;align-items:center;padding:0 16px 16px;border-bottom:1px solid #e8edf4}.chat-group-info>div:nth-child(2){display:grid;gap:4px}.chat-group-info strong{font-size:14px;color:#304973}.chat-group-info span{font-size:10px;color:#8290a4}.chat-info section{padding:17px 16px;border-bottom:1px solid #e8edf4}.info-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}.info-heading h3,.chat-info section>h3{margin:0;color:#324b76;font-size:13px}.info-heading button{display:flex;align-items:center;gap:4px;background:transparent;color:#2877db;font-size:9px}.member{display:flex;align-items:center;gap:9px;margin:11px 0}.member .message-avatar{width:34px;height:34px;font-size:10px}.member span{color:#40577b;font-size:11px;flex:1}.member b{background:#e8f2ff;color:#2874d4;border-radius:5px;padding:5px 7px;font-size:8px}.pinned-info p{background:#f1f7ff;margin:10px 0 0;padding:10px;border-radius:7px;color:#496b96;font-size:10px;display:flex;gap:7px;align-items:center}.pinned-info svg{color:#2777dd}.info-file{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #edf1f5;color:#ee4c57}.info-file span{display:grid;gap:3px;flex:1;min-width:0}.info-file b{font-size:10px;color:#456087;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.info-file small{font-size:8px;color:#8997aa;line-height:1.4}.info-file>svg:last-child{color:#2877db}
 .chat-room{width:auto!important;margin-left:0!important;min-height:0}@media(max-width:1350px){.chat-layout{grid-template-columns:minmax(270px,310px) minmax(0,1fr)}.chat-info{display:none}.chat-room{min-width:0}.chat-room-head{min-width:0}.chat-room-head>div:nth-child(2){min-width:0}.chat-room-head h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.messages{min-width:0}}@media(max-width:720px){.chat-page{padding:0 10px 10px;height:calc(100vh - 64px)}.chat-title{height:62px}.chat-title h1{font-size:20px}.chat-title p{font-size:10px}.chat-layout{height:calc(100% - 62px);grid-template-columns:1fr}.chat-list{display:none}.chat-room{grid-template-rows:67px 40px 1fr 60px}.chat-room-head{padding:10px}.messages{padding:10px}.message>div:nth-child(2),.message.outgoing>div:first-child{max-width:82%}.shared-file{width:220px}.message-input{gap:5px}.message-input>button:first-child{display:none}}
 
 /* Mock interactions and refined report chart */
@@ -58,9 +58,7 @@ main { width: calc(100% - 250px); margin-left:250px; min-height:100vh; }.topbar 
 .header-popover-wrap{position:relative}.profile{background:transparent;text-align:left}.header-popover{position:absolute;z-index:15;right:0;top:calc(100% + 10px);width:245px;border:1px solid #e0e8f2;border-radius:10px;background:#fff;box-shadow:0 12px 28px #183a6a23;padding:8px}.header-popover>b{display:block;padding:6px 8px;color:#29456e;font-size:11px}.period-menu button,.profile-menu button{display:block;width:100%;padding:10px 8px;border-radius:6px;background:#fff;color:#526b90;text-align:left;font-size:11px}.period-menu button:hover,.profile-menu button:hover{background:#f1f6ff;color:#2474da}.notification-menu p{padding:8px;margin:0;color:#70819b;font-size:10px;line-height:1.45;border-top:1px solid #edf1f5}.notification-menu p strong{color:#365984}.notification-menu button{margin:6px 8px 4px;background:transparent;color:#2675db;font-size:10px;font-weight:700}
 .notification-menu{width:290px}.notification-menu .notification-item{display:grid;width:100%;gap:4px;margin:0;padding:10px 8px;border-top:1px solid #edf1f5;border-radius:0;text-align:left;color:#3c5b87}.notification-item:hover{background:#f3f7fd}.notification-item strong{font-size:10px;color:#35527e}.notification-item span{font-size:9px;color:#8191a8;line-height:1.35}.notification-menu .mark-read{width:100%;margin:4px 0 0;padding:8px;text-align:center;border-top:1px solid #edf1f5}.empty-notification{text-align:center;padding:16px!important;border:0!important}
 
-/* Wide desktop: use available workspace instead of a narrow centered canvas */
-@media(min-width:1440px){main{flex:1}.content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content,.chat-page{max-width:none}.content{padding-left:clamp(32px,3vw,58px);padding-right:clamp(32px,3vw,58px)}.telesale-grid{grid-template-columns:clamp(290px,19vw,350px) minmax(560px,1fr) clamp(320px,21vw,390px)}.leads-grid,.orders-grid{grid-template-columns:minmax(680px,1fr) clamp(340px,24vw,410px)}.training-grid{grid-template-columns:minmax(720px,1fr) clamp(370px,25vw,440px)}.report-main-grid{grid-template-columns:minmax(650px,1.5fr) minmax(390px,.9fr)}.summary-card{min-height:104px}.call-stat{min-height:82px}.chart-panel{min-height:350px}.chat-layout{grid-template-columns:clamp(300px,20vw,350px) minmax(0,1fr) clamp(320px,21vw,380px)}.chat-page{padding-left:clamp(20px,2vw,40px);padding-right:clamp(20px,2vw,40px)}}
-@media(min-width:1900px){.topbar{padding-left:clamp(38px,3vw,70px);padding-right:clamp(38px,3vw,70px)}.content{padding-top:32px;padding-bottom:38px}.page-title h1{font-size:28px}.call-panel h2,.panel h2{font-size:18px}.telesale-grid{grid-template-columns:350px minmax(690px,1fr) 390px}.summary-card strong{font-size:23px}.call-stat strong{font-size:21px}}
+/* Large screen & desktop responsive scaling is unified below */
 
 /* Keep the application status at the bottom of the viewport on short pages. */
 main:not(.chat-room){display:flex;flex-direction:column;min-height:100vh}
@@ -73,8 +71,874 @@ main:not(.chat-room)>footer{margin-top:auto;flex:none}
 
 .empty-materials{margin:0 16px 16px;padding:28px 16px;border:1px dashed #c9d9ed;border-radius:9px;background:#fbfdff;color:#7388a7;font-size:11px;text-align:center}
 
-/* Use the workspace width efficiently on desktop and when the sidebar is collapsed. */
+/* ==========================================================================
+   UNIFIED RESPONSIVE SCALING ARCHITECTURE FOR LARGE & ULTRA-WIDE SCREENS
+   ========================================================================== */
+
+/* 1. Base Desktop (1025px - 1439px) */
 @media(min-width:1025px){
-  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{width:100%;max-width:none!important;margin:0;padding-left:clamp(18px,1.75vw,36px);padding-right:clamp(18px,1.75vw,36px)}
-  .chat-page{width:100%;max-width:none!important;margin:0;padding-left:clamp(12px,1.25vw,28px);padding-right:clamp(12px,1.25vw,28px)}
+  main{flex:1}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{width:100%;max-width:none!important;margin:0;padding-left:clamp(20px,1.8vw,36px);padding-right:clamp(20px,1.8vw,36px)}
+  .chat-page{width:100%;max-width:none!important;margin:0;padding-left:clamp(14px,1.25vw,28px);padding-right:clamp(14px,1.25vw,28px)}
 }
+
+/* 2. Standard Wide Desktop (1440px+) */
+@media(min-width:1440px){
+  :root{--sidebar-w:260px;--topbar-h:78px}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{padding-left:clamp(24px,2.2vw,44px);padding-right:clamp(24px,2.2vw,44px)}
+  .chat-page{padding-left:clamp(16px,1.6vw,34px);padding-right:clamp(16px,1.6vw,34px)}
+  .page-title h1{font-size:27px}
+  .summary-card strong,.report-metric strong{font-size:22px}
+  .call-stat strong{font-size:21px}
+  .summary-card{min-height:102px}
+  .call-stat{min-height:82px}
+  .telesale-grid{grid-template-columns:325px minmax(500px,1fr) 345px;gap:18px}
+  .leads-grid,.orders-grid{grid-template-columns:minmax(650px,1fr) 365px;gap:18px}
+  .training-grid{grid-template-columns:minmax(680px,1fr) 410px;gap:18px}
+  .report-main-grid{grid-template-columns:minmax(640px,1.48fr) minmax(380px,.92fr);gap:18px}
+  .chat-layout{grid-template-columns:345px minmax(460px,1fr) 345px}
+}
+
+/* 3. Wide Desktop / Laptop 16:10 Displays (1680px+) ~12-15% scale */
+@media(min-width:1680px){
+  :root{--sidebar-w:275px;--topbar-h:82px}
+  .brand-text{font-size:25px}
+  .nav-item{font-size:15px;padding:13px 15px;gap:14px}
+  .nav-item svg{width:21px;height:21px}
+  .workspace{font-size:11px;padding:21px 13px 14px}
+  .topbar{padding:0 40px}
+  .crumb{font-size:13px}
+  .crumb strong{font-size:13px}
+  .date-picker,.subtle-select{font-size:13px;padding:11px 13px}
+  .avatar{width:38px;height:38px;font-size:12px}
+  .profile strong{font-size:13px}
+  .profile span{font-size:11px}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{padding-top:30px;padding-bottom:36px;padding-left:clamp(30px,2.4vw,52px);padding-right:clamp(30px,2.4vw,52px)}
+  .chat-page{padding-left:clamp(18px,1.8vw,38px);padding-right:clamp(18px,1.8vw,38px)}
+  .page-title{margin-bottom:28px}
+  .page-title h1{font-size:29px}
+  .page-title p{font-size:14px}
+  .help{font-size:13px}
+  .panel{padding:22px;border-radius:13px}
+  .panel h2,.call-panel h2{font-size:18px}
+  .eyebrow{font-size:11px}
+  .summary-card{padding:19px 16px;border-radius:12px}
+  .summary-card p,.call-stat p,.report-metric p{font-size:12px}
+  .summary-card strong{font-size:23px}
+  .call-stat strong{font-size:22px}
+  .report-metric strong{font-size:23px}
+  .summary-card small{font-size:10px}
+  .card-icon,.report-icon{width:46px;height:46px;border-radius:11px}
+  .card-icon svg,.report-icon svg{width:23px;height:23px}
+  .metric-grid{border-radius:10px}
+  .metric{padding:17px 14px;gap:12px}
+  .metric-icon{width:38px;height:38px}
+  .metric-icon svg{width:20px;height:20px}
+  .metric span{font-size:11px}
+  .metric strong{font-size:18px}
+  th{font-size:11px;padding:11px 12px}
+  td{font-size:12px;padding:13px 12px}
+  .telesale-grid{grid-template-columns:350px minmax(560px,1fr) 370px;gap:18px}
+  .call-panel-heading{padding:18px 18px 14px}
+  .week-control{height:40px;font-size:12px}
+  .slot-header{font-size:11px;padding:9px 7px}
+  .slot-header small{font-size:9px}
+  .slot-section{font-size:10px;padding:9px 15px 7px}
+  .slot-row{height:28px;font-size:11px}
+  .slot-row b{font-size:11px}
+  .slot-count{min-width:22px;height:19px;font-size:10px}
+  .auto-dial,.save-result,.contact-button{padding:12px;font-size:13px;border-radius:9px}
+  .calling-status{font-size:11px}
+  .line{font-size:11px;padding:9px}
+  .caller{margin:20px 18px 0;padding:18px;gap:14px}
+  .customer-avatar{width:64px;height:64px}
+  .customer-avatar svg{width:38px;height:38px}
+  .customer-avatar.small{width:48px;height:48px}
+  .customer-avatar.small svg{width:28px;height:28px}
+  .caller h3,.customer-brief h3{font-size:17px}
+  .caller p,.customer-brief p{font-size:11px}
+  .caller strong{font-size:17px}
+  .caller-number{font-size:12.5px}
+  .call-controls{gap:22px;padding:21px 18px}
+  .call-controls span{width:42px;height:42px}
+  .call-controls span svg{width:22px;height:22px}
+  .call-controls button{font-size:11px}
+  .script-panel ol{font-size:13px;line-height:1.68}
+  .next-tip{font-size:11px;padding:10px 12px}
+  .customer-details{padding:14px 18px;gap:9px}
+  .customer-details span{font-size:11px}
+  .history strong{font-size:12px}
+  .history p{font-size:11px;padding:10px}
+  .result-grid button{height:40px;font-size:11px}
+  .field-label{font-size:11px}
+  .field-label input{font-size:11px;padding:10px;min-height:37px}
+  .field-label textarea{font-size:11px;padding:10px;height:62px}
+  .leads-grid,.orders-grid{grid-template-columns:minmax(720px,1fr) 385px;gap:18px}
+  .lead-filters,.order-filters{gap:10px;padding:0 18px 14px}
+  .lead-filters label,.order-filters label{height:41px}
+  .lead-filters input,.order-filters input{font-size:12px}
+  .lead-filters button,.order-filters button{font-size:11px}
+  .lead-tabs button,.order-tabs button{height:36px;font-size:11px}
+  .lead-table th{font-size:10px;padding:10px 14px}
+  .lead-table td{font-size:11px;padding:10px 14px}
+  .lead-name b{font-size:12px}
+  .lead-name small{font-size:10px}
+  .tiny-avatar{width:34px;height:34px}
+  .lead-status{font-size:10px;min-width:102px;padding:7px 8px}
+  .pagination{font-size:11px;padding:14px 18px}
+  .pagination button{width:28px;height:28px;font-size:11px}
+  .timeline time{font-size:11px}
+  .timeline p{font-size:11px;padding:11px}
+  .appointment-fields label{font-size:11px}
+  .appointment-fields label>span{height:38px}
+  .appointment-fields input{font-size:11px}
+  .training-grid{grid-template-columns:minmax(720px,1fr) 420px;gap:18px}
+  .training-search{width:330px;height:43px}
+  .training-search input{font-size:12px}
+  .training-tabs button{height:41px;font-size:12px}
+  .material-card{min-height:160px;padding:16px;gap:14px}
+  .material-icon{width:82px;height:82px}
+  .material-copy h3{font-size:14.5px}
+  .material-copy p{font-size:11px}
+  .material-copy span{font-size:10px}
+  .material-copy button{font-size:10px;padding:9px 11px}
+  .journey-step strong{font-size:11px}
+  .journey-step small{font-size:10px}
+  .report-main-grid{grid-template-columns:minmax(690px,1.48fr) minmax(410px,.92fr);gap:18px}
+  .report-filters button,.report-select{height:42px;font-size:11px}
+  .upcoming-days>div b{font-size:21px}
+  .upcoming-days span{font-size:10px}
+  .total-booked{font-size:12px}
+  .total-booked strong{font-size:22px}
+  .chat-layout{grid-template-columns:360px minmax(500px,1fr) 360px}
+  .contact strong{font-size:12px}
+  .contact span{font-size:10px}
+  .contact time{font-size:10px}
+  .contact-avatar{width:46px;height:46px;font-size:13px}
+  .chat-room-head h2{font-size:16.5px}
+  .chat-room-head p{font-size:11px}
+  .message p{font-size:11px}
+  .message span:not(.shared-file span){font-size:12px;padding:11px 13px}
+  .message-avatar{width:42px;height:42px;font-size:12px}
+  .shared-file{width:290px}
+  .message-input input{height:42px;font-size:12px}
+  .message-input .send-button{height:42px;font-size:12px}
+  .settings-hero h2{font-size:26px}
+  .settings-hero span{font-size:13px}
+  .settings-avatar{width:78px;height:78px}
+  .settings-fields label{font-size:12px}
+  .settings-fields input,.settings-fields select{height:42px;font-size:12px}
+  footer{height:50px;font-size:11px;padding:0 40px}
+}
+
+/* 4. Full HD Standard / Large Desktop Viewports (1920px+) ~22-26% scale */
+@media(min-width:1920px){
+  :root{--sidebar-w:295px;--topbar-h:88px}
+  .brand-text{font-size:27px}
+  .brand-mark{width:36px;height:36px;font-size:18px;border-radius:10px}
+  .nav-item{font-size:16px;padding:14px 17px;gap:15px;border-radius:10px}
+  .nav-item svg{width:22px;height:22px}
+  .workspace{font-size:12px;padding:23px 15px 15px}
+  .support-card{padding:15px 12px;border-radius:12px;gap:11px}
+  .support-card strong{font-size:12.5px}
+  .support-card span{font-size:10.5px}
+  .support-icon{width:38px;height:38px}
+  .topbar{padding:0 48px}
+  .crumb{font-size:13.5px;gap:11px}
+  .crumb strong{font-size:13.5px}
+  .date-picker,.subtle-select{font-size:13.5px;padding:12px 15px;border-radius:9px}
+  .date-picker svg,.subtle-select svg{width:18px;height:18px}
+  .avatar{width:42px;height:42px;font-size:13px}
+  .profile{gap:11px;padding-left:26px}
+  .profile strong{font-size:13.5px}
+  .profile span{font-size:11.5px}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{padding-top:34px;padding-bottom:42px;padding-left:clamp(36px,2.8vw,60px);padding-right:clamp(36px,2.8vw,60px)}
+  .chat-page{padding-left:clamp(20px,2vw,44px);padding-right:clamp(20px,2vw,44px)}
+  .page-title{margin-bottom:30px}
+  .page-title h1{font-size:32px}
+  .page-title p{font-size:15px}
+  .help{font-size:13.5px;gap:9px}
+  .help svg{width:19px;height:19px}
+  .panel{padding:25px;border-radius:14px;margin-top:24px}
+  .panel h2,.call-panel h2{font-size:20px}
+  .eyebrow{font-size:12px}
+  .summary-grid{gap:18px}
+  .summary-card{padding:21px 18px;border-radius:13px;gap:14px}
+  .summary-card p,.call-stat p,.report-metric p{font-size:13px}
+  .summary-card strong{font-size:26px}
+  .call-stat strong{font-size:25px}
+  .report-metric strong{font-size:26px}
+  .summary-card small{font-size:11px}
+  .card-icon,.report-icon{width:50px;height:50px;border-radius:12px}
+  .card-icon svg,.report-icon svg{width:26px;height:26px}
+  .metric-grid{border-radius:11px}
+  .metric{padding:19px 16px;gap:13px}
+  .metric-icon{width:42px;height:42px}
+  .metric-icon svg{width:22px;height:22px}
+  .metric span{font-size:12px}
+  .metric strong{font-size:20px}
+  th{font-size:12px;padding:13px 14px}
+  td{font-size:13px;padding:14px 14px}
+  .closed{min-width:26px;padding:3px 8px;font-size:11px;border-radius:7px}
+  .telesale-grid{grid-template-columns:385px minmax(640px,1fr) 405px;gap:22px}
+  .call-stat-grid{gap:16px;margin-bottom:20px}
+  .call-stat{padding:18px;gap:13px}
+  .call-panel{border-radius:14px}
+  .call-panel-heading{padding:20px 20px 15px}
+  .icon-button{width:35px;height:35px;border-radius:8px}
+  .week-control{height:44px;font-size:13px;padding:0 6px;margin:0 18px 14px}
+  .slot-header{font-size:12px;padding:11px 9px}
+  .slot-header small{font-size:10px}
+  .slot-section{font-size:11px;padding:10px 18px 8px}
+  .slot-row{height:32px;padding:0 9px;font-size:12px}
+  .slot-row input{width:15px;height:15px}
+  .slot-row b{font-size:12px}
+  .slot-count{min-width:25px;height:21px;font-size:11px;border-radius:5px}
+  .auto-dial,.save-result,.contact-button{padding:14px;font-size:14px;border-radius:10px;gap:10px}
+  .center-call-column{gap:20px}
+  .calling-status{font-size:12px;gap:7px}
+  .calling-status i{width:8px;height:8px}
+  .line-list{gap:10px;padding:0 20px}
+  .line{font-size:12px;padding:11px;border-radius:9px}
+  .line svg{width:16px;height:16px}
+  .line b{font-size:10.5px}
+  .caller{margin:22px 20px 0;padding:20px;border-radius:12px;gap:16px}
+  .customer-avatar{width:72px;height:72px}
+  .customer-avatar svg{width:42px;height:42px}
+  .customer-avatar.small{width:52px;height:52px}
+  .customer-avatar.small svg{width:30px;height:30px}
+  .caller h3,.customer-brief h3{font-size:19px}
+  .caller p,.customer-brief p{font-size:12px;gap:6px}
+  .caller strong{font-size:19px}
+  .caller-number{margin:12px 38px 0;font-size:13.5px;gap:9px}
+  .caller-number svg{width:18px;height:18px}
+  .call-controls{gap:26px;padding:24px 20px}
+  .call-controls span{width:46px;height:46px}
+  .call-controls span svg{width:24px;height:24px}
+  .call-controls button{font-size:12px;gap:8px}
+  .script-panel ol{padding:0 30px 4px 44px;font-size:14px;line-height:1.72}
+  .script-panel li{padding:8px 3px 9px 5px}
+  .next-tip{font-size:12px;padding:11px 14px;margin:12px 20px 18px auto}
+  .right-call-column{gap:20px}
+  .customer-brief{padding:0 20px 18px;gap:14px}
+  .customer-details{padding:15px 20px;gap:11px}
+  .customer-details span{font-size:12px}
+  .history{padding:16px 20px}
+  .history strong{font-size:13px;gap:8px}
+  .history p{font-size:12px;padding:12px;margin:11px 0 0}
+  .result-grid{gap:9px;padding:0 20px 16px}
+  .result-grid button{height:44px;font-size:12px;border-radius:8px;gap:8px}
+  .result-grid button svg{width:20px;height:20px}
+  .field-label{padding:0 20px 14px;font-size:12px;gap:9px}
+  .field-label svg{width:17px;height:17px}
+  .field-label input{font-size:12.5px;padding:11px;min-height:40px;border-radius:8px}
+  .field-label textarea{font-size:12.5px;padding:11px;height:70px;border-radius:8px}
+  .save-result{width:calc(100% - 40px);margin:4px 20px 20px}
+  .leads-grid,.orders-grid{grid-template-columns:minmax(780px,1fr) 420px;gap:22px}
+  .lead-list-column,.order-list-column{gap:20px}
+  .lead-filters,.order-filters{gap:11px;padding:0 20px 16px}
+  .lead-filters label,.order-filters label{height:44px;padding:0 13px;border-radius:8px}
+  .lead-filters label svg,.order-filters label svg{width:18px;height:18px}
+  .lead-filters input,.order-filters input{font-size:13px}
+  .lead-filters button,.order-filters button{font-size:12px;padding:0 12px;border-radius:8px}
+  .lead-tabs button,.order-tabs button{height:39px;font-size:12px;border-radius:7px}
+  .lead-table-wrap{padding:0 20px}
+  .lead-table th{font-size:11px;padding:11px 15px}
+  .lead-table td{font-size:12px;padding:11px 15px}
+  .lead-name{gap:10px}
+  .lead-name b{font-size:13px}
+  .lead-name small{font-size:11px}
+  .tiny-avatar{width:36px;height:36px}
+  .tiny-avatar svg{width:18px;height:18px}
+  .lead-status{font-size:11px;min-width:110px;padding:8px 10px;border-radius:6px}
+  .pagination{padding:16px 20px;font-size:12px}
+  .pagination button{width:30px;height:30px;font-size:12px;border-radius:6px}
+  .timeline{padding:0 20px 18px}
+  .timeline time{font-size:12px}
+  .timeline p{font-size:12px;padding:13px;border-radius:8px}
+  .appointment-fields{gap:12px;padding:0 20px 16px}
+  .appointment-fields label{font-size:12px}
+  .appointment-fields label>span{height:41px;padding:0 11px;border-radius:8px}
+  .appointment-fields label>span svg{width:18px;height:18px}
+  .appointment-fields input{font-size:12.5px}
+  .result-label{font-size:12px;margin:0 20px 9px}
+  .order-note{padding:16px 20px;border-radius:12px;gap:14px}
+  .order-note strong{font-size:13px}
+  .order-note p{font-size:12px}
+  .order-id{padding:0 20px 13px;font-size:25px}
+  .return-order{width:calc(100% - 40px);margin:0 20px 20px;padding:12px;font-size:12.5px;border-radius:9px}
+  .training-grid{grid-template-columns:minmax(780px,1fr) 460px;gap:22px}
+  .training-search{width:360px;height:46px;border-radius:9px;padding:0 14px}
+  .training-search input{font-size:13px}
+  .training-tabs{padding:7px;border-radius:13px;margin-bottom:20px}
+  .training-tabs button{height:44px;font-size:12.5px;border-radius:8px}
+  .materials-list{gap:16px;padding:0 20px}
+  .material-card{min-height:175px;padding:18px;gap:16px;border-radius:12px}
+  .material-icon{width:90px;height:90px;border-radius:12px}
+  .material-icon svg{width:46px;height:46px}
+  .material-copy h3{font-size:15.5px}
+  .material-copy p{font-size:12px}
+  .material-copy span{font-size:11px}
+  .material-copy button{font-size:11px;padding:10px 13px;border-radius:7px}
+  .training-tip{padding:16px 20px;border-radius:12px}
+  .training-tip strong{font-size:14px}
+  .training-tip ul{font-size:12px}
+  .journey-step{padding:14px 18px;gap:12px}
+  .journey-step>b{width:32px;height:32px;font-size:13px}
+  .journey-icon{width:40px;height:40px;border-radius:8px}
+  .journey-icon svg{width:22px;height:22px}
+  .journey-step strong{font-size:12px}
+  .journey-step small{font-size:11px}
+  .updated-row{margin:0 18px;padding:13px 2px;font-size:11.5px}
+  .training-help{padding:18px;border-radius:12px;gap:13px}
+  .training-help strong{font-size:13px}
+  .training-help span{font-size:11px}
+  .training-help button{padding:11px 14px;font-size:11px;border-radius:8px}
+  .report-main-grid{grid-template-columns:minmax(740px,1.48fr) minmax(440px,.92fr);gap:22px}
+  .report-filters button,.report-select{height:45px;font-size:12px;border-radius:8px}
+  .report-filters button svg,.report-select svg{width:18px;height:18px}
+  .report-filters .apply{padding:0 18px;font-size:12.5px}
+  .chart-legend{font-size:12px;gap:24px}
+  .modern-chart{height:280px}
+  .chart-scale{font-size:11px}
+  .bar-group small{font-size:12px}
+  .bar-zone b{font-size:11px}
+  .upcoming-days{gap:10px;padding:0 18px 15px}
+  .upcoming-days>div{padding:13px 11px;border-radius:10px}
+  .upcoming-days span{font-size:11px}
+  .upcoming-days>div b{font-size:23px}
+  .total-booked{margin:0 18px 13px;padding:14px;font-size:13px;border-radius:10px}
+  .total-booked strong{font-size:24px}
+  .upcoming-bottom{gap:10px;padding:0 18px 18px}
+  .upcoming-bottom>div{padding:14px;border-radius:10px}
+  .upcoming-bottom span{font-size:11px}
+  .upcoming-bottom b{font-size:18px}
+  .chat-page{height:calc(100vh - var(--topbar-h))}
+  .chat-title{height:86px}
+  .chat-title h1{font-size:28px}
+  .chat-title p{font-size:13.5px}
+  .chat-layout{height:calc(100% - 86px);grid-template-columns:390px minmax(540px,1fr) 390px;border-radius:14px}
+  .chat-list-head{padding:20px 18px 14px}
+  .chat-list h2,.chat-info h2{font-size:19px}
+  .chat-list-head button{width:35px;height:35px}
+  .chat-search{margin:0 18px 14px;height:42px;border-radius:8px}
+  .chat-search input{font-size:12.5px}
+  .chat-filter button{padding:11px;font-size:11.5px}
+  .contact{padding:13px 16px;grid-template-columns:54px 1fr 40px;gap:11px}
+  .contact-avatar{width:48px;height:48px;font-size:14px}
+  .contact strong{font-size:13px}
+  .contact span{font-size:11px}
+  .contact time{font-size:11px}
+  .contact time b{width:21px;height:21px;font-size:10px}
+  .chat-room{grid-template-rows:84px 46px 1fr 68px}
+  .chat-room-head{padding:16px 20px;gap:13px}
+  .chat-room-head h2{font-size:17.5px}
+  .chat-room-head p{font-size:12px}
+  .chat-room-head button{width:40px;height:40px;border-radius:8px}
+  .pinned-message{font-size:11.5px;padding:0 20px}
+  .messages{padding:20px}
+  .message{margin:15px 0;gap:12px}
+  .message-avatar{width:44px;height:44px;font-size:13px}
+  .message p{font-size:11.5px}
+  .message span:not(.shared-file span){font-size:12.5px;padding:12px 15px;line-height:1.48}
+  .shared-file{width:310px;padding:12px;border-radius:10px}
+  .shared-file b{font-size:11.5px}
+  .shared-file small{font-size:10px}
+  .message-input{padding:12px;gap:10px}
+  .message-input input{height:44px;font-size:12.5px;border-radius:8px;padding:0 13px}
+  .message-input .send-button{height:44px;padding:0 20px;font-size:12.5px;border-radius:8px}
+  .chat-group-info{padding:0 18px 18px;gap:13px}
+  .chat-group-info strong{font-size:16px}
+  .chat-group-info span{font-size:11.5px}
+  .chat-info section{padding:20px 18px}
+  .info-heading h3,.chat-info section>h3{font-size:14.5px}
+  .member{margin:13px 0;gap:11px}
+  .member span{font-size:12.5px}
+  .member b{font-size:9.5px;padding:6px 9px}
+  .settings-hero{padding:26px 32px;border-radius:15px;gap:22px}
+  .settings-avatar{width:86px;height:86px}
+  .settings-hero h2{font-size:29px}
+  .settings-hero span{font-size:14px}
+  .settings-fields{padding:0 22px;gap:14px}
+  .settings-fields label{font-size:13px;grid-template-columns:26px 210px minmax(0,1fr);gap:10px}
+  .settings-fields input,.settings-fields select{height:44px;font-size:12.5px;padding:0 13px;border-radius:8px}
+  .upload-area{margin:0 20px;min-height:225px}
+  .settings-actions{padding:20px 22px 0;gap:11px}
+  .settings-actions button{height:44px;padding:0 18px;font-size:12.5px;border-radius:8px}
+  footer{height:54px;font-size:11.5px;padding:0 48px}
+}
+
+/* 5. 2K QHD / High-Resolution Viewports (2240px+) ~38-42% scale */
+@media(min-width:2240px){
+  :root{--sidebar-w:330px;--topbar-h:96px}
+  .brand-text{font-size:30px}
+  .brand-mark{width:40px;height:40px;font-size:20px;border-radius:11px}
+  .nav-item{font-size:17.5px;padding:16px 20px;gap:17px;border-radius:12px}
+  .nav-item svg{width:25px;height:25px}
+  .workspace{font-size:13px;padding:26px 17px 17px}
+  .support-card{padding:17px 14px;border-radius:13px;gap:13px}
+  .support-card strong{font-size:14px}
+  .support-card span{font-size:12px}
+  .support-icon{width:42px;height:42px}
+  .topbar{padding:0 56px}
+  .crumb{font-size:15px;gap:13px}
+  .crumb strong{font-size:15px}
+  .date-picker,.subtle-select{font-size:14.5px;padding:14px 17px;border-radius:10px}
+  .date-picker svg,.subtle-select svg{width:20px;height:20px}
+  .avatar{width:46px;height:46px;font-size:14px}
+  .profile{gap:13px;padding-left:30px}
+  .profile strong{font-size:15px}
+  .profile span{font-size:12.5px}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{padding-top:38px;padding-bottom:48px;padding-left:clamp(42px,3.2vw,72px);padding-right:clamp(42px,3.2vw,72px)}
+  .chat-page{padding-left:clamp(24px,2.4vw,52px);padding-right:clamp(24px,2.4vw,52px)}
+  .page-title{margin-bottom:34px}
+  .page-title h1{font-size:36px}
+  .page-title p{font-size:16.5px}
+  .help{font-size:15px;gap:10px}
+  .help svg{width:21px;height:21px}
+  .panel{padding:28px;border-radius:16px;margin-top:28px}
+  .panel h2,.call-panel h2{font-size:22.5px}
+  .eyebrow{font-size:13.5px}
+  .summary-grid{gap:22px}
+  .summary-card{padding:24px 21px;border-radius:15px;gap:16px}
+  .summary-card p,.call-stat p,.report-metric p{font-size:14.5px}
+  .summary-card strong{font-size:30px}
+  .call-stat strong{font-size:28px}
+  .report-metric strong{font-size:30px}
+  .summary-card small{font-size:12.5px}
+  .card-icon,.report-icon{width:56px;height:56px;border-radius:13px}
+  .card-icon svg,.report-icon svg{width:30px;height:30px}
+  .metric-grid{border-radius:12px}
+  .metric{padding:22px 18px;gap:15px}
+  .metric-icon{width:46px;height:46px}
+  .metric-icon svg{width:25px;height:25px}
+  .metric span{font-size:13.5px}
+  .metric strong{font-size:22px}
+  th{font-size:13.5px;padding:15px 16px}
+  td{font-size:14.5px;padding:16px 16px}
+  .closed{min-width:30px;padding:4px 10px;font-size:12.5px;border-radius:8px}
+  .telesale-grid{grid-template-columns:435px minmax(720px,1fr) 455px;gap:26px}
+  .call-stat-grid{gap:20px;margin-bottom:24px}
+  .call-stat{padding:21px;gap:15px}
+  .call-panel{border-radius:16px}
+  .call-panel-heading{padding:22px 22px 17px}
+  .icon-button{width:38px;height:38px;border-radius:9px}
+  .week-control{height:48px;font-size:14.5px;padding:0 8px;margin:0 22px 16px}
+  .slot-header{font-size:13.5px;padding:12px 10px}
+  .slot-header small{font-size:11px}
+  .slot-section{font-size:12px;padding:11px 20px 9px}
+  .slot-row{height:36px;padding:0 10px;font-size:13.5px}
+  .slot-row input{width:17px;height:17px}
+  .slot-row b{font-size:13.5px}
+  .slot-count{min-width:28px;height:24px;font-size:12.5px;border-radius:6px}
+  .auto-dial,.save-result,.contact-button{padding:16px;font-size:15.5px;border-radius:11px;gap:11px}
+  .center-call-column{gap:24px}
+  .calling-status{font-size:13.5px;gap:8px}
+  .calling-status i{width:9px;height:9px}
+  .line-list{gap:12px;padding:0 22px}
+  .line{font-size:13.5px;padding:13px;border-radius:10px}
+  .line svg{width:18px;height:18px}
+  .line b{font-size:12px}
+  .caller{margin:25px 22px 0;padding:22px;border-radius:14px;gap:18px}
+  .customer-avatar{width:80px;height:80px}
+  .customer-avatar svg{width:48px;height:48px}
+  .customer-avatar.small{width:58px;height:58px}
+  .customer-avatar.small svg{width:34px;height:34px}
+  .caller h3,.customer-brief h3{font-size:22px}
+  .caller p,.customer-brief p{font-size:13.5px;gap:7px}
+  .caller strong{font-size:22px}
+  .caller-number{margin:14px 44px 0;font-size:15px;gap:10px}
+  .caller-number svg{width:20px;height:20px}
+  .call-controls{gap:30px;padding:26px 22px}
+  .call-controls span{width:52px;height:52px}
+  .call-controls span svg{width:27px;height:27px}
+  .call-controls button{font-size:13.5px;gap:9px}
+  .script-panel ol{padding:0 34px 5px 48px;font-size:15.5px;line-height:1.75}
+  .script-panel li{padding:9px 4px 10px 6px}
+  .next-tip{font-size:13.5px;padding:13px 16px;margin:14px 22px 20px auto}
+  .right-call-column{gap:24px}
+  .customer-brief{padding:0 22px 20px;gap:16px}
+  .customer-details{padding:17px 22px;gap:12px}
+  .customer-details span{font-size:13.5px}
+  .history{padding:18px 22px}
+  .history strong{font-size:14.5px;gap:9px}
+  .history p{font-size:13.5px;padding:13px;margin:12px 0 0}
+  .result-grid{gap:11px;padding:0 22px 18px}
+  .result-grid button{height:48px;font-size:13.5px;border-radius:9px;gap:9px}
+  .result-grid button svg{width:22px;height:22px}
+  .field-label{padding:0 22px 16px;font-size:13.5px;gap:10px}
+  .field-label svg{width:19px;height:19px}
+  .field-label input{font-size:13.5px;padding:12px;min-height:44px;border-radius:9px}
+  .field-label textarea{font-size:13.5px;padding:12px;height:78px;border-radius:9px}
+  .save-result{width:calc(100% - 44px);margin:4px 22px 22px}
+  .leads-grid,.orders-grid{grid-template-columns:minmax(880px,1fr) 465px;gap:26px}
+  .lead-list-column,.order-list-column{gap:24px}
+  .lead-filters,.order-filters{gap:12px;padding:0 22px 18px}
+  .lead-filters label,.order-filters label{height:48px;padding:0 15px;border-radius:9px}
+  .lead-filters label svg,.order-filters label svg{width:20px;height:20px}
+  .lead-filters input,.order-filters input{font-size:14.5px}
+  .lead-filters button,.order-filters button{font-size:13.5px;padding:0 14px;border-radius:9px}
+  .lead-tabs button,.order-tabs button{height:43px;font-size:13.5px;border-radius:8px}
+  .lead-table-wrap{padding:0 22px}
+  .lead-table th{font-size:12.5px;padding:13px 17px}
+  .lead-table td{font-size:13.5px;padding:13px 17px}
+  .lead-name{gap:12px}
+  .lead-name b{font-size:14.5px}
+  .lead-name small{font-size:12.5px}
+  .tiny-avatar{width:40px;height:40px}
+  .tiny-avatar svg{width:20px;height:20px}
+  .lead-status{font-size:12.5px;min-width:125px;padding:9px 12px;border-radius:7px}
+  .pagination{padding:18px 22px;font-size:13.5px}
+  .pagination button{width:34px;height:34px;font-size:13.5px;border-radius:7px}
+  .timeline{padding:0 22px 20px}
+  .timeline time{font-size:13.5px}
+  .timeline p{font-size:13.5px;padding:14px;border-radius:9px}
+  .appointment-fields{gap:14px;padding:0 22px 18px}
+  .appointment-fields label{font-size:13.5px}
+  .appointment-fields label>span{height:45px;padding:0 13px;border-radius:9px}
+  .appointment-fields label>span svg{width:20px;height:20px}
+  .appointment-fields input{font-size:13.5px}
+  .result-label{font-size:13.5px;margin:0 22px 10px}
+  .order-note{padding:18px 22px;border-radius:13px;gap:16px}
+  .order-note strong{font-size:14.5px}
+  .order-note p{font-size:13.5px}
+  .order-id{padding:0 22px 15px;font-size:28px}
+  .return-order{width:calc(100% - 44px);margin:0 22px 22px;padding:13px;font-size:14px;border-radius:10px}
+  .training-grid{grid-template-columns:minmax(880px,1fr) 510px;gap:26px}
+  .training-search{width:400px;height:50px;border-radius:10px;padding:0 16px}
+  .training-search input{font-size:14.5px}
+  .training-tabs{padding:8px;border-radius:14px;margin-bottom:22px}
+  .training-tabs button{height:48px;font-size:14px;border-radius:9px}
+  .materials-list{gap:18px;padding:0 22px}
+  .material-card{min-height:195px;padding:21px;gap:18px;border-radius:13px}
+  .material-icon{width:100px;height:100px;border-radius:13px}
+  .material-icon svg{width:52px;height:52px}
+  .material-copy h3{font-size:17px}
+  .material-copy p{font-size:13.5px}
+  .material-copy span{font-size:12.5px}
+  .material-copy button{font-size:12.5px;padding:11px 15px;border-radius:8px}
+  .training-tip{padding:18px 22px;border-radius:13px}
+  .training-tip strong{font-size:15.5px}
+  .training-tip ul{font-size:13.5px}
+  .journey-step{padding:16px 20px;gap:14px}
+  .journey-step>b{width:36px;height:36px;font-size:14.5px}
+  .journey-icon{width:45px;height:45px;border-radius:9px}
+  .journey-icon svg{width:25px;height:25px}
+  .journey-step strong{font-size:13.5px}
+  .journey-step small{font-size:12px}
+  .updated-row{margin:0 20px;padding:15px 3px;font-size:13px}
+  .training-help{padding:21px;border-radius:13px;gap:15px}
+  .training-help strong{font-size:14.5px}
+  .training-help span{font-size:12.5px}
+  .training-help button{padding:12px 16px;font-size:12.5px;border-radius:9px}
+  .report-main-grid{grid-template-columns:minmax(840px,1.48fr) minmax(490px,.92fr);gap:26px}
+  .report-filters button,.report-select{height:50px;font-size:13.5px;border-radius:9px}
+  .report-filters button svg,.report-select svg{width:20px;height:20px}
+  .report-filters .apply{padding:0 21px;font-size:14px}
+  .chart-legend{font-size:13.5px;gap:28px}
+  .modern-chart{height:320px}
+  .chart-scale{font-size:12.5px}
+  .bar-group small{font-size:13.5px}
+  .bar-zone b{font-size:12px}
+  .upcoming-days{gap:12px;padding:0 21px 18px}
+  .upcoming-days>div{padding:15px 13px;border-radius:11px}
+  .upcoming-days span{font-size:12.5px}
+  .upcoming-days>div b{font-size:26px}
+  .total-booked{margin:0 21px 15px;padding:16px;font-size:14.5px;border-radius:11px}
+  .total-booked strong{font-size:27px}
+  .upcoming-bottom{gap:12px;padding:0 21px 21px}
+  .upcoming-bottom>div{padding:16px;border-radius:11px}
+  .upcoming-bottom span{font-size:12.5px}
+  .upcoming-bottom b{font-size:20px}
+  .chat-page{height:calc(100vh - var(--topbar-h))}
+  .chat-title{height:94px}
+  .chat-title h1{font-size:32px}
+  .chat-title p{font-size:15px}
+  .chat-layout{height:calc(100% - 94px);grid-template-columns:430px minmax(620px,1fr) 430px;border-radius:16px}
+  .chat-list-head{padding:22px 21px 16px}
+  .chat-list h2,.chat-info h2{font-size:21px}
+  .chat-list-head button{width:38px;height:38px}
+  .chat-search{margin:0 21px 16px;height:46px;border-radius:9px}
+  .chat-search input{font-size:14px}
+  .chat-filter button{padding:12px;font-size:13px}
+  .contact{padding:15px 18px;grid-template-columns:58px 1fr 44px;gap:13px}
+  .contact-avatar{width:54px;height:54px;font-size:15.5px}
+  .contact strong{font-size:14.5px}
+  .contact span{font-size:12.5px}
+  .contact time{font-size:12.5px}
+  .contact time b{width:23px;height:23px;font-size:11px}
+  .chat-room{grid-template-rows:92px 50px 1fr 74px}
+  .chat-room-head{padding:18px 22px;gap:15px}
+  .chat-room-head h2{font-size:19.5px}
+  .chat-room-head p{font-size:13.5px}
+  .chat-room-head button{width:44px;height:44px;border-radius:9px}
+  .pinned-message{font-size:13px;padding:0 22px}
+  .messages{padding:22px}
+  .message{margin:17px 0;gap:14px}
+  .message-avatar{width:48px;height:48px;font-size:14.5px}
+  .message p{font-size:13px}
+  .message span:not(.shared-file span){font-size:14px;padding:14px 17px;line-height:1.52}
+  .shared-file{width:340px;padding:14px;border-radius:11px}
+  .shared-file b{font-size:13px}
+  .shared-file small{font-size:11.5px}
+  .message-input{padding:14px;gap:12px}
+  .message-input input{height:48px;font-size:14px;border-radius:9px;padding:0 15px}
+  .message-input .send-button{height:48px;padding:0 23px;font-size:14px;border-radius:9px}
+  .chat-group-info{padding:0 21px 21px;gap:15px}
+  .chat-group-info strong{font-size:18px}
+  .chat-group-info span{font-size:13px}
+  .chat-info section{padding:22px 21px}
+  .info-heading h3,.chat-info section>h3{font-size:16px}
+  .member{margin:15px 0;gap:13px}
+  .member span{font-size:14px}
+  .member b{font-size:10.5px;padding:7px 10px}
+  .settings-hero{padding:30px 36px;border-radius:17px;gap:25px}
+  .settings-avatar{width:96px;height:96px}
+  .settings-hero h2{font-size:32px}
+  .settings-hero span{font-size:15.5px}
+  .settings-fields{padding:0 25px;gap:16px}
+  .settings-fields label{font-size:14.5px;grid-template-columns:29px 230px minmax(0,1fr);gap:12px}
+  .settings-fields input,.settings-fields select{height:48px;font-size:14px;padding:0 15px;border-radius:9px}
+  .upload-area{margin:0 23px;min-height:245px}
+  .settings-actions{padding:22px 25px 0;gap:13px}
+  .settings-actions button{height:48px;padding:0 20px;font-size:14px;border-radius:9px}
+  footer{height:60px;font-size:13px;padding:0 56px}
+}
+
+/* 6. 4K Ultra HD Viewports (3200px+) ~65-75% scale */
+@media(min-width:3200px){
+  :root{--sidebar-w:400px;--topbar-h:114px}
+  .brand-text{font-size:36px}
+  .brand-mark{width:48px;height:48px;font-size:24px;border-radius:13px}
+  .nav-item{font-size:20px;padding:19px 24px;gap:20px;border-radius:14px}
+  .nav-item svg{width:28px;height:28px}
+  .workspace{font-size:15px;padding:30px 20px 20px}
+  .support-card{padding:20px 16px;border-radius:15px;gap:15px}
+  .support-card strong{font-size:16px}
+  .support-card span{font-size:13.5px}
+  .support-icon{width:48px;height:48px}
+  .topbar{padding:0 68px}
+  .crumb{font-size:17px;gap:15px}
+  .crumb strong{font-size:17px}
+  .date-picker,.subtle-select{font-size:16.5px;padding:16px 20px;border-radius:12px}
+  .date-picker svg,.subtle-select svg{width:24px;height:24px}
+  .avatar{width:54px;height:54px;font-size:16px}
+  .profile{gap:15px;padding-left:36px}
+  .profile strong{font-size:17px}
+  .profile span{font-size:14.5px}
+  .content,.telesale-content,.leads-content,.orders-content,.training-content,.reports-content,.settings-content{padding-top:46px;padding-bottom:56px;padding-left:clamp(52px,3.8vw,90px);padding-right:clamp(52px,3.8vw,90px)}
+  .chat-page{padding-left:clamp(28px,2.8vw,64px);padding-right:clamp(28px,2.8vw,64px)}
+  .page-title{margin-bottom:40px}
+  .page-title h1{font-size:44px}
+  .page-title p{font-size:19px}
+  .help{font-size:17px;gap:12px}
+  .help svg{width:24px;height:24px}
+  .panel{padding:34px;border-radius:18px;margin-top:34px}
+  .panel h2,.call-panel h2{font-size:27px}
+  .eyebrow{font-size:15px}
+  .summary-grid{gap:26px}
+  .summary-card{padding:28px 25px;border-radius:18px;gap:19px}
+  .summary-card p,.call-stat p,.report-metric p{font-size:17px}
+  .summary-card strong{font-size:36px}
+  .call-stat strong{font-size:34px}
+  .report-metric strong{font-size:36px}
+  .summary-card small{font-size:14.5px}
+  .card-icon,.report-icon{width:68px;height:68px;border-radius:15px}
+  .card-icon svg,.report-icon svg{width:36px;height:36px}
+  .metric-grid{border-radius:14px}
+  .metric{padding:26px 22px;gap:18px}
+  .metric-icon{width:54px;height:54px}
+  .metric-icon svg{width:29px;height:29px}
+  .metric span{font-size:15.5px}
+  .metric strong{font-size:26px}
+  th{font-size:15.5px;padding:18px 20px}
+  td{font-size:17px;padding:19px 20px}
+  .closed{min-width:36px;padding:5px 12px;font-size:14.5px;border-radius:9px}
+  .telesale-grid{grid-template-columns:520px minmax(900px,1fr) 540px;gap:32px}
+  .call-stat-grid{gap:24px;margin-bottom:28px}
+  .call-stat{padding:25px;gap:18px}
+  .call-panel{border-radius:18px}
+  .call-panel-heading{padding:26px 26px 20px}
+  .icon-button{width:44px;height:44px;border-radius:10px}
+  .week-control{height:56px;font-size:17px;padding:0 10px;margin:0 26px 20px}
+  .slot-header{font-size:15.5px;padding:14px 12px}
+  .slot-header small{font-size:12.5px}
+  .slot-section{font-size:14px;padding:13px 24px 10px}
+  .slot-row{height:42px;padding:0 12px;font-size:15.5px}
+  .slot-row input{width:20px;height:20px}
+  .slot-row b{font-size:15.5px}
+  .slot-count{min-width:34px;height:28px;font-size:14.5px;border-radius:7px}
+  .auto-dial,.save-result,.contact-button{padding:19px;font-size:18px;border-radius:13px;gap:13px}
+  .center-call-column{gap:28px}
+  .calling-status{font-size:15.5px;gap:10px}
+  .calling-status i{width:11px;height:11px}
+  .line-list{gap:15px;padding:0 26px}
+  .line{font-size:15.5px;padding:15px;border-radius:12px}
+  .line svg{width:22px;height:22px}
+  .line b{font-size:14px}
+  .caller{margin:30px 26px 0;padding:26px;border-radius:16px;gap:22px}
+  .customer-avatar{width:96px;height:96px}
+  .customer-avatar svg{width:56px;height:56px}
+  .customer-avatar.small{width:70px;height:70px}
+  .customer-avatar.small svg{width:40px;height:40px}
+  .caller h3,.customer-brief h3{font-size:26px}
+  .caller p,.customer-brief p{font-size:16px;gap:8px}
+  .caller strong{font-size:26px}
+  .caller-number{margin:16px 52px 0;font-size:18px;gap:12px}
+  .caller-number svg{width:24px;height:24px}
+  .call-controls{gap:36px;padding:32px 26px}
+  .call-controls span{width:62px;height:62px}
+  .call-controls span svg{width:32px;height:32px}
+  .call-controls button{font-size:16px;gap:11px}
+  .script-panel ol{padding:0 40px 6px 56px;font-size:18px;line-height:1.8}
+  .script-panel li{padding:11px 5px 12px 7px}
+  .next-tip{font-size:16px;padding:15px 19px;margin:16px 26px 24px auto}
+  .right-call-column{gap:28px}
+  .customer-brief{padding:0 26px 24px;gap:19px}
+  .customer-details{padding:20px 26px;gap:15px}
+  .customer-details span{font-size:16px}
+  .history{padding:22px 26px}
+  .history strong{font-size:17px;gap:11px}
+  .history p{font-size:16px;padding:16px;margin:14px 0 0}
+  .result-grid{gap:13px;padding:0 26px 22px}
+  .result-grid button{height:56px;font-size:16px;border-radius:11px;gap:11px}
+  .result-grid button svg{width:26px;height:26px}
+  .field-label{padding:0 26px 19px;font-size:16px;gap:12px}
+  .field-label svg{width:22px;height:22px}
+  .field-label input{font-size:16px;padding:14px;min-height:50px;border-radius:11px}
+  .field-label textarea{font-size:16px;padding:14px;height:90px;border-radius:11px}
+  .save-result{width:calc(100% - 52px);margin:4px 26px 26px}
+  .leads-grid,.orders-grid{grid-template-columns:minmax(1050px,1fr) 560px;gap:32px}
+  .lead-list-column,.order-list-column{gap:28px}
+  .lead-filters,.order-filters{gap:14px;padding:0 26px 22px}
+  .lead-filters label,.order-filters label{height:56px;padding:0 18px;border-radius:11px}
+  .lead-filters label svg,.order-filters label svg{width:24px;height:24px}
+  .lead-filters input,.order-filters input{font-size:17px}
+  .lead-filters button,.order-filters button{font-size:16px;padding:0 17px;border-radius:11px}
+  .lead-tabs button,.order-tabs button{height:50px;font-size:16px;border-radius:10px}
+  .lead-table-wrap{padding:0 26px}
+  .lead-table th{font-size:14.5px;padding:15px 20px}
+  .lead-table td{font-size:16px;padding:15px 20px}
+  .lead-name{gap:14px}
+  .lead-name b{font-size:17px}
+  .lead-name small{font-size:14.5px}
+  .tiny-avatar{width:46px;height:46px}
+  .tiny-avatar svg{width:24px;height:24px}
+  .lead-status{font-size:14.5px;min-width:145px;padding:11px 15px;border-radius:8px}
+  .pagination{padding:22px 26px;font-size:16px}
+  .pagination button{width:40px;height:40px;font-size:16px;border-radius:8px}
+  .timeline{padding:0 26px 24px}
+  .timeline time{font-size:16px}
+  .timeline p{font-size:16px;padding:17px;border-radius:11px}
+  .appointment-fields{gap:17px;padding:0 26px 22px}
+  .appointment-fields label{font-size:16px}
+  .appointment-fields label>span{height:52px;padding:0 15px;border-radius:11px}
+  .appointment-fields label>span svg{width:24px;height:24px}
+  .appointment-fields input{font-size:16px}
+  .result-label{font-size:16px;margin:0 26px 12px}
+  .order-note{padding:22px 26px;border-radius:15px;gap:19px}
+  .order-note strong{font-size:17px}
+  .order-note p{font-size:16px}
+  .order-id{padding:0 26px 18px;font-size:34px}
+  .return-order{width:calc(100% - 52px);margin:0 26px 26px;padding:16px;font-size:16.5px;border-radius:12px}
+  .training-grid{grid-template-columns:minmax(1050px,1fr) 600px;gap:32px}
+  .training-search{width:460px;height:58px;border-radius:12px;padding:0 19px}
+  .training-search input{font-size:17px}
+  .training-tabs{padding:10px;border-radius:16px;margin-bottom:26px}
+  .training-tabs button{height:56px;font-size:16.5px;border-radius:11px}
+  .materials-list{gap:22px;padding:0 26px}
+  .material-card{min-height:230px;padding:25px;gap:21px;border-radius:15px}
+  .material-icon{width:116px;height:116px;border-radius:15px}
+  .material-icon svg{width:60px;height:60px}
+  .material-copy h3{font-size:20px}
+  .material-copy p{font-size:16px}
+  .material-copy span{font-size:14.5px}
+  .material-copy button{font-size:14.5px;padding:13px 18px;border-radius:9px}
+  .training-tip{padding:22px 26px;border-radius:15px}
+  .training-tip strong{font-size:18px}
+  .training-tip ul{font-size:16px}
+  .journey-step{padding:19px 24px;gap:17px}
+  .journey-step>b{width:42px;height:42px;font-size:17px}
+  .journey-icon{width:52px;height:52px;border-radius:11px}
+  .journey-icon svg{width:29px;height:29px}
+  .journey-step strong{font-size:16px}
+  .journey-step small{font-size:14px}
+  .updated-row{margin:0 24px;padding:18px 4px;font-size:15.5px}
+  .training-help{padding:25px;border-radius:15px;gap:18px}
+  .training-help strong{font-size:17px}
+  .training-help span{font-size:14.5px}
+  .training-help button{padding:14px 19px;font-size:14.5px;border-radius:11px}
+  .report-main-grid{grid-template-columns:minmax(1000px,1.48fr) minmax(580px,.92fr);gap:32px}
+  .report-filters button,.report-select{height:58px;font-size:16px;border-radius:11px}
+  .report-filters button svg,.report-select svg{width:24px;height:24px}
+  .report-filters .apply{padding:0 25px;font-size:16.5px}
+  .chart-legend{font-size:16px;gap:34px}
+  .modern-chart{height:380px}
+  .chart-scale{font-size:14.5px}
+  .bar-group small{font-size:16px}
+  .bar-zone b{font-size:14.5px}
+  .upcoming-days{gap:15px;padding:0 25px 22px}
+  .upcoming-days>div{padding:18px 15px;border-radius:13px}
+  .upcoming-days span{font-size:14.5px}
+  .upcoming-days>div b{font-size:31px}
+  .total-booked{margin:0 25px 18px;padding:19px;font-size:17px;border-radius:13px}
+  .total-booked strong{font-size:32px}
+  .upcoming-bottom{gap:15px;padding:0 25px 25px}
+  .upcoming-bottom>div{padding:19px;border-radius:13px}
+  .upcoming-bottom span{font-size:14.5px}
+  .upcoming-bottom b{font-size:24px}
+  .chat-page{height:calc(100vh - var(--topbar-h))}
+  .chat-title{height:108px}
+  .chat-title h1{font-size:38px}
+  .chat-title p{font-size:18px}
+  .chat-layout{height:calc(100% - 108px);grid-template-columns:500px minmax(750px,1fr) 500px;border-radius:18px}
+  .chat-list-head{padding:26px 25px 19px}
+  .chat-list h2,.chat-info h2{font-size:25px}
+  .chat-list-head button{width:44px;height:44px}
+  .chat-search{margin:0 25px 19px;height:54px;border-radius:11px}
+  .chat-search input{font-size:16.5px}
+  .chat-filter button{padding:14px;font-size:15.5px}
+  .contact{padding:18px 22px;grid-template-columns:68px 1fr 52px;gap:16px}
+  .contact-avatar{width:64px;height:64px;font-size:18px}
+  .contact strong{font-size:17px}
+  .contact span{font-size:14.5px}
+  .contact time{font-size:14.5px}
+  .contact time b{width:27px;height:27px;font-size:13px}
+  .chat-room{grid-template-rows:106px 58px 1fr 86px}
+  .chat-room-head{padding:22px 26px;gap:18px}
+  .chat-room-head h2{font-size:23px}
+  .chat-room-head p{font-size:16px}
+  .chat-room-head button{width:52px;height:52px;border-radius:11px}
+  .pinned-message{font-size:15.5px;padding:0 26px}
+  .messages{padding:26px}
+  .message{margin:20px 0;gap:17px}
+  .message-avatar{width:56px;height:56px;font-size:17px}
+  .message p{font-size:15.5px}
+  .message span:not(.shared-file span){font-size:16.5px;padding:16px 20px;line-height:1.56}
+  .shared-file{width:400px;padding:17px;border-radius:13px}
+  .shared-file b{font-size:15.5px}
+  .shared-file small{font-size:13.5px}
+  .message-input{padding:17px;gap:14px}
+  .message-input input{height:56px;font-size:16.5px;border-radius:11px;padding:0 18px}
+  .message-input .send-button{height:56px;padding:0 27px;font-size:16.5px;border-radius:11px}
+  .chat-group-info{padding:0 25px 25px;gap:18px}
+  .chat-group-info strong{font-size:21px}
+  .chat-group-info span{font-size:15.5px}
+  .chat-info section{padding:26px 25px}
+  .info-heading h3,.chat-info section>h3{font-size:19px}
+  .member{margin:18px 0;gap:16px}
+  .member span{font-size:16.5px}
+  .member b{font-size:12.5px;padding:8px 12px}
+  .settings-hero{padding:36px 44px;border-radius:20px;gap:30px}
+  .settings-avatar{width:112px;height:112px}
+  .settings-hero h2{font-size:38px}
+  .settings-hero span{font-size:18px}
+  .settings-fields{padding:0 30px;gap:19px}
+  .settings-fields label{font-size:17px;grid-template-columns:34px 270px minmax(0,1fr);gap:15px}
+  .settings-fields input,.settings-fields select{height:56px;font-size:16.5px;padding:0 18px;border-radius:11px}
+  .upload-area{margin:0 28px;min-height:285px}
+  .settings-actions{padding:26px 30px 0;gap:15px}
+  .settings-actions button{height:56px;padding:0 24px;font-size:16.5px;border-radius:11px}
+  footer{height:70px;font-size:15.5px;padding:0 68px}
+}
+
