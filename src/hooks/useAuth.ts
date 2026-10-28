@@ -4,6 +4,19 @@ import { useAuthStore } from '../store/useAuthStore'
 import { notify } from '../utils/notify'
 
 export const USER_INFO_QUERY_KEY = ['user_info']
+export const USER_LISTS_QUERY_KEY = ['user_lists']
+
+export function useUserLists(params?: {
+  phong_ban?: number
+  bo_phan?: number
+  branch_id?: number
+}) {
+  return useQuery({
+    queryKey: [...USER_LISTS_QUERY_KEY, params?.phong_ban, params?.bo_phan, params?.branch_id],
+    queryFn: () => authService.getUserLists(params),
+    staleTime: 1000 * 60 * 10,
+  })
+}
 
 export function useAuth() {
   const queryClient = useQueryClient()

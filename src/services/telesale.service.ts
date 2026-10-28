@@ -1,5 +1,8 @@
 import { API_ENDPOINTS } from '../constants/apiEndpoints'
 import {
+  ApiPaginatedResult,
+  AttendanceDto,
+  CallLogDto,
   CampaignsResponse,
   DailyResultDto,
   DialCallResponse,
@@ -19,6 +22,22 @@ export interface GetNextCustomerPayload {
 export interface DialCallPayload {
   customer_id: number
   member_id?: number
+}
+
+export interface CallLogsPayload {
+  from_date?: string
+  to_date?: string
+  start?: number
+  length?: number
+  user_id?: number
+}
+
+export interface AttendancePayload {
+  from_date?: string
+  to_date?: string
+  start?: number
+  length?: number
+  user_id?: number
 }
 
 export const telesaleService = {
@@ -98,6 +117,61 @@ export const telesaleService = {
       return result[0] || null
     }
     return result || null
+  },
+
+  /**
+   * Lấy danh sách hiệu suất theo khoảng thời gian hoặc theo danh sách nhân viên (API 10b)
+   */
+  async getDailyResultsList(payload?: {
+    from_date?: string
+    to_date?: string
+  }): Promise<DailyResultDto[]> {
+    const response = await apiClient.post<any, { result: DailyResultDto[] | DailyResultDto }>(
+      API_ENDPOINTS.DAILY_RESULTS,
+      payload || {},
+    )
+
+    const result = response.result || response
+    if (Array.isArray(result)) {
+      return result
+    }
+    return result ? [result] : []
+  },
+
+  /**
+   * Lấy lịch sử cuộc gọi telesale (API 10a: POST /api/telesale/call-logs)
+   */
+  async getCallLogs(payload?: CallLogsPayload): Promise<ApiPaginatedResult<CallLogDto>> {
+    const response = await apiClient.post<any, any>(
+      API_ENDPOINTS.CALL_LOGS,
+      payload || { start: 0, length: 50 },
+    )
+    const result = response.result || response || {}
+    if (Array.isArray(result)) {
+      return { items: result, total: result.length }
+    }
+    return {
+      items: result.items || [],
+      total: result.total ?? (result.items?.length || 0),
+    }
+  },
+
+  /**
+   * Lấy dữ liệu chấm công nhân sự (API 09: POST /api/telesale/attendance)
+   */
+  async getAttendance(payload?: AttendancePayload): Promise<ApiPaginatedResult<AttendanceDto>> {
+    const response = await apiClient.post<any, any>(
+      API_ENDPOINTS.ATTENDANCE,
+      payload || { start: 0, length: 50 },
+    )
+    const result = response.result || response || {}
+    if (Array.isArray(result)) {
+      return { items: result, total: result.length }
+    }
+    return {
+      items: result.items || [],
+      total: result.total ?? (result.items?.length || 0),
+    }
   },
 }
 

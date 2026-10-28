@@ -301,13 +301,8 @@ export const Telesale: React.FC = () => {
     }
   }
 
-  // Danh mục dịch vụ mặc định từ Enums
-  const serviceOptions = enums?.services || [
-    { code: 'thay_loi_123', label: 'Thay lõi 1, 2, 3', price: 250000 },
-    { code: 'thay_loi_ro', label: 'Thay màng RO', price: 450000 },
-    { code: 'bao_duong_toan_dien', label: 'Bảo dưỡng toàn diện', price: 150000 },
-    { code: 'kiem_tra_may', label: 'Kiểm tra máy & đo TDS', price: 0 },
-  ]
+  // Danh mục dịch vụ thực tế từ API (GET /api/telesale/enums)
+  const serviceOptions = enums?.services || []
 
   return (
     <div className="content telesale-content">

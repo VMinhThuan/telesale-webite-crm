@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Building2,
   Camera,
@@ -13,6 +13,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { notify } from '../../utils/notify'
+import { useAuth } from '../../hooks/useAuth'
 
 interface FileUploadState {
   name: string
@@ -22,13 +23,24 @@ interface FileUploadState {
 type PhotoAngle = 'front' | 'left' | 'right'
 
 export const SettingsPage: React.FC = () => {
+  const { user, updateInfoMutation } = useAuth()
   const [form, setForm] = useState({
-    phone: '0901 234 567',
-    bank: 'Vietcombank',
-    account: '1028 6688 9999',
-    holder: 'NGUYEN VAN A',
+    phone: user?.username || '',
+    bank: '',
+    account: '',
+    holder: user?.name || '',
   })
   const [savedForm, setSavedForm] = useState(form)
+
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        phone: prev.phone || user.username || '',
+        holder: prev.holder || user.name || '',
+      }))
+    }
+  }, [user])
   const [files, setFiles] = useState<{
     qr: FileUploadState | null
     front: FileUploadState | null
@@ -58,9 +70,19 @@ export const SettingsPage: React.FC = () => {
     notify('Đã hủy các thay đổi')
   }
 
-  const handleSave = () => {
-    setSavedForm(form)
-    notify('Đã lưu thông tin tài khoản và định danh KYC')
+  const handleSave = async () => {
+    const formData = new FormData()
+    if (form.phone) formData.append('contact_number', form.phone)
+    if (form.bank) formData.append('bank_name', form.bank)
+    if (form.account) formData.append('bank_account_number', form.account)
+    if (form.holder) formData.append('bank_account_name', form.holder)
+    try {
+      await updateInfoMutation.mutateAsync(formData)
+      setSavedForm(form)
+      notify('Đã lưu thông tin tài khoản và định danh KYC lên')
+    } catch {
+      // notify đã được xử lý trong hook
+    }
   }
 
   const photoCards: [PhotoAngle, string][] = [
@@ -99,9 +121,9 @@ export const SettingsPage: React.FC = () => {
         </div>
         <div>
           <p className="eyebrow">TÀI KHOẢN CỦA TÔI</p>
-          <h2>Hồ sơ cá nhân</h2>
+          <h2>{user?.name || user?.username || 'Hồ sơ cá nhân'}</h2>
           <span>
-            <UserCheck size={15} /> Nhân viên telesale
+            <UserCheck size={15} /> {user?.role || 'Nhân viên'} · {user?.department || 'Telesale'}
           </span>
         </div>
         <div className="settings-status">

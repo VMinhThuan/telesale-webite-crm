@@ -78,6 +78,34 @@ export const setStoredToken = (token: string | null): void => {
 }
 
 /**
+ * Lấy thông tin user đã lưu
+ */
+export const getStoredUser = (): any | null => {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (err) {
+    console.error('Không thể đọc user từ localStorage:', err)
+    return null
+  }
+}
+
+/**
+ * Lưu thông tin user vào localStorage
+ */
+export const setStoredUser = (user: any | null): void => {
+  try {
+    if (user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(user))
+    } else {
+      localStorage.removeItem(USER_KEY)
+    }
+  } catch (err) {
+    console.error('Không thể lưu user vào localStorage:', err)
+  }
+}
+
+/**
  * Xóa token và phiên làm việc
  */
 export const clearStoredAuth = (): void => {

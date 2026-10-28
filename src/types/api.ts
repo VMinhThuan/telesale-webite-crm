@@ -297,6 +297,10 @@ export interface DailyResultDto {
   tong_don_tra_ve: number
   tong_don_da_xac_nhan: number
   tong_tg_dam_thoai: number // tính theo phút
+  tong_kh_tiem_nang?: number
+  doanh_so?: number
+  date?: string
+  ngay?: string
 }
 
 // 7. Thông báo hệ thống (API 06 & 07)

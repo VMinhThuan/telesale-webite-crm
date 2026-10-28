@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import { clearStoredAuth, getStoredToken, setStoredToken } from '../services/apiClient'
+import {
+  clearStoredAuth,
+  getStoredToken,
+  getStoredUser,
+  setStoredToken,
+  setStoredUser,
+} from '../services/apiClient'
 
 export interface UserProfile {
   id: number | string
@@ -31,17 +37,17 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: getStoredToken(),
-  user: {
-    id: 1,
-    name: 'Nguyễn Văn A',
-    username: 'nguyenvana',
-    role: 'Telesale',
-    department: 'Phòng Telesale',
-  },
+  user: getStoredUser(),
   isAuthenticated: Boolean(getStoredToken()),
 
   login: (token, user) => {
+    if (!token) {
+      clearStoredAuth()
+      set({ token: null, user: null, isAuthenticated: false })
+      return
+    }
     setStoredToken(token)
+    setStoredUser(user)
     set({ token, user, isAuthenticated: true })
   },
 
@@ -51,7 +57,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   updateUser: (partial) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, ...partial } : null,
-    })),
+  set((state) => {
+  const updated = state.user ? { ...state.user, ...partial } : null
+  setStoredUser(updated)
+  return { user: updated }
+}),
 }))

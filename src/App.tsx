@@ -10,7 +10,7 @@ import {
 import { Dialog } from '@/components/common/Dialog'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { FloatingCallWidget } from '@/components/common/FloatingCallWidget'
-import { LoginModal } from '@/components/common/LoginModal'
+import { ProtectedRoute } from '@/components/common/ProtectedRoute'
 import { Sidebar } from '@/components/common/Sidebar'
 import { Toast } from '@/components/common/Toast'
 import { Topbar } from '@/components/common/Topbar'
@@ -19,6 +19,9 @@ import { useEnums } from '@/hooks/useEnums'
 import { DialogState, PageType, PeriodType } from '@/types'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
+const LoginPage = lazy(() =>
+  import('@/pages/Login').then((m) => ({ default: m.LoginPage })),
+)
 const Dashboard = lazy(() =>
   import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })),
 )
@@ -52,8 +55,6 @@ const AppShell: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   const [toast, setToast] = useState('')
   const [dialog, setDialog] = useState<DialogState | null>(null)
-  const [loginOpen, setLoginOpen] = useState(false)
-  const [sessionExpired, setSessionExpired] = useState(false)
   const [period, setPeriod] = useState<PeriodType>('Tháng 09/2025')
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
@@ -71,8 +72,9 @@ const AppShell: React.FC = () => {
     const onUnauthorized = (event: Event) => {
       const customEvent = event as CustomEvent<{ message: string }>
       setToast(customEvent.detail?.message || 'Phiên làm việc hết hạn.')
-      setSessionExpired(true)
-      setLoginOpen(true)
+      const current = location.pathname + location.search
+      const redirectParam = current !== '/' ? `&redirect=${encodeURIComponent(current)}` : ''
+      navigate(`/login?session_expired=true${redirectParam}`, { replace: true })
     }
 
     window.addEventListener('salesflow:toast', onToast)
@@ -83,7 +85,7 @@ const AppShell: React.FC = () => {
       window.removeEventListener('salesflow:unauthorized', onUnauthorized)
       window.clearTimeout(timeoutId)
     }
-  }, [])
+  }, [location.pathname, location.search, navigate])
 
   // Xác định tiêu đề trang dựa trên đường dẫn URL hiện tại
   const getPageTitle = (pathname: string): string => {
@@ -127,10 +129,7 @@ const AppShell: React.FC = () => {
           setPeriod={setPeriod}
           setPage={handleNavigatePage}
           openSidebar={() => setOpen(true)}
-          onOpenLogin={() => {
-            setSessionExpired(false)
-            setLoginOpen(true)
-          }}
+          onOpenLogin={() => navigate('/login')}
         />
 
         {/* Tầng ErrorBoundary cấp Page (tự động reset khi chuyển route qua resetKeys) */}
@@ -178,11 +177,6 @@ const AppShell: React.FC = () => {
       {/* Thông báo và Hộp thoại toàn cục */}
       <Toast message={toast} />
       <Dialog dialog={dialog} onClose={() => setDialog(null)} />
-      <LoginModal
-        isOpen={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        isSessionExpired={sessionExpired}
-      />
     </div>
   )
 }
@@ -190,9 +184,39 @@ const AppShell: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      {/* Tầng ErrorBoundary cấp Layout bao bọc toàn bộ AppShell */}
+      {/* Tầng ErrorBoundary cấp Layout bao bọc toàn bộ ứng dụng */}
       <ErrorBoundary level="layout">
-        <AppShell />
+        <Suspense
+          fallback={
+            <div
+              style={{
+                display: 'grid',
+                placeItems: 'center',
+                height: '100vh',
+                background: '#f8fafc',
+              }}
+            >
+              <div style={{ padding: '28px 34px', width: '100%', maxWidth: '800px' }}>
+                <TableSkeleton rows={8} cols={4} />
+              </div>
+            </div>
+          }
+        >
+          <Routes>
+            {/* Tuyến đường công khai: Trang đăng nhập toàn màn hình */}
+            <Route path="/login" element={<LoginPage />} />
+
+            {/* Toàn bộ tuyến đường nghiệp vụ nội bộ: Bảo vệ bởi Route Guard */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <AppShell />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
     </BrowserRouter>
   )

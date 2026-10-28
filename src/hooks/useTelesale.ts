@@ -9,6 +9,9 @@ import { notify } from '../utils/notify'
 
 export const CAMPAIGNS_QUERY_KEY = ['telesale_campaigns']
 export const DAILY_RESULTS_QUERY_KEY = ['telesale_daily_results']
+export const DAILY_RESULTS_LIST_QUERY_KEY = ['telesale_daily_results_list']
+export const CALL_LOGS_QUERY_KEY = ['telesale_call_logs']
+export const ATTENDANCE_QUERY_KEY = ['telesale_attendance']
 
 /**
  * Hook truy vấn danh sách chiến dịch đang hoạt động
@@ -29,6 +32,65 @@ export function useDailyResults(date?: string) {
     queryKey: [...DAILY_RESULTS_QUERY_KEY, date],
     queryFn: () => telesaleService.getDailyResults(date),
     staleTime: 1000 * 60 * 2, // 2 phút
+  })
+}
+
+/**
+ * Hook truy vấn danh sách hiệu suất telesale theo khoảng thời gian
+ */
+export function useDailyResultsList(payload?: { from_date?: string; to_date?: string }) {
+  return useQuery({
+    queryKey: [...DAILY_RESULTS_LIST_QUERY_KEY, payload?.from_date, payload?.to_date],
+    queryFn: () => telesaleService.getDailyResultsList(payload),
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+/**
+ * Hook truy vấn lịch sử cuộc gọi telesale (API 10a)
+ */
+export function useCallLogs(payload?: {
+  from_date?: string
+  to_date?: string
+  start?: number
+  length?: number
+  user_id?: number
+}) {
+  return useQuery({
+    queryKey: [
+      ...CALL_LOGS_QUERY_KEY,
+      payload?.from_date,
+      payload?.to_date,
+      payload?.start,
+      payload?.length,
+      payload?.user_id,
+    ],
+    queryFn: () => telesaleService.getCallLogs(payload),
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+/**
+ * Hook truy vấn chấm công nhân viên (API 09)
+ */
+export function useAttendance(payload?: {
+  from_date?: string
+  to_date?: string
+  start?: number
+  length?: number
+  user_id?: number
+}) {
+  return useQuery({
+    queryKey: [
+      ...ATTENDANCE_QUERY_KEY,
+      payload?.from_date,
+      payload?.to_date,
+      payload?.start,
+      payload?.length,
+      payload?.user_id,
+    ],
+    queryFn: () => telesaleService.getAttendance(payload),
+    staleTime: 1000 * 60 * 5,
   })
 }
 

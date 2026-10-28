@@ -42,7 +42,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   setPeriod,
   setPage,
   openSidebar,
-  onOpenLogin,
+  onOpenLogin: _onOpenLogin,
 }) => {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -109,7 +109,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   const handleLogout = async () => {
     setProfileOpen(false)
     await logout()
-    if (onOpenLogin) onOpenLogin()
+    navigate('/login')
   }
 
   // 4. Lọc thông báo theo Tab (Tất cả / Chưa đọc)
@@ -120,7 +120,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     return notifications
   }, [notifications, notificationTab])
 
-  // Lấy 2 chữ cái đầu của tên hiển thị
+  // Lấy 2 chữ cái đầu của tên hiển thị từ tài khoản đăng nhập thật
   const initials = user?.name
     ? user.name
       .split(' ')
@@ -128,7 +128,9 @@ export const Topbar: React.FC<TopbarProps> = ({
       .slice(-2)
       .join('')
       .toUpperCase()
-    : 'NA'
+    : user?.username
+      ? user.username.slice(0, 2).toUpperCase()
+      : 'U'
 
   // Icon phù hợp theo loại thông báo
   const renderNotificationIcon = (type?: AppNotification['type']) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   BarChart3,
   CalendarDays,
@@ -13,31 +13,40 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
-import { StaffPerformance } from '../../types'
+import dayjs from '../../lib/dayjs'
+import { useUserLists } from '../../hooks/useAuth'
+import { useDailyResultsList } from '../../hooks/useTelesale'
+import { useOrdersList } from '../../hooks/useOrders'
 import { notify } from '../../utils/notify'
+import { formatVND } from '../../utils/formatters'
 
-interface ReportPeriodItem {
+interface PeriodOption {
   label: string
-  multiplier: number
+  getFromDate: () => string
+  getToDate: () => string
   days: number
-  chart: string[]
 }
 
-const reportPeriods: ReportPeriodItem[] = [
-  { label: '01/10/2026 — 04/10/2026', multiplier: 1, days: 4, chart: ['01/10', '02/10', '03/10', '04/10'] },
-  { label: '05/10/2026 — 11/10/2026', multiplier: 0.84, days: 7, chart: ['05/10', '06/10', '07/10', '08/10', '09/10', '10/10', '11/10'] },
-  { label: 'Tháng 09/2026', multiplier: 5.2, days: 30, chart: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'] },
+const PERIOD_OPTIONS: PeriodOption[] = [
+  {
+    label: 'Hôm nay',
+    getFromDate: () => dayjs().format('YYYY-MM-DD'),
+    getToDate: () => dayjs().format('YYYY-MM-DD'),
+    days: 1,
+  },
+  {
+    label: '7 ngày gần nhất',
+    getFromDate: () => dayjs().subtract(6, 'day').format('YYYY-MM-DD'),
+    getToDate: () => dayjs().format('YYYY-MM-DD'),
+    days: 7,
+  },
+  {
+    label: 'Tháng này',
+    getFromDate: () => dayjs().startOf('month').format('YYYY-MM-DD'),
+    getToDate: () => dayjs().format('YYYY-MM-DD'),
+    days: dayjs().date(),
+  },
 ]
-
-const reportStaff: StaffPerformance[] = [
-  { name: 'Nguyễn Văn A', hours: 24, calls: 300, connected: 150, leads: 75, closed: 30, returned: 2, commission: 2750000 },
-  { name: 'Trần Thị Lan', hours: 24, calls: 280, connected: 140, leads: 70, closed: 28, returned: 1, commission: 2500000 },
-  { name: 'Lê Văn Hùng', hours: 24, calls: 280, connected: 130, leads: 65, closed: 22, returned: 2, commission: 2000000 },
-]
-
-const reportEmployeeOptions = ['Tất cả nhân viên', ...reportStaff.map((p) => p.name)]
-const formatMoney = (val: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(val))}đ`
-const asNumber = (val: number, mult: number) => Math.round(val * mult)
 
 interface ChartPointData {
   day: string
@@ -45,64 +54,9 @@ interface ChartPointData {
   orders: number
 }
 
-function buildReportData(periodName: string, employee: string) {
-  const period = reportPeriods.find((item) => item.label === periodName) || reportPeriods[0]
-  const people = employee === 'Tất cả nhân viên' ? reportStaff : reportStaff.filter((p) => p.name === employee)
-  const scale = period.multiplier
-
-  const totals = people.reduce(
-    (sum, person) => ({
-      hours: sum.hours + asNumber(person.hours, scale),
-      calls: sum.calls + asNumber(person.calls, scale),
-      connected: sum.connected + asNumber(person.connected, scale),
-      leads: sum.leads + asNumber(person.leads, scale),
-      closed: sum.closed + asNumber(person.closed, scale),
-      returned: sum.returned + asNumber(person.returned, scale),
-      commission: sum.commission + Math.round(person.commission * scale),
-    }),
-    { hours: 0, calls: 0, connected: 0, leads: 0, closed: 0, returned: 0, commission: 0 },
-  )
-
-  const totalAllCalls = reportStaff.reduce((sum, p) => sum + p.calls, 0)
-  const ratio = people.reduce((sum, p) => sum + p.calls, 0) / (totalAllCalls || 1)
-  const baseCalls =
-    period.chart.length === 4
-      ? [200, 220, 210, 230]
-      : period.chart.length === 7
-      ? [118, 132, 125, 143, 137, 149, 156]
-      : [1740, 1920, 1810, 2005]
-
-  const baseOrders =
-    period.chart.length === 4
-      ? [18, 20, 19, 23]
-      : period.chart.length === 7
-      ? [11, 13, 12, 14, 13, 16, 17]
-      : [158, 176, 166, 190]
-
-  const chart: ChartPointData[] = period.chart.map((day, index) => ({
-    day,
-    calls: Math.max(1, Math.round(baseCalls[index] * scale * ratio)),
-    orders: Math.max(0, Math.round(baseOrders[index] * scale * ratio)),
-  }))
-
-  const appointments = [8, 9, 7].map((amount, index) =>
-    Math.max(0, Math.round(amount * scale * ratio + (index === 1 ? 0.2 : 0))),
-  )
-
-  return {
-    period,
-    people,
-    totals,
-    chart,
-    appointments,
-    care: Math.max(1, Math.round(12 * scale * ratio)),
-    consulting: Math.max(1, Math.round(18 * scale * ratio)),
-  }
-}
-
 function ReportChart({ values }: { values: ChartPointData[] }) {
-  const maxCalls = Math.max(50, Math.ceil(Math.max(...values.map((item) => item.calls)) / 50) * 50)
-  const maxOrders = Math.max(1, Math.max(...values.map((item) => item.orders)))
+  const maxCalls = Math.max(10, Math.ceil(Math.max(1, ...values.map((item) => item.calls)) / 10) * 10)
+  const maxOrders = Math.max(1, Math.max(1, ...values.map((item) => item.orders)))
   const scaleLabels = Array.from({ length: 6 }, (_, index) =>
     Math.round(maxCalls - (maxCalls / 5) * index),
   )
@@ -131,7 +85,7 @@ function ReportChart({ values }: { values: ChartPointData[] }) {
         </div>
         <div
           className="bar-groups"
-          style={{ gridTemplateColumns: `repeat(${values.length}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, values.length)}, 1fr)` }}
         >
           {values.map((item) => (
             <div className="bar-group" key={item.day}>
@@ -139,14 +93,14 @@ function ReportChart({ values }: { values: ChartPointData[] }) {
                 <span
                   className="call-bar"
                   title={`${item.calls} cuộc gọi`}
-                  style={{ height: `${(item.calls / maxCalls) * 100}%` }}
+                  style={{ height: `${Math.min(100, (item.calls / maxCalls) * 100)}%` }}
                 >
                   <b>{item.calls}</b>
                 </span>
                 <span
                   className="order-bar"
                   title={`${item.orders} đơn chốt`}
-                  style={{ height: `${(item.orders / maxOrders) * 100}%` }}
+                  style={{ height: `${Math.min(100, (item.orders / maxOrders) * 100)}%` }}
                 >
                   <b>{item.orders}</b>
                 </span>
@@ -156,17 +110,101 @@ function ReportChart({ values }: { values: ChartPointData[] }) {
           ))}
         </div>
       </div>
-      <p className="chart-footnote">Dữ liệu được cập nhật theo bộ lọc đang chọn.</p>
+      <p className="chart-footnote">Dữ liệu thời gian thực theo khoảng thời gian đang chọn.</p>
     </section>
   )
 }
 
 export const Reports: React.FC = () => {
-  const [period, setPeriod] = useState(reportPeriods[0].label)
-  const [employee, setEmployee] = useState('Tất cả nhân viên')
+  const [selectedPeriodIndex, setSelectedPeriodIndex] = useState(1) // 7 ngày gần nhất
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
 
-  const data = buildReportData(period, employee)
-  const { totals } = data
+  const currentPeriod = PERIOD_OPTIONS[selectedPeriodIndex] || PERIOD_OPTIONS[1]
+  const fromDate = currentPeriod.getFromDate()
+  const toDate = currentPeriod.getToDate()
+
+  // 1. Tải danh sách nhân sự Telesale
+  const { data: userListsData } = useUserLists({ phong_ban: 19 })
+  const employeeList = useMemo(() => {
+    if (!userListsData) return []
+    if (Array.isArray(userListsData)) return userListsData
+    return userListsData.items || []
+  }, [userListsData])
+
+  // 2. Tải dữ liệu hiệu suất đàm thoại
+  const { data: dailyResults = [], isLoading: isLoadingDaily } = useDailyResultsList({
+    from_date: fromDate,
+    to_date: toDate,
+  })
+
+  // 3. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn
+  const upcomingStartDate = dayjs().format('YYYY-MM-DD')
+  const upcomingEndDate = dayjs().add(2, 'day').format('YYYY-MM-DD')
+  const { data: upcomingOrdersData } = useOrdersList({
+    from_date: upcomingStartDate,
+    to_date: upcomingEndDate,
+    page_size: 100,
+  })
+
+  // Lọc dữ liệu theo nhân viên nếu chọn cụ thể
+  const filteredResults = useMemo(() => {
+    if (selectedEmployeeId === 'all') return dailyResults
+    return dailyResults.filter((r) => String(r.user_id) === selectedEmployeeId)
+  }, [dailyResults, selectedEmployeeId])
+
+  // Tính tổng các chỉ số từ dữ liệu thật
+  const totals = useMemo(() => {
+    return filteredResults.reduce(
+      (acc, cur) => ({
+        hours: acc.hours + Math.round((cur.tong_tg_dam_thoai || 0) / 60),
+        calls: acc.calls + (cur.tong_total_call || 0),
+        connected: acc.connected + (cur.tong_call_answer || 0),
+        leads: acc.leads + (cur.tong_giu_lai_cs || 0) + (cur.tong_hen_goi_lai || 0),
+        closed: acc.closed + (cur.tong_da_chot || 0),
+        returned: acc.returned + (cur.tong_don_tra_ve || 0),
+        commission: acc.commission + (cur.tong_da_chot || 0) * 150000,
+      }),
+      { hours: 0, calls: 0, connected: 0, leads: 0, closed: 0, returned: 0, commission: 0 },
+    )
+  }, [filteredResults])
+
+  // Biểu đồ xu hướng cuộc gọi & đơn chốt theo từng ngày trong kỳ
+  const chartData: ChartPointData[] = useMemo(() => {
+    const daysCount = currentPeriod.days
+    const start = dayjs(fromDate)
+    const points: ChartPointData[] = []
+
+    for (let i = 0; i < Math.min(daysCount, 7); i++) {
+      const dayStr = start.add(i, 'day').format('DD/MM')
+      const targetDate = start.add(i, 'day').format('YYYY-MM-DD')
+
+      const dayMatches = filteredResults.filter(
+        (r) => (r as any).date === targetDate || (r as any).ngay === targetDate,
+      )
+
+      const calls = dayMatches.reduce((sum, r) => sum + (r.tong_total_call || 0), 0)
+      const orders = dayMatches.reduce((sum, r) => sum + (r.tong_da_chot || 0), 0)
+
+      points.push({ day: dayStr, calls, orders })
+    }
+
+    return points
+  }, [currentPeriod, fromDate, filteredResults])
+
+  // Thống kê lịch hẹn 3 ngày tới từ danh sách đơn hàng thật
+  const upcomingAppointments = useMemo(() => {
+    const orders = upcomingOrdersData?.items || []
+    const days = [0, 1, 2].map((offset) => {
+      const d = dayjs().add(offset, 'day')
+      const dateStr = d.format('YYYY-MM-DD')
+      const count = orders.filter((o) => o.ngay_hen_khach === dateStr).length
+      return {
+        label: `${offset === 0 ? 'Hôm nay' : offset === 1 ? 'Ngày mai' : d.format('DD/MM')} · ${d.format('DD/MM')}`,
+        count,
+      }
+    })
+    return days
+  }, [upcomingOrdersData])
 
   const metrics = [
     { label: 'Thời gian làm việc', value: `${totals.hours} giờ`, icon: Clock3, tone: 'blue' },
@@ -177,27 +215,21 @@ export const Reports: React.FC = () => {
     { label: 'Đơn trả về', value: String(totals.returned), icon: Undo2, tone: 'rose' },
     {
       label: 'Số đơn trung bình/ngày',
-      value: String(Math.max(0, Math.round(totals.closed / data.period.days))),
+      value: String(Math.round(totals.closed / Math.max(1, currentPeriod.days))),
       icon: BarChart3,
       tone: 'blue',
     },
-    { label: 'Tổng hoa hồng', value: formatMoney(totals.commission), icon: Coins, tone: 'amber' },
+    { label: 'Tổng hoa hồng', value: formatVND(totals.commission), icon: Coins, tone: 'amber' },
   ]
-
-  const appointmentDays = ['T2 · 05/10', 'T3 · 06/10', 'T4 · 07/10']
 
   const handleExportCSV = () => {
     const csvContent =
       'Nhân viên,Cuộc gọi,Kết nối,Đã chốt,Hoa hồng\n' +
-      data.people
+      filteredResults
         .map(
           (p) =>
-            `${p.name},${asNumber(p.calls, data.period.multiplier)},${asNumber(
-              p.connected,
-              data.period.multiplier,
-            )},${asNumber(p.closed, data.period.multiplier)},${Math.round(
-              p.commission * data.period.multiplier,
-            )}`,
+            `${p.user_name || 'Nhân viên'},${p.tong_total_call || 0},${p.tong_call_answer || 0},${p.tong_da_chot || 0
+            },${(p.tong_da_chot || 0) * 150000}`,
         )
         .join('\n')
 
@@ -211,6 +243,12 @@ export const Reports: React.FC = () => {
     notify('Đã tải xuống file báo cáo CSV')
   }
 
+  const selectedEmployeeName = useMemo(() => {
+    if (selectedEmployeeId === 'all') return 'Tất cả nhân viên'
+    const found = employeeList.find((e: any) => String(e.id || e.user_id) === selectedEmployeeId)
+    return found ? found.name || found.user_name || found.username : 'Nhân viên'
+  }, [selectedEmployeeId, employeeList])
+
   return (
     <div className="content reports-content">
       <div className="page-title report-title">
@@ -222,32 +260,45 @@ export const Reports: React.FC = () => {
           <label className="report-select">
             <CalendarDays size={16} />
             <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
+              value={selectedPeriodIndex}
+              onChange={(e) => setSelectedPeriodIndex(Number(e.target.value))}
               aria-label="Chọn khoảng thời gian"
             >
-              {reportPeriods.map((item) => (
-                <option key={item.label}>{item.label}</option>
-              ))}
+              {
+                PERIOD_OPTIONS.map((item, index) => (
+                  <option key={item.label} value={index}>
+                    {item.label}
+                  </option>
+                ))
+              }
             </select>
           </label>
           <label className="report-select">
             <Users size={16} />
             <select
-              value={employee}
-              onChange={(e) => setEmployee(e.target.value)}
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
               aria-label="Chọn nhân viên"
             >
-              {reportEmployeeOptions.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
+              <option value="all">Tất cả nhân viên</option>
+              {employeeList.map((emp: any) => {
+                const id = emp.id || emp.user_id
+                const name = emp.name || emp.user_name || emp.username || `NV #${id}`
+                return (
+                  <option key={id} value={String(id)}>
+                    {name}
+                  </option>
+                )
+              })}
             </select>
             <ChevronDown size={14} />
           </label>
           <button
             className="apply"
             type="button"
-            onClick={() => notify(`Đã áp dụng báo cáo: ${employee} · ${period}`)}
+            onClick={() =>
+              notify(`Đã cập nhật báo cáo: ${selectedEmployeeName} · ${currentPeriod.label}`)
+            }
           >
             Áp dụng
           </button>
@@ -255,7 +306,7 @@ export const Reports: React.FC = () => {
       </div>
 
       <section className="report-filter-note">
-        <Info size={14} /> Đang xem: <b>{employee}</b> · <span>{period}</span>
+        <Info size={14} /> Đang xem: <b>{selectedEmployeeName}</b> · <span>{currentPeriod.label}</span>
       </section>
 
       <section className="report-metrics">
@@ -273,7 +324,7 @@ export const Reports: React.FC = () => {
       </section>
 
       <div className="report-main-grid">
-        <ReportChart values={data.chart} />
+        <ReportChart values={chartData} />
 
         <section className="call-panel upcoming">
           <div className="call-panel-heading">
@@ -283,30 +334,30 @@ export const Reports: React.FC = () => {
             </div>
           </div>
           <div className="upcoming-days">
-            {appointmentDays.map((day, index) => (
-              <div className={['blue', 'green', 'amber'][index]} key={day}>
+            {upcomingAppointments.map((item, index) => (
+              <div className={['blue', 'green', 'amber'][index % 3]} key={item.label}>
                 <CalendarDays size={17} />
-                <span>{day}</span>
-                <b>{data.appointments[index]} đơn</b>
+                <span>{item.label}</span>
+                <b>{item.count} đơn</b>
               </div>
             ))}
           </div>
           <div className="total-booked">
             <CalendarDays size={21} />
             <span>Tổng đơn đã hẹn:</span>
-            <strong>{data.appointments.reduce((sum, val) => sum + val, 0)}</strong>
+            <strong>{upcomingAppointments.reduce((sum, val) => sum + val.count, 0)}</strong>
           </div>
           <div className="upcoming-bottom">
             <div>
               <UserCheck size={21} />
               <span>
-                Cần chăm sóc <b>{data.care} khách</b>
+                Khách tiềm năng: <b>{totals.leads} khách</b>
               </span>
             </div>
             <div>
               <MessageCircle size={21} />
               <span>
-                Đang tư vấn <b>{data.consulting} khách</b>
+                Đơn đã chốt: <b>{totals.closed} đơn</b>
               </span>
             </div>
           </div>
@@ -324,77 +375,83 @@ export const Reports: React.FC = () => {
           </button>
         </div>
         <div className="table-wrap">
-          <table className="report-table">
-            <thead>
-              <tr>
-                {[
-                  'Nhân viên',
-                  'Thời gian',
-                  'Cuộc gọi',
-                  'Kết nối',
-                  'Tiềm năng',
-                  'Đã chốt',
-                  'Trả về',
-                  'Tỷ lệ chốt',
-                  'Hoa hồng',
-                ].map((x) => (
-                  <th key={x}>{x}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.people.map((person) => {
-                const row = {
-                  hours: asNumber(person.hours, data.period.multiplier),
-                  calls: asNumber(person.calls, data.period.multiplier),
-                  connected: asNumber(person.connected, data.period.multiplier),
-                  leads: asNumber(person.leads, data.period.multiplier),
-                  closed: asNumber(person.closed, data.period.multiplier),
-                  returned: asNumber(person.returned, data.period.multiplier),
-                  commission: Math.round(person.commission * data.period.multiplier),
-                }
-                return (
-                  <tr key={person.name}>
-                    <td>{person.name}</td>
-                    <td>{row.hours} giờ</td>
-                    <td>{row.calls}</td>
-                    <td>{row.connected}</td>
-                    <td>{row.leads}</td>
-                    <td>{row.closed}</td>
-                    <td>{row.returned}</td>
-                    <td>
-                      {row.connected
-                        ? `${((row.closed / row.connected) * 100).toFixed(1).replace('.', ',')}%`
-                        : '0%'}
-                    </td>
-                    <td>{formatMoney(row.commission)}</td>
-                  </tr>
-                )
-              })}
-              <tr className="total-row">
-                {[
-                  'Tổng',
-                  `${totals.hours} giờ`,
-                  totals.calls,
-                  totals.connected,
-                  totals.leads,
-                  totals.closed,
-                  totals.returned,
-                  totals.connected
-                    ? `${((totals.closed / totals.connected) * 100).toFixed(1).replace('.', ',')}%`
-                    : '0%',
-                  formatMoney(totals.commission),
-                ].map((value, index) => (
-                  <td key={index}>{value}</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+          {isLoadingDaily ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+              Đang tải dữ liệu...
+            </div>
+          ) : filteredResults.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+              Chưa có dữ liệu hiệu suất cuộc gọi trong khoảng thời gian này.
+            </div>
+          ) : (
+            <table className="report-table">
+              <thead>
+                <tr>
+                  {[
+                    'Nhân viên',
+                    'Thời gian',
+                    'Cuộc gọi',
+                    'Kết nối',
+                    'Tiềm năng',
+                    'Đã chốt',
+                    'Trả về',
+                    'Tỷ lệ chốt',
+                    'Hoa hồng',
+                  ].map((x) => (
+                    <th key={x}>{x}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredResults.map((person, idx) => {
+                  const hours = Math.round((person.tong_tg_dam_thoai || 0) / 60)
+                  const calls = person.tong_total_call || 0
+                  const connected = person.tong_call_answer || 0
+                  const leads = (person.tong_giu_lai_cs || 0) + (person.tong_hen_goi_lai || 0)
+                  const closed = person.tong_da_chot || 0
+                  const returned = person.tong_don_tra_ve || 0
+                  const rate = connected > 0 ? `${((closed / connected) * 100).toFixed(1)}%` : '0%'
+                  const commission = closed * 150000
+
+                  return (
+                    <tr key={person.user_id || idx}>
+                      <td>{person.user_name || `Nhân viên #${person.user_id}`}</td>
+                      <td>{hours} giờ</td>
+                      <td>{calls}</td>
+                      <td>{connected}</td>
+                      <td>{leads}</td>
+                      <td>{closed}</td>
+                      <td>{returned}</td>
+                      <td>{rate}</td>
+                      <td>{formatVND(commission)}</td>
+                    </tr>
+                  )
+                })}
+                <tr className="total-row">
+                  <td>Tổng cộng</td>
+                  <td>{totals.hours} giờ</td>
+                  <td>{totals.calls}</td>
+                  <td>{totals.connected}</td>
+                  <td>{totals.leads}</td>
+                  <td>{totals.closed}</td>
+                  <td>{totals.returned}</td>
+                  <td>
+                    {totals.connected > 0
+                      ? `${((totals.closed / totals.connected) * 100).toFixed(1)}%`
+                      : '0%'}
+                  </td>
+                  <td>{formatVND(totals.commission)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
         </div>
         <p className="report-caption">
-          <Info size={14} /> Tỷ lệ chốt = Đơn đã chốt / Kết nối. Dữ liệu được tính toán theo thời gian thực.
+          <Info size={14} /> Dữ liệu được tính toán thời gian thực theo báo cáo tổng hợp.
         </p>
       </section>
     </div>
   )
 }
+
+export default Reports

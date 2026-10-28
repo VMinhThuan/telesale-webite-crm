@@ -23,11 +23,34 @@ export const authService = {
       password: credentials.password,
     })
 
+    // 1. Kiểm tra cờ thất bại từ ERP (backend trả HTTP 200 nhưng success: false hoặc có trường error)
+    if (!response || response.success === false || response.error) {
+      const errorMsg =
+        response?.error ||
+        response?.result?.msg ||
+        response?.message ||
+        'Đăng nhập thất bại, sai tên tài khoản hoặc mật khẩu.'
+      throw new Error(errorMsg)
+    }
+
+    // 2. Trích xuất access_token
     const token =
       response.access_token ||
       response.token ||
       response.result?.access_token ||
-      response.result?.token
+      response.result?.token ||
+      response.data?.access_token ||
+      response.data?.token
+
+    // Nếu không có token hợp lệ -> Bắt buộc ném lỗi, không cho phép đăng nhập
+    if (!token || typeof token !== 'string') {
+      const errorMsg =
+        response?.error ||
+        response?.result?.msg ||
+        response?.message ||
+        'Không nhận được mã xác thực access_token từ máy chủ.'
+      throw new Error(errorMsg)
+    }
 
     const user: UserProfile =
       response.user ||
@@ -40,9 +63,7 @@ export const authService = {
         branchId: response.result?.branch_id || 3,
       }
 
-    if (token) {
-      setStoredToken(token)
-    }
+    setStoredToken(token)
 
     return {
       access_token: token,

@@ -4,6 +4,132 @@ import apiClient from './apiClient'
 
 export const chatService = {
   /**
+   * Lấy danh sách cuộc trò chuyện (API 35: GET /api/chats?page=1&per_page=20)
+   */
+  async getThreads(page = 1, perPage = 20): Promise<{ threads: any[]; total?: number }> {
+    const response: any = await apiClient.get(
+      `${API_ENDPOINTS.CHATS}?page=${page}&per_page=${perPage}`,
+    )
+    const result = response?.result || response?.data || response || {}
+    if (Array.isArray(result)) {
+      return { threads: result, total: result.length }
+    }
+    return {
+      threads: result.threads || result.items || [],
+      total: result.total ?? (result.threads?.length || 0),
+    }
+  },
+
+  /**
+   * Lấy chi tiết hội thoại, danh sách tin nhắn và thành viên (API 37: GET /api/chats/{thread_id})
+   * Tương thích hoàn toàn chuẩn RTippin Laravel Messenger của hệ thống ERP
+   */
+  async getThreadDetail(threadId: number | string): Promise<{
+    messages: ChatMessageItem[]
+    participants: any[]
+    thread: any
+  }> {
+    const response: any = await apiClient.get(API_ENDPOINTS.CHAT_THREAD(threadId))
+    const result = response?.result || response?.data || response || {}
+
+    const rawList = Array.isArray(result)
+      ? result
+      : Array.isArray(result.messages)
+        ? result.messages
+        : Array.isArray(result.items)
+          ? result.items
+          : []
+
+    const participants = Array.isArray(result.participants)
+      ? result.participants
+      : Array.isArray(result.recent_participants)
+        ? result.recent_participants
+        : []
+
+    const messages = rawList.map((m: any): ChatMessageItem => {
+      // RTippin Messenger type: 0 = MESSAGE (text), 1 = IMAGE, 2 = DOCUMENT, 3 = AUDIO, 4 = VIDEO
+      let type: ChatMessageType = 'text'
+      if (m.type === 1 || m.type === 'image') type = 'image'
+      else if (m.type === 2 || m.type === 'document') type = 'document'
+      else if (m.type === 3 || m.type === 'audio') type = 'audio'
+      else if (m.type === 4 || m.type === 'video') type = 'video'
+
+      const rawBody = m.body || m.content || m.message || ''
+      let fileUrl = m.file_url || m.url
+      if (!fileUrl && type !== 'text' && typeof rawBody === 'string') {
+        if (rawBody.startsWith('http')) fileUrl = rawBody
+        else if (rawBody.startsWith('/')) fileUrl = `https://locnuoc365.xyz${rawBody}`
+      }
+
+      const senderName =
+        m.owner_name ||
+        m.owner?.name ||
+        m.sender_name ||
+        m.user_name ||
+        m.from ||
+        'Đồng nghiệp'
+
+      return {
+        id: m.id || m.message_id || `msg_${Date.now()}_${Math.random()}`,
+        sender_name: senderName,
+        is_outgoing: Boolean(m.is_outgoing ?? m.outgoing ?? false),
+        type,
+        content: rawBody,
+        file_url: fileUrl,
+        file_name: m.file_name || m.name || (type !== 'text' ? rawBody : undefined),
+        file_size: m.file_size || m.size,
+        created_at: m.created_at || m.time || new Date().toISOString(),
+      }
+    })
+
+    return {
+      messages,
+      participants,
+      thread: result.thread || null,
+    }
+  },
+
+  /**
+   * Lấy danh sách tin nhắn của hội thoại (API 37)
+   */
+  async getMessages(threadId: number | string): Promise<ChatMessageItem[]> {
+    const detail = await this.getThreadDetail(threadId)
+    return detail.messages
+  },
+
+  /**
+   * Tìm kiếm danh bạ / liên hệ nội bộ (API 42: GET /api/chats/find/contacts)
+   */
+  async getContacts(): Promise<any[]> {
+    const response: any = await apiClient.get(API_ENDPOINTS.CHAT_CONTACTS)
+    const result = response?.result || response?.data || response || []
+    return Array.isArray(result) ? result : result.contacts || result.items || []
+  },
+
+  /**
+   * Tìm kiếm tin nhắn trong hội thoại (API 38: GET /api/chats/{thread_id}/search)
+   */
+  async searchMessages(threadId: number | string, keyword: string): Promise<ChatMessageItem[]> {
+    const response: any = await apiClient.get(
+      `${API_ENDPOINTS.CHAT_SEARCH(threadId)}?keyword=${encodeURIComponent(keyword)}`,
+    )
+    const result = response?.result || response?.data || response || []
+    return Array.isArray(result) ? result : result.messages || []
+  },
+
+  /**
+   * Đánh dấu đã đọc hội thoại (API 43: POST /api/chats/{thread_id}/mark-read)
+   */
+  async markRead(threadId: number | string): Promise<boolean> {
+    try {
+      await apiClient.post(API_ENDPOINTS.CHAT_MARK_READ(threadId), {})
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  /**
    * Gửi tin nhắn văn bản thông thường (API 39a: POST /api/chats/{thread_id}/messages)
    */
   async sendTextMessage(
