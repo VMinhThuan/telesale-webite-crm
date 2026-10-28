@@ -51,10 +51,12 @@ export function useSaveCareLogMutation() {
     mutationFn: ({
       customerId,
       payload,
+      idempotencyKey,
     }: {
       customerId: number
       payload: SaveCareLogPayload
-    }) => customerService.saveCareLog(customerId, payload),
+      idempotencyKey?: string
+    }) => customerService.saveCareLog(customerId, payload, idempotencyKey),
 
     onSuccess: (_, variables) => {
       // Làm mới danh sách và lịch sử tương tác của khách hàng

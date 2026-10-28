@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3,
   CalendarCheck,
@@ -28,10 +28,14 @@ import { Pagination } from '../../components/ui/Pagination'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { useCustomerDetail, useCustomerHistory, useCustomersList, useSaveCareLogMutation } from '../../hooks/useCustomers'
 import { useDebounce } from '../../hooks/useDebounce'
+import { generateIdempotencyKey } from '../../services/apiClient'
 import { CareStatusType, CustomerDto } from '../../types/api'
 import { DialogState } from '../../types'
 import { formatDate, formatDateTime } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
+import customerService from '../../services/customer.service'
+import { SecureAudioPlayer } from '../../components/common/SecureAudioPlayer'
+import { SecureVideoPlayer } from '../../components/common/SecureVideoPlayer'
 
 interface LeadsProps {
   onOpenDialog?: (dialog: DialogState) => void
@@ -43,13 +47,13 @@ const careOutcomes: {
   icon: any
   tone: string
 }[] = [
-  { key: 'consulting', label: 'Đang tư vấn', icon: Phone, tone: 'blue' },
-  { key: 'scheduled', label: 'Đã hẹn lịch', icon: CalendarCheck, tone: 'green' },
-  { key: 'closed', label: 'Đã chốt', icon: ShoppingCart, tone: 'rose' },
-  { key: 'callback', label: 'Gọi lại', icon: Timer, tone: 'amber' },
-  { key: 'no_need', label: 'Chưa có nhu cầu', icon: Voicemail, tone: 'gray' },
-  { key: 'unreachable', label: 'Không liên lạc được', icon: CircleX, tone: 'purple' },
-]
+    { key: 'consulting', label: 'Đang tư vấn', icon: Phone, tone: 'blue' },
+    { key: 'scheduled', label: 'Đã hẹn lịch', icon: CalendarCheck, tone: 'green' },
+    { key: 'closed', label: 'Đã chốt', icon: ShoppingCart, tone: 'rose' },
+    { key: 'callback', label: 'Gọi lại', icon: Timer, tone: 'amber' },
+    { key: 'no_need', label: 'Chưa có nhu cầu', icon: Voicemail, tone: 'gray' },
+    { key: 'unreachable', label: 'Không liên lạc được', icon: CircleX, tone: 'purple' },
+  ]
 
 export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'callback' | 'scheduled'>('all')
@@ -60,6 +64,14 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
   const [nextCareDate, setNextCareDate] = useState('')
   const [nextCareTime, setNextCareTime] = useState('')
   const [note, setNote] = useState('')
+
+  // Khóa chống double-click và quản lý Idempotency-Key cho phiên chăm sóc / chốt đơn
+  const isSubmittingCareRef = useRef(false)
+  const currentCareKeyRef = useRef<string>(generateIdempotencyKey())
+
+  useEffect(() => {
+    currentCareKeyRef.current = generateIdempotencyKey()
+  }, [selectedCustomerId])
 
   // Debounce ô tìm kiếm 400ms chống spam API
   const debouncedQuery = useDebounce(query, 400)
@@ -120,10 +132,16 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
   }, [customerDetail])
 
   const handleSaveCare = async () => {
+    // Chặn tức thời double-click
+    if (isSubmittingCareRef.current) return
+
     if (!selectedCustomerId) {
       notify('Vui lòng chọn khách hàng cần cập nhật')
       return
     }
+
+    isSubmittingCareRef.current = true
+
     try {
       await saveCareLogMutation.mutateAsync({
         customerId: selectedCustomerId,
@@ -131,10 +149,21 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
           result: outcome,
           next_care_at: nextCareDate ? `${nextCareDate} ${nextCareTime || '09:00'}:00` : undefined,
           note: note.trim() || undefined,
+          idempotencyKey: outcome === 'closed' ? currentCareKeyRef.current : undefined,
         },
+        idempotencyKey: outcome === 'closed' ? currentCareKeyRef.current : undefined,
       })
-    } catch {
-      // Error handled in hook onError
+
+      // Nếu là chốt đơn thành công, sinh key mới cho lần sau
+      if (outcome === 'closed') {
+        currentCareKeyRef.current = generateIdempotencyKey()
+      }
+    } catch (err: any) {
+      if (err?.status === 409) {
+        notify('Yêu cầu chốt đơn đang được hệ thống xử lý hoặc khách hàng đang có đơn chưa hoàn tất.')
+      }
+    } finally {
+      isSubmittingCareRef.current = false
     }
   }
 
@@ -462,8 +491,8 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
                   {customerDetail?.care_status === 'scheduled'
                     ? 'Đã hẹn lịch'
                     : customerDetail?.care_status === 'callback'
-                    ? 'Cần gọi lại'
-                    : 'Đang tư vấn'}
+                      ? 'Cần gọi lại'
+                      : 'Đang tư vấn'}
                 </b>
               </span>
             </div>
@@ -472,6 +501,65 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
               <Phone size={18} /> Gọi khách hàng
             </button>
           </section>
+
+          {/* Dữ liệu đa phương tiện CSKH (API 19b - Tự động re-fetch Signed URL khi hết hạn 403) */}
+          {((customerDetail?.record && customerDetail.record.length > 0) ||
+            (customerDetail?.list_images && customerDetail.list_images.some((img) => img.type === 'video'))) && (
+            <section className="call-panel media-panel" style={{ padding: '14px 16px' }}>
+              <div className="call-panel-heading" style={{ marginBottom: '10px' }}>
+                <div>
+                  <p className="eyebrow">DỮ LIỆU ĐA PHƯƠNG TIỆN</p>
+                  <h2 style={{ fontSize: '13px' }}>Ghi âm & Video CSKH</h2>
+                </div>
+              </div>
+
+              {/* Danh sách ghi âm cuộc gọi */}
+              {customerDetail?.record && customerDetail.record.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
+                    Ghi âm cuộc gọi ({customerDetail.record.length}):
+                  </p>
+                  {customerDetail.record.map((rec) => (
+                    <SecureAudioPlayer
+                      key={rec.recording_id || rec.call_id}
+                      src={rec.url}
+                      title={`Cuộc gọi #${rec.call_id}${rec.at ? ` · ${rec.at}` : ''}`}
+                      onRefreshUrl={async () => {
+                        if (!selectedCustomerId) return null
+                        const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
+                        const matched = refreshed.record?.find((r) => r.recording_id === rec.recording_id)
+                        return matched?.url || null
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Danh sách video hiện trường */}
+              {customerDetail?.list_images &&
+                customerDetail.list_images.filter((img) => img.type === 'video').length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
+                      Video bảo dưỡng / lắp ráp:
+                    </p>
+                    {customerDetail.list_images
+                      .filter((img) => img.type === 'video')
+                      .map((vid) => (
+                        <SecureVideoPlayer
+                          key={vid.image_id}
+                          src={vid.url}
+                          onRefreshUrl={async () => {
+                            if (!selectedCustomerId) return null
+                            const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
+                            const matched = refreshed.list_images?.find((img) => img.image_id === vid.image_id)
+                            return matched?.url || null
+                          }}
+                        />
+                      ))}
+                  </div>
+                )}
+            </section>
+          )}
 
           {/* Form Cập nhật kết quả chăm sóc */}
           <section className="call-panel care-form">

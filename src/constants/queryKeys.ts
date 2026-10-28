@@ -50,4 +50,10 @@ export const queryKeys = {
     attendance: (params?: any) => [...queryKeys.reports.all, 'attendance', params] as const,
     callLogs: (params?: any) => [...queryKeys.reports.all, 'callLogs', params] as const,
   },
+
+  // 7. Thông báo hệ thống
+  notifications: {
+    all: ['notifications'] as const,
+    list: () => [...queryKeys.notifications.all, 'list'] as const,
+  },
 } as const

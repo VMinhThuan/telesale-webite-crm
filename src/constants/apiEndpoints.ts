@@ -47,5 +47,11 @@ export const API_ENDPOINTS = {
   CHATS: '/api/chats',
   CHAT_THREAD: (threadId: number | string) => `/api/chats/${threadId}`,
   CHAT_MESSAGES: (threadId: number | string) => `/api/chats/${threadId}/messages`,
+  CHAT_IMAGES: (threadId: number | string) => `/api/chats/${threadId}/images`,
+  CHAT_DOCUMENTS: (threadId: number | string) => `/api/chats/${threadId}/documents`,
+  CHAT_AUDIO: (threadId: number | string) => `/api/chats/${threadId}/audio`,
+  CHAT_VIDEOS: (threadId: number | string) => `/api/chats/${threadId}/videos`,
+  CHAT_SEARCH: (threadId: number | string) => `/api/chats/${threadId}/search`,
+  CHAT_CONTACTS: '/api/chats/find/contacts',
   CHAT_MARK_READ: (threadId: number | string) => `/api/chats/${threadId}/mark-read`,
 } as const

@@ -34,6 +34,8 @@ export interface SaveCareLogPayload {
   gio_hen_khach?: string
   branch_id?: number
   services?: string[]
+  /** Khóa chống trùng lặp đơn hàng khi kết quả là 'closed' (Header Idempotency-Key) */
+  idempotencyKey?: string
 }
 
 export const customerService = {
@@ -85,13 +87,20 @@ export const customerService = {
   /**
    * Ghi nhận kết quả chăm sóc khách hàng lên ERP
    */
-  async saveCareLog(customerId: number, payload: SaveCareLogPayload): Promise<any> {
+  async saveCareLog(
+    customerId: number,
+    payload: SaveCareLogPayload,
+    customIdempotencyKey?: string,
+  ): Promise<any> {
+    const { idempotencyKey: payloadKey, ...bodyPayload } = payload
+    const key = customIdempotencyKey || payloadKey || generateIdempotencyKey()
+
     const headers: Record<string, string> = {}
     if (payload.result === 'closed') {
-      headers['Idempotency-Key'] = generateIdempotencyKey()
+      headers['Idempotency-Key'] = key
     }
 
-    return apiClient.post(API_ENDPOINTS.CUSTOMER_CARE_LOGS(customerId), payload, { headers })
+    return apiClient.post(API_ENDPOINTS.CUSTOMER_CARE_LOGS(customerId), bodyPayload, { headers })
   },
 }
 

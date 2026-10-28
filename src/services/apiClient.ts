@@ -90,10 +90,13 @@ export const clearStoredAuth = (): void => {
 }
 
 /**
- * Tạo Idempotency-Key ngẫu nhiên khi chốt đơn
+ * Tạo Idempotency-Key chuẩn UUID ngẫu nhiên khi chốt đơn
  * Giúp chống tạo trùng lặp đơn hàng trong vòng 24h
  */
 export const generateIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `sf_${crypto.randomUUID()}`
+  }
   return 'sf_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11)
 }
 
@@ -142,12 +145,14 @@ apiClient.interceptors.response.use(
       )
     }
 
-    // Trích xuất thông điệp lỗi tiếng Việt theo chuẩn API_TELESALE_APP.md
+    // Trích xuất thông điệp lỗi tiếng Việt
     let errorMessage = 'Lỗi kết nối máy chủ, vui lòng thử lại sau.'
     if (error.response?.data?.error) {
       errorMessage = error.response.data.error
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
+    } else if (status === 409) {
+      errorMessage = 'Yêu cầu chốt đơn đang được hệ thống xử lý hoặc khách hàng đang có đơn chưa hoàn tất.'
     } else if (error.message) {
       errorMessage = error.message
     }

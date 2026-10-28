@@ -60,15 +60,19 @@ export const telesaleService = {
   async saveCallResult(
     customerId: number,
     payload: SaveCallResultPayload,
+    customIdempotencyKey?: string,
   ): Promise<SaveCallResultResponse> {
+    const { idempotencyKey: payloadKey, ...bodyPayload } = payload
+    const key = customIdempotencyKey || payloadKey || generateIdempotencyKey()
+
     const headers: Record<string, string> = {}
     if (payload.result === 'closed') {
-      headers['Idempotency-Key'] = generateIdempotencyKey()
+      headers['Idempotency-Key'] = key
     }
 
     const response = await apiClient.post<any, { result: SaveCallResultResponse }>(
       API_ENDPOINTS.SAVE_CALL_RESULT(customerId),
-      payload,
+      bodyPayload,
       { headers },
     )
     return response.result || response

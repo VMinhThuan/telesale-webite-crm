@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3,
   CalendarCheck,
@@ -42,6 +42,7 @@ import {
   NextCustomerDto,
   SaveCallResultPayload,
 } from '../../types/api'
+import { generateIdempotencyKey } from '../../services/apiClient'
 import { formatDuration, formatVND } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 
@@ -51,13 +52,13 @@ const resultOptions: {
   icon: any
   tone: string
 }[] = [
-  { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
-  { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
-  { key: 'callback', label: 'Hẹn gọi lại', icon: Timer, tone: 'amber' },
-  { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
-  { key: 'no_answer', label: 'Không nghe máy', icon: Voicemail, tone: 'gray' },
-  { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
-]
+    { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
+    { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
+    { key: 'callback', label: 'Hẹn gọi lại', icon: Timer, tone: 'amber' },
+    { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
+    { key: 'no_answer', label: 'Không nghe máy', icon: Voicemail, tone: 'gray' },
+    { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
+  ]
 
 export const Telesale: React.FC = () => {
   // Lấy dữ liệu danh mục Enums hệ thống
@@ -85,6 +86,15 @@ export const Telesale: React.FC = () => {
   // 3. Quản lý khách hàng đang tương tác
   const [currentCustomer, setCurrentCustomer] = useState<NextCustomerDto | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<number | undefined>(undefined)
+
+  // Khóa chống double-click tức thời và quản lý Idempotency-Key theo vòng đời phiên chốt đơn
+  const isSubmittingResultRef = useRef(false)
+  const currentOrderKeyRef = useRef<string>(generateIdempotencyKey())
+
+  // Tự động cấp mới Idempotency-Key khi chuyển sang khách hàng khác
+  useEffect(() => {
+    currentOrderKeyRef.current = generateIdempotencyKey()
+  }, [currentCustomer?.customer_id])
 
   // 4. Form lưu kết quả cuộc gọi
   const [selectedOutcome, setSelectedOutcome] = useState<CallResultOutcome>('potential')
@@ -224,6 +234,9 @@ export const Telesale: React.FC = () => {
 
   // Hàm lưu kết quả cuộc gọi
   const handleSaveResult = async () => {
+    // Chặn tức thời mọi double-click hoặc spam click trước khi React re-render
+    if (isSubmittingResultRef.current) return
+
     if (!currentCustomer) {
       notify('Chưa có khách hàng để lưu kết quả')
       return
@@ -257,11 +270,17 @@ export const Telesale: React.FC = () => {
       payload.do_can_mang = selectedDoCanMang
     }
 
+    isSubmittingResultRef.current = true
+
     try {
       await saveCallResultMutation.mutateAsync({
         customerId: currentCustomer.customer_id,
         payload,
+        idempotencyKey: currentOrderKeyRef.current,
       })
+
+      // Chốt đơn thành công: làm mới key cho lần lên đơn tiếp theo
+      currentOrderKeyRef.current = generateIdempotencyKey()
 
       // Kết thúc phiên đàm thoại
       resetCall()
@@ -272,8 +291,13 @@ export const Telesale: React.FC = () => {
           handleFetchNextCustomer()
         }, 800)
       }
-    } catch {
-      // Error handled in hook
+    } catch (err: any) {
+      // Bắt lỗi 409 xung đột đơn hàng nếu phát sinh
+      if (err?.status === 409) {
+        notify('Yêu cầu chốt đơn đang được hệ thống xử lý hoặc khách hàng đang có đơn chưa hoàn tất.')
+      }
+    } finally {
+      isSubmittingResultRef.current = false
     }
   }
 
@@ -504,10 +528,10 @@ export const Telesale: React.FC = () => {
                 {status === 'connected'
                   ? 'Đang đàm thoại'
                   : status === 'paused'
-                  ? 'Đang giữ máy'
-                  : status === 'calling'
-                  ? 'Đang đổ chuông...'
-                  : 'Sẵn sàng quay số'}
+                    ? 'Đang giữ máy'
+                    : status === 'calling'
+                      ? 'Đang đổ chuông...'
+                      : 'Sẵn sàng quay số'}
               </span>
             </div>
 

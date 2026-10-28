@@ -16,7 +16,7 @@ import { Toast } from '@/components/common/Toast'
 import { Topbar } from '@/components/common/Topbar'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { useEnums } from '@/hooks/useEnums'
-import { DialogState, NotificationItem, PageType, PeriodType } from '@/types'
+import { DialogState, PageType, PeriodType } from '@/types'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
 const Dashboard = lazy(() =>
@@ -55,11 +55,6 @@ const AppShell: React.FC = () => {
   const [loginOpen, setLoginOpen] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [period, setPeriod] = useState<PeriodType>('Tháng 09/2025')
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    { id: 1, title: '03 lịch hẹn cần xác nhận', detail: 'Trần Thị Lan · 05/10 lúc 08:30', page: 'orders' },
-    { id: 2, title: 'Báo cáo ngày đã sẵn sàng', detail: '860 cuộc gọi · 80 đơn đã chốt', page: 'reports' },
-    { id: 3, title: '12 khách cần chăm sóc', detail: 'Ưu tiên gọi lại trước 16:00 hôm nay', page: 'leads' },
-  ])
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
   useEnums()
@@ -130,8 +125,6 @@ const AppShell: React.FC = () => {
           pageTitle={getPageTitle(location.pathname)}
           period={period}
           setPeriod={setPeriod}
-          notifications={notifications}
-          setNotifications={setNotifications}
           setPage={handleNavigatePage}
           openSidebar={() => setOpen(true)}
           onOpenLogin={() => {
@@ -140,38 +133,38 @@ const AppShell: React.FC = () => {
           }}
         />
 
-          {/* Tầng ErrorBoundary cấp Page (tự động reset khi chuyển route qua resetKeys) */}
-          <ErrorBoundary level="page" resetKeys={[location.pathname]}>
-            <Suspense
-              fallback={
-                <div style={{ padding: '28px 34px' }}>
-                  <TableSkeleton rows={8} cols={4} />
-                </div>
-              }
-            >
-              <Routes>
-                <Route path="/" element={<Dashboard period={period} />} />
-                <Route path="/telesale" element={<Telesale />} />
-                <Route path="/leads" element={<Leads onOpenDialog={setDialog} />} />
-                <Route path="/orders" element={<Orders onOpenDialog={setDialog} />} />
-                <Route
-                  path="/training"
-                  element={<Training onOpenDialog={setDialog} setPage={handleNavigatePage} />}
-                />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/chat" element={<Chat />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
+        {/* Tầng ErrorBoundary cấp Page (tự động reset khi chuyển route qua resetKeys) */}
+        <ErrorBoundary level="page" resetKeys={[location.pathname]}>
+          <Suspense
+            fallback={
+              <div style={{ padding: '28px 34px' }}>
+                <TableSkeleton rows={8} cols={4} />
+              </div>
+            }
+          >
+            <Routes>
+              <Route path="/" element={<Dashboard period={period} />} />
+              <Route path="/telesale" element={<Telesale />} />
+              <Route path="/leads" element={<Leads onOpenDialog={setDialog} />} />
+              <Route path="/orders" element={<Orders onOpenDialog={setDialog} />} />
+              <Route
+                path="/training"
+                element={<Training onOpenDialog={setDialog} setPage={handleNavigatePage} />}
+              />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
 
-          <footer>
-            <span>
-              <i /> Hệ thống hoạt động ổn định
-            </span>
-            <span>© 2026 SalesFlow CRM</span>
-          </footer>
+        <footer>
+          <span>
+            <i /> Hệ thống hoạt động ổn định
+          </span>
+          <span>© 2026 SalesFlow CRM</span>
+        </footer>
       </main>
 
       <div

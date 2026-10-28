@@ -67,10 +67,12 @@ export function useSaveCallResultMutation() {
     mutationFn: ({
       customerId,
       payload,
+      idempotencyKey,
     }: {
       customerId: number
       payload: SaveCallResultPayload
-    }) => telesaleService.saveCallResult(customerId, payload),
+    idempotencyKey?: string
+  }) => telesaleService.saveCallResult(customerId, payload, idempotencyKey),
 
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: DAILY_RESULTS_QUERY_KEY })
@@ -83,8 +85,8 @@ export function useSaveCallResultMutation() {
       }
     },
 
-    onError: (err: any) => {
-      notify(err.message || 'Lỗi khi lưu kết quả cuộc gọi. Vui lòng thử lại.')
-    },
+      onError: (err: any) => {
+        notify(err.message || 'Lỗi khi lưu kết quả cuộc gọi. Vui lòng thử lại.')
+      },
   })
 }

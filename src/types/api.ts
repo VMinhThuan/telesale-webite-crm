@@ -237,6 +237,8 @@ export interface SaveCallResultPayload {
   other_more_request?: string
   machine_problem?: string
   other_machine_problem?: string
+  /** Khóa chống trùng lặp đơn hàng khi kết quả là 'closed' (Header Idempotency-Key) */
+  idempotencyKey?: string
 }
 
 export interface SaveCallResultResponse {
@@ -295,4 +297,31 @@ export interface DailyResultDto {
   tong_don_tra_ve: number
   tong_don_da_xac_nhan: number
   tong_tg_dam_thoai: number // tính theo phút
+}
+
+// 7. Thông báo hệ thống (API 06 & 07)
+export interface AppNotification {
+  id: number | string
+  title: string
+  content: string
+  is_read: boolean
+  created_at: string
+  type?: 'order' | 'call' | 'customer' | 'system'
+  target_page?: 'orders' | 'telesale' | 'leads' | 'reports' | 'dashboard'
+  target_id?: number | string
+}
+
+// 8. Tin nhắn Chat & Đính kèm đa phương tiện (API 35–42)
+export type ChatMessageType = 'text' | 'image' | 'document' | 'audio' | 'video'
+
+export interface ChatMessageItem {
+  id: string | number
+  sender_name: string
+  is_outgoing: boolean
+  type: ChatMessageType
+  content?: string
+  file_url?: string
+  file_name?: string
+  file_size?: number
+  created_at: string
 }
