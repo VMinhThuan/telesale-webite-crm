@@ -77,9 +77,11 @@ export const customerService = {
     customerId: number,
     type?: 'call' | 'care' | 'service',
   ): Promise<CustomerHistoryDto[]> {
-    const typeParam = type ? `?type=${type}` : ''
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    params.set('page_size', '100')
     const response = await apiClient.get<any, { result: { items: CustomerHistoryDto[] } }>(
-      `${API_ENDPOINTS.CUSTOMER_HISTORY(customerId)}${typeParam}`,
+      `${API_ENDPOINTS.CUSTOMER_HISTORY(customerId)}?${params.toString()}`,
     )
     return response.result?.items || []
   },

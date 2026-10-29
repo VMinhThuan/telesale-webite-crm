@@ -44,7 +44,7 @@ import {
 } from '../../hooks/useOrders'
 import { DialogState } from '../../types'
 import dayjs from '../../lib/dayjs'
-import { OrderDto } from '../../types/api'
+import { BranchSlotDto, OrderDto } from '../../types/api'
 import { useEnums } from '../../hooks/useEnums'
 import { formatDate, formatVND, getStatusBadgeTone } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
@@ -254,11 +254,17 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
   }, [activeOrder])
 
   // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh
-  const { data: branchSlots = [] } = useBranchSlots(
+  const { data: rawBranchSlots = [] } = useBranchSlots(
     activeOrder?.branch_id || 3,
     adjDate,
     adjDate,
   )
+
+  const branchSlots: BranchSlotDto[] = useMemo(() => {
+    if (Array.isArray(rawBranchSlots)) return rawBranchSlots
+    if (Array.isArray((rawBranchSlots as any)?.items)) return (rawBranchSlots as any).items
+    return []
+  }, [rawBranchSlots])
 
   // Các mutations nghiệp vụ đơn hàng
   const confirmOrderMutation = useConfirmOrderMutation()

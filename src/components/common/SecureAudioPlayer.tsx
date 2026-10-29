@@ -149,7 +149,7 @@ export const SecureAudioPlayer: React.FC<SecureAudioPlayerProps> = ({
       <audio
         ref={audioRef}
         src={mediaUrl || undefined}
-        preload="metadata"
+        preload="none"
         onError={handleMediaError}
         onLoadedMetadata={handleLoadedMetadata}
         onTimeUpdate={handleTimeUpdate}

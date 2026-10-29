@@ -113,10 +113,10 @@ export interface CustomerDetailDto extends CustomerDto {
 export interface CustomerHistoryDto {
   history_type: 'call' | 'care' | 'service'
   at: string
-  user_name: string
-  result: string
-  note?: string
-  ord_code?: string
+  user_name?: string | null
+  result?: string | null
+  note?: string | null
+  ord_code?: string | null
 }
 
 // 4. Đơn hàng & Slot hẹn chi nhánh

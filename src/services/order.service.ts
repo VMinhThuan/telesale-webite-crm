@@ -64,11 +64,18 @@ export const orderService = {
     if (fromDate) query.set('date_from', fromDate)
     if (toDate) query.set('date_to', toDate)
 
-    const response = await apiClient.get<any, { result: BranchSlotDto[] }>(
+    const response = await apiClient.get<any, { result: any }>(
       `${API_ENDPOINTS.BRANCH_SLOTS}?${query.toString()}`,
     )
 
-    return response.result || []
+    const result = response.result
+    if (Array.isArray(result)) {
+      return result
+    }
+    if (Array.isArray(result?.items)) {
+      return result.items
+    }
+    return []
   },
 
   /**
