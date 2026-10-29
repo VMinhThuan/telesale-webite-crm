@@ -9,6 +9,7 @@ export interface OrderQueryParams {
   search?: string
   page?: number
   page_size?: number
+  user_id?: number
 }
 
 export interface RescheduleOrderPayload {

@@ -84,23 +84,38 @@ const POSTPONE_REASONS = [
   'Đang chờ linh kiện phù hợp với máy',
 ]
 
+interface ReasonOption {
+  value: string
+  label: string
+}
+
 export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
   const navigate = useNavigate()
   const { traVeNote, huyNote } = useEnums()
 
-  const returnReasonOptions = useMemo(() => {
+  const returnReasonOptions = useMemo<ReasonOption[]>(() => {
     if (traVeNote && traVeNote.length > 0) {
-      return traVeNote.map((item) => item.label)
+      return traVeNote.map((item) => ({
+        value: item.code || item.label,
+        label: item.label || item.code,
+      }))
     }
-    return RETURN_REASONS
+    return RETURN_REASONS.map((r) => ({ value: r, label: r }))
   }, [traVeNote])
 
-  const cancelReasonOptions = useMemo(() => {
+  const cancelReasonOptions = useMemo<ReasonOption[]>(() => {
     if (huyNote && huyNote.length > 0) {
-      return huyNote.map((item) => item.label)
+      return huyNote.map((item) => ({
+        value: item.code || item.label,
+        label: item.label || item.code,
+      }))
     }
-    return CANCEL_REASONS
+    return CANCEL_REASONS.map((r) => ({ value: r, label: r }))
   }, [huyNote])
+
+  const postponeReasonOptions = useMemo<ReasonOption[]>(() => {
+    return POSTPONE_REASONS.map((r) => ({ value: r, label: r }))
+  }, [])
 
   // Tạo danh sách tab ngày hẹn động dựa trên thời gian thực tế
   const dateTabs = useMemo(() => {
@@ -149,6 +164,23 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
     dayjs().add(1, 'day').format('YYYY-MM-DD'),
   )
   const [luiHuyPostponeTime, setLuiHuyPostponeTime] = useState('09:00')
+
+  // Danh sách lý do theo loại thao tác hiện tại
+  const currentReasonOptions = useMemo<ReasonOption[]>(() => {
+    if (luiHuyType === 'tra_ve') return returnReasonOptions
+    if (luiHuyType === 'huy') return cancelReasonOptions
+    return postponeReasonOptions
+  }, [luiHuyType, returnReasonOptions, cancelReasonOptions, postponeReasonOptions])
+
+  // Tự động đồng bộ luiHuyReason khi danh mục Enums tải xong hoặc đổi loại thao tác
+  useEffect(() => {
+    if (isLuiHuyModalOpen && currentReasonOptions.length > 0) {
+      const isValid = currentReasonOptions.some((opt) => opt.value === luiHuyReason)
+      if (!isValid) {
+        setLuiHuyReason(currentReasonOptions[0].value)
+      }
+    }
+  }, [isLuiHuyModalOpen, currentReasonOptions, luiHuyReason])
 
   // Tham số query API đơn hàng
   const orderQueryParams = useMemo(() => {
@@ -307,7 +339,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
   const handleOpenLuiHuyModal = () => {
     if (!activeOrder) return
     setLuiHuyType('tra_ve')
-    setLuiHuyReason(returnReasonOptions[0] || RETURN_REASONS[0])
+    setLuiHuyReason(returnReasonOptions[0]?.value || RETURN_REASONS[0])
     setLuiHuyNote('')
     setLuiHuyPostponeDate(dayjs().add(1, 'day').format('YYYY-MM-DD'))
     setLuiHuyPostponeTime('09:00')
@@ -479,9 +511,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
 
             {/* Bảng hiển thị danh sách đơn hàng */}
             <div className="lead-table-wrap">
-              {isLoading ? (
-                <TableSkeleton rows={6} cols={5} />
-              ) : isError ? (
+              {isError ? (
                 <ErrorState
                   message="Không thể tải dữ liệu đơn hàng từ máy chủ"
                   onRetry={() => refetch()}
@@ -498,7 +528,9 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {ordersList.length > 0 ? (
+                    {isLoading ? (
+                      <TableSkeleton rows={6} cols={5} />
+                    ) : ordersList.length > 0 ? (
                       ordersList.map((order) => {
                         const tone = getStatusBadgeTone(order.trang_thai)
                         const isSelected = activeOrder?.order_id === order.order_id
@@ -861,7 +893,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                     type="button"
                     onClick={() => {
                       setLuiHuyType('tra_ve')
-                      setLuiHuyReason(returnReasonOptions[0] || RETURN_REASONS[0])
+                      setLuiHuyReason(returnReasonOptions[0]?.value || RETURN_REASONS[0])
                     }}
                     style={{
                       padding: '8px 4px',
@@ -879,7 +911,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                     type="button"
                     onClick={() => {
                       setLuiHuyType('lui')
-                      setLuiHuyReason(POSTPONE_REASONS[0])
+                      setLuiHuyReason(postponeReasonOptions[0]?.value || POSTPONE_REASONS[0])
                     }}
                     style={{
                       padding: '8px 4px',
@@ -897,7 +929,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                     type="button"
                     onClick={() => {
                       setLuiHuyType('huy')
-                      setLuiHuyReason(cancelReasonOptions[0] || CANCEL_REASONS[0])
+                      setLuiHuyReason(cancelReasonOptions[0]?.value || CANCEL_REASONS[0])
                     }}
                     style={{
                       padding: '8px 4px',
@@ -933,14 +965,9 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                     background: '#fff',
                   }}
                 >
-                  {(luiHuyType === 'tra_ve'
-                    ? returnReasonOptions
-                    : luiHuyType === 'huy'
-                      ? cancelReasonOptions
-                      : POSTPONE_REASONS
-                  ).map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                  {currentReasonOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>

@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Building2,
+  Calendar,
   Camera,
+  Copy,
   FileText,
+  Headphones,
   ImagePlus,
+  Mail,
   Phone,
+  PhoneCall,
   Save,
+  Sparkles,
   Undo2,
   Upload,
   UserCheck,
@@ -13,6 +19,7 @@ import {
 } from 'lucide-react'
 import { notify } from '../../utils/notify'
 import { useAuth } from '../../hooks/useAuth'
+import dayjs from '../../lib/dayjs'
 
 interface FileUploadState {
   name: string
@@ -195,16 +202,233 @@ export const SettingsPage: React.FC = () => {
             />
           </label>
         </div>
-        <div>
-          <p className="eyebrow">TÀI KHOẢN CỦA TÔI</p>
-          <h2>{user?.name || user?.username || 'Hồ sơ cá nhân'}</h2>
-          <span>
-            <UserCheck size={15} /> {user?.chucVu || user?.role || 'Nhân viên'} · {user?.department || 'Phòng Telesale'}
-          </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p className="eyebrow">HỒ SƠ NHÂN SỰ CHÍNH THỨC</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <h2 style={{ margin: '2px 0 4px', fontSize: '22px' }}>{user?.name || user?.username || 'Hồ sơ cá nhân'}</h2>
+            {user?.surname && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: '#e0effe',
+                  color: '#1d4ed8',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.3px',
+                }}
+              >
+                Mã NV: {user.surname}
+              </span>
+            )}
+            {user?.userExtension && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: '#fef3c7',
+                  color: '#b45309',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                }}
+              >
+                <Headphones size={13} /> Máy lẻ: #{user.userExtension}
+              </span>
+            )}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              flexWrap: 'wrap',
+              marginTop: '6px',
+              fontSize: '11.5px',
+              color: '#56749c',
+            }}
+          >
+            <span>
+              <UserCheck size={14} style={{ color: '#2563eb' }} /> {user?.chucVu || user?.role || 'Nhân viên'} ·{' '}
+              {user?.department || 'Phòng Telesale'} ({user?.loaiNv?.toUpperCase() || 'NVKD'})
+            </span>
+            {user?.email && (
+              <span>
+                <Mail size={14} style={{ color: '#2563eb' }} /> {user.email}
+              </span>
+            )}
+            <span>
+              <Sparkles size={14} style={{ color: '#059669' }} /> Chấm công:{' '}
+              {user?.attendanceMethod === 'face_detection' ? 'Nhận diện khuôn mặt (Face ID)' : 'Mặc định'}
+            </span>
+            {user?.createdAt && (
+              <span>
+                <Calendar size={14} style={{ color: '#64748b' }} /> Gia nhập:{' '}
+                {dayjs(user.createdAt).format('DD/MM/YYYY')}
+              </span>
+            )}
+          </div>
         </div>
         <div className="settings-status">
           <i style={{ backgroundColor: user?.isVerified ? '#24c987' : '#f59e0b' }} />{' '}
           {user?.isVerified ? 'Tài khoản đã xác thực' : 'Chưa hoàn tất định danh'}
+        </div>
+      </section>
+
+      {/* Khối Thông tin Tổng đài & Danh bạ Điều hành chi nhánh (Read-only) */}
+      <section className="call-panel" style={{ marginTop: '16px', paddingBottom: '16px' }}>
+        <div className="call-panel-heading">
+          <div>
+            <p className="eyebrow">VOIP & LIÊN HỆ ĐIỀU PHỐI</p>
+            <h2>Tổng đài & Danh bạ điều hành</h2>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: '0 18px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '14px',
+          }}
+        >
+          {/* Box thông số SIP Softphone */}
+          <div
+            style={{
+              background: '#f8fafd',
+              border: '1px solid #dce5f0',
+              borderRadius: '8px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span
+                style={{
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  color: '#1e3a8a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Headphones size={16} style={{ color: '#2563eb' }} /> Máy nhánh Softphone Telesale
+              </span>
+              <span
+                style={{
+                  fontSize: '10.5px',
+                  color: '#15803d',
+                  fontWeight: 600,
+                  background: '#dcfce7',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                }}
+              >
+                ● Đã kích hoạt
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '11px' }}>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Số máy lẻ:</span>
+                <b style={{ color: '#0f172a', fontSize: '14px' }}>#{user?.userExtension || '1126'}</b>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Giao thức kết nối:</span>
+                <span style={{ color: '#334155', fontWeight: 600 }}>WebRTC / SIP WSS</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Máy chủ tổng đài:</span>
+                <span style={{ color: '#334155' }}>tongdai.zozin.vn:7443</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Hệ thống PBX:</span>
+                <span style={{ color: '#334155' }}>Grandstream</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Danh bạ NV điều hành (list_pdh) */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <p
+              style={{
+                margin: '0 0 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <PhoneCall size={13} style={{ color: '#2563eb' }} /> Danh bạ Phụ trách / Điều hành chi nhánh (
+              {user?.listPdh?.length || 0}):
+            </p>
+            <div style={{ display: 'grid', gap: '6px' }}>
+              {user?.listPdh && user.listPdh.length > 0 ? (
+                user.listPdh.map((pdh, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      background: '#fff',
+                      fontSize: '11px',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>{pdh.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span
+                        style={{
+                          color: '#0284c7',
+                          background: '#e0f2fe',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Máy lẻ: {pdh.sdt}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(pdh.sdt)
+                          notify(`Đã sao chép máy lẻ: ${pdh.sdt}`)
+                        }}
+                        title="Sao chép số máy lẻ"
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          padding: '3px 6px',
+                          cursor: 'pointer',
+                          color: '#475569',
+                          fontSize: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                      >
+                        <Copy size={11} /> Chép
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>Chưa có danh bạ điều hành</p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

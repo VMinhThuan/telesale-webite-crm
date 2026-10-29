@@ -14,6 +14,8 @@ const emptyEnumsCatalog: EnumsCatalog = {
   denied_reason: [],
   phong_ban: [],
   bo_phan: [],
+  huy_note: [],
+  tra_ve_note: [],
 }
 
 export const enumsService = {

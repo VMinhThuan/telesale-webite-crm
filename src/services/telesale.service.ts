@@ -98,44 +98,65 @@ export const telesaleService = {
   },
 
   /**
-   * Lấy thống kê hiệu suất đàm thoại trong ngày của nhân viên
+   * Lấy thống kê hiệu suất đàm thoại trong ngày hoặc khoảng ngày của nhân viên
    */
-  async getDailyResults(date?: string): Promise<DailyResultDto | null> {
+  async getDailyResults(
+    date?: string | { from_date?: string; to_date?: string },
+  ): Promise<DailyResultDto | null> {
     const payload: Record<string, any> = {}
-    if (date) {
+    if (typeof date === 'string') {
       payload.from_date = date
       payload.to_date = date
+    } else if (date && typeof date === 'object') {
+      if (date.from_date) payload.from_date = date.from_date
+      if (date.to_date) payload.to_date = date.to_date
     }
 
-    const response = await apiClient.post<any, { result: DailyResultDto[] | DailyResultDto }>(
+    const response = await apiClient.post<any, any>(
       API_ENDPOINTS.DAILY_RESULTS,
       payload,
     )
 
     const result = response.result || response
+    if (result && Array.isArray(result.items)) {
+      return result.items[0] || null
+    }
     if (Array.isArray(result)) {
       return result[0] || null
     }
-    return result || null
+    if (result && typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
+      return result
+    }
+    return null
   },
 
   /**
-   * Lấy danh sách hiệu suất theo khoảng thời gian hoặc theo danh sách nhân viên (API 10b)
+   * Lấy danh sách hiệu suất theo khoảng thời gian hoặc theo danh sách nhân viên (API 10b: POST /api/telesale/daily-results)
+   * Quản lý / Admin có thể gửi kèm user_id để lấy riêng 1 nhân viên
    */
   async getDailyResultsList(payload?: {
     from_date?: string
     to_date?: string
+    user_id?: number
+    start?: number
+    length?: number
   }): Promise<DailyResultDto[]> {
-    const response = await apiClient.post<any, { result: DailyResultDto[] | DailyResultDto }>(
+    const response = await apiClient.post<any, any>(
       API_ENDPOINTS.DAILY_RESULTS,
       payload || {},
     )
 
     const result = response.result || response
+    if (result && Array.isArray(result.items)) {
+      return result.items
+    }
     if (Array.isArray(result)) {
       return result
     }
-    return result ? [result] : []
+    if (result && typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
+      return [result]
+    }
+    return []
   },
 
   /**

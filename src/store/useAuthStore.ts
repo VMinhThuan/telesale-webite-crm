@@ -22,6 +22,12 @@ export interface UserProfile {
   userExtension?: string
   chucVu?: string
   status?: string
+  loaiNv?: string
+  attendanceMethod?: string
+  lastSeen?: string
+  createdAt?: string
+  listPdh?: Array<{ name: string; sdt: string }>
+  features?: Record<string, boolean>
   bankName?: string
   bankAccountNumber?: string
   bankAccountName?: string
@@ -36,6 +42,8 @@ export interface UserProfile {
     password?: string
     websocketProxyUrl?: string
     iceServerUrl?: string
+    realm?: string
+    displayName?: string
   }
 }
 

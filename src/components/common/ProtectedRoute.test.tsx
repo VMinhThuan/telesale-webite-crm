@@ -15,7 +15,10 @@ describe('ProtectedRoute Route Guard Unit Tests', () => {
 
   it('chưa đăng nhập (!isAuthenticated): chuyển hướng về /login kèm redirect query', () => {
     render(
-      <MemoryRouter initialEntries={['/orders']}>
+      <MemoryRouter
+        initialEntries={['/orders']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route
             path="/orders"
@@ -49,7 +52,10 @@ describe('ProtectedRoute Route Guard Unit Tests', () => {
     })
 
     render(
-      <MemoryRouter initialEntries={['/telesale']}>
+      <MemoryRouter
+        initialEntries={['/telesale']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route
             path="/telesale"

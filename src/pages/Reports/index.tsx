@@ -123,27 +123,51 @@ export const Reports: React.FC = () => {
   const fromDate = currentPeriod.getFromDate()
   const toDate = currentPeriod.getToDate()
 
-  // 1. Tải danh sách nhân sự Telesale
+  // 1. Tải danh sách nhân sự Telesale (Phòng ban 19: API 05 get-user-lists)
   const { data: userListsData } = useUserLists({ phong_ban: 19 })
-  const employeeList = useMemo(() => {
-    if (!userListsData) return []
-    if (Array.isArray(userListsData)) return userListsData
-    return userListsData.items || []
-  }, [userListsData])
 
-  // 2. Tải dữ liệu hiệu suất đàm thoại
+  // Xác định user_id khi Quản lý chọn 1 nhân viên cụ thể (để gửi lên API daily-results và orders)
+  const queryUserId = selectedEmployeeId !== 'all' ? Number(selectedEmployeeId) : undefined
+
+  // 2. Tải dữ liệu hiệu suất đàm thoại (API 10b: POST /api/telesale/daily-results)
+  // - Nếu chọn "Tất cả nhân viên": user_id = undefined -> BE trả về toàn bộ phòng ban cho Quản lý
+  // - Nếu chọn 1 nhân viên: Gửi kèm user_id -> BE trả về riêng dữ liệu nhân viên đó
   const { data: dailyResults = [], isLoading: isLoadingDaily } = useDailyResultsList({
     from_date: fromDate,
     to_date: toDate,
+    user_id: queryUserId,
   })
 
-  // 3. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn
+  // Chuẩn hóa danh sách nhân sự Telesale: Hợp nhất từ API 05 get-user-lists và các user_id có trong dailyResults
+  const employeeList = useMemo(() => {
+    const listFromApi: any[] = Array.isArray(userListsData)
+      ? userListsData
+      : (userListsData as any)?.items || (userListsData as any)?.users || []
+
+    const map = new Map<string, { id: string | number; name: string }>()
+
+    // Đưa từ API get-user-lists vào map
+    listFromApi.forEach((emp) => {
+      const id = emp.id || emp.user_id
+      if (id) {
+        const name = (
+          emp.first_name
+        ).trim()
+        map.set(String(id), { id, name })
+      }
+    })
+
+    return Array.from(map.values())
+  }, [userListsData, dailyResults])
+
+  // 3. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn (API 11b: POST /api/telesale/orders)
   const upcomingStartDate = dayjs().format('YYYY-MM-DD')
   const upcomingEndDate = dayjs().add(2, 'day').format('YYYY-MM-DD')
   const { data: upcomingOrdersData } = useOrdersList({
     from_date: upcomingStartDate,
     to_date: upcomingEndDate,
     page_size: 100,
+    user_id: queryUserId,
   })
 
   // Lọc dữ liệu theo nhân viên nếu chọn cụ thể
@@ -191,9 +215,14 @@ export const Reports: React.FC = () => {
     return points
   }, [currentPeriod, fromDate, filteredResults])
 
-  // Thống kê lịch hẹn 3 ngày tới từ danh sách đơn hàng thật
+  // Thống kê lịch hẹn 3 ngày tới từ danh sách đơn hàng thật (Lọc theo nhân viên nếu đang chọn nhân viên cụ thể)
   const upcomingAppointments = useMemo(() => {
-    const orders = upcomingOrdersData?.items || []
+    const rawOrders = upcomingOrdersData?.items || []
+    const orders =
+      selectedEmployeeId === 'all'
+        ? rawOrders
+        : rawOrders.filter((o) => String(o.nvkd_id) === String(selectedEmployeeId))
+
     const days = [0, 1, 2].map((offset) => {
       const d = dayjs().add(offset, 'day')
       const dateStr = d.format('YYYY-MM-DD')
@@ -204,7 +233,7 @@ export const Reports: React.FC = () => {
       }
     })
     return days
-  }, [upcomingOrdersData])
+  }, [upcomingOrdersData, selectedEmployeeId])
 
   const metrics = [
     { label: 'Thời gian làm việc', value: `${totals.hours} giờ`, icon: Clock3, tone: 'blue' },
@@ -245,8 +274,8 @@ export const Reports: React.FC = () => {
 
   const selectedEmployeeName = useMemo(() => {
     if (selectedEmployeeId === 'all') return 'Tất cả nhân viên'
-    const found = employeeList.find((e: any) => String(e.id || e.user_id) === selectedEmployeeId)
-    return found ? found.name || found.user_name || found.username : 'Nhân viên'
+    const found = employeeList.find((e) => String(e.id) === String(selectedEmployeeId))
+    return found ? found.name : 'Nhân viên'
   }, [selectedEmployeeId, employeeList])
 
   return (
@@ -279,16 +308,14 @@ export const Reports: React.FC = () => {
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               aria-label="Chọn nhân viên"
             >
-              <option value="all">Tất cả nhân viên</option>
-              {employeeList.map((emp: any) => {
-                const id = emp.id || emp.user_id
-                const name = emp.name || emp.user_name || emp.username || `NV #${id}`
-                return (
-                  <option key={id} value={String(id)}>
-                    {name}
-                  </option>
-                )
-              })}
+              <option value="all">
+                Tất cả nhân viên{employeeList.length > 0 ? ` (${employeeList.length})` : ''}
+              </option>
+              {employeeList.map((emp) => (
+                <option key={emp.id} value={String(emp.id)}>
+                  {emp.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={14} />
           </label>

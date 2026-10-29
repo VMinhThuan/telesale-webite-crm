@@ -26,11 +26,18 @@ export function useCampaigns() {
 }
 
 /**
- * Hook truy vấn kết quả hiệu suất telesale trong ngày
+ * Hook truy vấn kết quả hiệu suất telesale trong ngày hoặc khoảng ngày
  */
-export function useDailyResults(date?: string) {
+export function useDailyResults(date?: string | { from_date?: string; to_date?: string }) {
+  const dateKey =
+    typeof date === 'string'
+      ? date
+      : date
+        ? `${date.from_date || ''}_${date.to_date || ''}`
+        : undefined
+
   return useQuery({
-    queryKey: queryKeys.telesale.dailyResults(date),
+    queryKey: queryKeys.telesale.dailyResults(dateKey),
     queryFn: () => telesaleService.getDailyResults(date),
     staleTime: 1000 * 60 * 2, // 2 phút
   })
@@ -39,7 +46,13 @@ export function useDailyResults(date?: string) {
 /**
  * Hook truy vấn danh sách hiệu suất telesale theo khoảng thời gian
  */
-export function useDailyResultsList(payload?: { from_date?: string; to_date?: string }) {
+export function useDailyResultsList(payload?: {
+  from_date?: string
+  to_date?: string
+  user_id?: number
+  start?: number
+  length?: number
+}) {
   return useQuery({
     queryKey: queryKeys.telesale.dailyResultsList(payload),
     queryFn: () => telesaleService.getDailyResultsList(payload),

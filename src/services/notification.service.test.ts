@@ -63,6 +63,49 @@ describe('Notification Service Unit Tests', () => {
     expect(list[0].type).toBe('customer')
   })
 
+  it('Data Normalizer: xử lý cấu trúc thực tế ERP { result: { notifications_data: [...] } }', async () => {
+    vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+      result: {
+        notifications_data: [
+          {
+            id: 'cbd42071-c79c-4d76-9c54-966e7dea4130',
+            msg: 'Tin mới: QUY TRÌNH HỖ TRỢ KIỂM TRA CHECK MAP CHO NVKD',
+            post_id: 847,
+            order_id: null,
+            read_at: '2026-10-17 08:48:44',
+            created_at: '2026-10-17 08:36:33',
+          },
+          {
+            id: 'un-read-notify-123',
+            msg: 'Thông báo đơn hàng mới #DH888 đã xác nhận',
+            post_id: null,
+            order_id: 888,
+            read_at: null,
+            created_at: '2026-10-29 08:00:00',
+          },
+        ],
+      },
+      success: true,
+      error: null,
+    } as any)
+
+    const list = await notificationService.getNotifications()
+    expect(list.length).toBe(2)
+
+    // Item 1: Tin bài đào tạo đã đọc
+    expect(list[0].id).toBe('cbd42071-c79c-4d76-9c54-966e7dea4130')
+    expect(list[0].title).toBe('Tin mới')
+    expect(list[0].content).toBe('QUY TRÌNH HỖ TRỢ KIỂM TRA CHECK MAP CHO NVKD')
+    expect(list[0].is_read).toBe(true)
+    expect(list[0].target_page).toBe('training')
+
+    // Item 2: Đơn hàng chưa đọc
+    expect(list[1].id).toBe('un-read-notify-123')
+    expect(list[1].is_read).toBe(false)
+    expect(list[1].target_page).toBe('orders')
+    expect(list[1].type).toBe('order')
+  })
+
   it('markAsRead: gửi đúng payload khi đánh dấu 1 item hoặc tất cả', async () => {
     const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue({ success: true } as any)
 

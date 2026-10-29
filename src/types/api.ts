@@ -311,7 +311,7 @@ export interface AppNotification {
   is_read: boolean
   created_at: string
   type?: 'order' | 'call' | 'customer' | 'system'
-  target_page?: 'orders' | 'telesale' | 'leads' | 'reports' | 'dashboard'
+  target_page?: 'orders' | 'telesale' | 'leads' | 'reports' | 'dashboard' | 'training' | 'chat' | 'settings'
   target_id?: number | string
 }
 

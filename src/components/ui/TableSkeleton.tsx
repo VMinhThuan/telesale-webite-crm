@@ -1,12 +1,17 @@
 import React from 'react'
 
-interface TableSkeletonProps {
+export interface TableSkeletonProps {
   rows?: number
   cols?: number
+  standalone?: boolean
 }
 
-export const TableSkeleton: React.FC<TableSkeletonProps> = ({ rows = 5, cols = 4 }) => {
-  return (
+export const TableSkeleton: React.FC<TableSkeletonProps> = ({
+  rows = 5,
+  cols = 4,
+  standalone = false,
+}) => {
+  const content = (
     <>
       {Array.from({ length: rows }).map((_, rIdx) => (
         <tr key={rIdx} style={{ opacity: 0.7 }}>
@@ -28,6 +33,16 @@ export const TableSkeleton: React.FC<TableSkeletonProps> = ({ rows = 5, cols = 4
       ))}
     </>
   )
+
+  if (standalone) {
+    return (
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>{content}</tbody>
+      </table>
+    )
+  }
+
+  return content
 }
 
 export default TableSkeleton

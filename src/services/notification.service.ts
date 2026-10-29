@@ -11,21 +11,49 @@ export const notificationService = {
     try {
       const response: any = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS, {})
 
-      // Xử lý linh hoạt các format response legacy của Laravel ERP
+      // Xử lý linh hoạt (hỗ trợ notifications_data, items, mảng trực tiếp,...)
       const rawList: any[] = Array.isArray(response)
         ? response
-        : Array.isArray(response?.result?.items)
-          ? response.result.items
-          : Array.isArray(response?.result)
-            ? response.result
-            : Array.isArray(response?.data)
-              ? response.data
-              : []
+        : Array.isArray(response?.result?.notifications_data)
+          ? response.result.notifications_data
+          : Array.isArray(response?.result?.items)
+            ? response.result.items
+            : Array.isArray(response?.result)
+              ? response.result
+              : Array.isArray(response?.data?.notifications_data)
+                ? response.data.notifications_data
+                : Array.isArray(response?.data)
+                  ? response.data
+                  : []
 
       return rawList.map((item: any, idx: number): AppNotification => {
         const id = item.id || item.notify_id || item.notification_id || idx + 1
-        const title = item.title || item.name || item.subject || 'Thông báo hệ thống'
-        const content = item.content || item.detail || item.message || item.body || ''
+
+        // Tách tiêu đề và nội dung thông minh từ trường `msg` của ERP hoặc title/content
+        let title = item.title || item.name || item.subject || ''
+        let content = item.content || item.detail || item.message || item.body || ''
+
+        if (item.msg) {
+          if (!title && !content) {
+            if (item.msg.includes(':')) {
+              const colonIndex = item.msg.indexOf(':')
+              title = item.msg.substring(0, colonIndex).trim()
+              content = item.msg.substring(colonIndex + 1).trim()
+            } else {
+              title = item.post_id ? 'Tin tức & Đào tạo' : 'Thông báo hệ thống'
+              content = item.msg
+            }
+          } else if (!content) {
+            content = item.msg
+          } else if (!title) {
+            title = item.msg
+          }
+        }
+
+        if (!title) {
+          title = item.post_id ? 'Tin tức & Đào tạo' : item.order_id ? 'Thông báo đơn hàng' : 'Thông báo hệ thống'
+        }
+
         const isRead = Boolean(
           item.is_read || item.read_at || item.status === 'read' || item.status === 1 || item.read === 1,
         )
@@ -35,10 +63,13 @@ export const notificationService = {
         let targetPage: AppNotification['target_page'] = 'dashboard'
         let type: AppNotification['type'] = 'system'
 
-        const lowerContent = `${title} ${content}`.toLowerCase()
-        if (lowerContent.includes('đơn') || lowerContent.includes('lịch hẹn') || item.order_id) {
+        const lowerContent = `${title} ${content} ${item.msg || ''}`.toLowerCase()
+        if (item.order_id || lowerContent.includes('đơn') || lowerContent.includes('lịch hẹn')) {
           targetPage = 'orders'
           type = 'order'
+        } else if (item.post_id || lowerContent.includes('tin mới') || lowerContent.includes('quy trình') || lowerContent.includes('thông báo')) {
+          targetPage = 'training'
+          type = 'system'
         } else if (lowerContent.includes('cuộc gọi') || lowerContent.includes('gọi lại') || lowerContent.includes('telesale')) {
           targetPage = 'telesale'
           type = 'call'
@@ -58,7 +89,7 @@ export const notificationService = {
           created_at: createdAt,
           type,
           target_page: targetPage,
-          target_id: item.order_id || item.customer_id,
+          target_id: item.order_id || item.post_id || item.customer_id,
         }
       })
     } catch (err) {

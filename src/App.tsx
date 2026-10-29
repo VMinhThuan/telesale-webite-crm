@@ -137,7 +137,7 @@ const AppShell: React.FC = () => {
           <Suspense
             fallback={
               <div style={{ padding: '28px 34px' }}>
-                <TableSkeleton rows={8} cols={4} />
+                <TableSkeleton rows={8} cols={4} standalone />
               </div>
             }
           >
@@ -175,7 +175,7 @@ const AppShell: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       {/* Tầng ErrorBoundary cấp Layout bao bọc toàn bộ ứng dụng */}
       <ErrorBoundary level="layout">
         <Suspense
@@ -189,7 +189,7 @@ export const App: React.FC = () => {
               }}
             >
               <div style={{ padding: '28px 34px', width: '100%', maxWidth: '800px' }}>
-                <TableSkeleton rows={8} cols={4} />
+                <TableSkeleton rows={8} cols={4} standalone />
               </div>
             </div>
           }

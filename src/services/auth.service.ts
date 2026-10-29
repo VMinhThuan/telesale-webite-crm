@@ -111,6 +111,12 @@ export const authService = {
       userExtension: raw.user_extension || '',
       chucVu: raw.chuc_vu || '',
       status: raw.status || 'active',
+      loaiNv: raw.loai_nv || 'nvkd',
+      attendanceMethod: raw.attendance_method || 'face_detection',
+      lastSeen: raw.last_seen || '',
+      createdAt: raw.created_at || '',
+      listPdh: Array.isArray(raw.list_pdh) ? raw.list_pdh : [],
+      features: raw.features || {},
       bankName: raw.bank_name || '',
       bankAccountNumber: raw.bank_account_number || '',
       bankAccountName: raw.bank_account_name || '',
@@ -125,6 +131,8 @@ export const authService = {
         password: raw.sip_password || raw.password,
         websocketProxyUrl: raw.websocket_proxy_url,
         iceServerUrl: raw.ice_server_url,
+        realm: raw.realm || 'grandstream',
+        displayName: raw.display_name || raw.user_extension,
       } : undefined),
     }
 
@@ -144,15 +152,25 @@ export const authService = {
   },
 
   /**
-   * Lấy danh sách nhân sự Telesale theo phòng ban và bộ phận
+   * Lấy danh sách nhân sự Telesale theo phòng ban và bộ phận (API 05: POST /api/manage-users/get-user-lists)
    */
   async getUserLists(params?: {
     phong_ban?: number
     bo_phan?: number
     branch_id?: number
-  }): Promise<any> {
-    const response = await apiClient.post<any, any>(API_ENDPOINTS.USER_LISTS, params || {})
-    return response.result || response.items || response || []
+  }): Promise<any[]> {
+    try {
+      const response = await apiClient.post<any, any>(API_ENDPOINTS.USER_LISTS, params || {})
+      const res = response?.result ?? response
+      if (Array.isArray(res)) return res
+      if (Array.isArray(res?.items)) return res.items
+      if (Array.isArray(res?.users)) return res.users
+      if (Array.isArray(res?.data)) return res.data
+      return []
+    } catch (error) {
+      console.warn('Lỗi lấy danh sách nhân viên:', error)
+      return []
+    }
   },
 }
 
