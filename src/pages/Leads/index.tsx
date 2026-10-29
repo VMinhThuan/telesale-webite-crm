@@ -22,6 +22,8 @@ import {
   Voicemail,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../constants/queryKeys'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ErrorState } from '../../components/ui/ErrorState'
 import { Pagination } from '../../components/ui/Pagination'
@@ -76,9 +78,33 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
   // Debounce ô tìm kiếm 400ms chống spam API
   const debouncedQuery = useDebounce(query, 400)
 
+  const queryClient = useQueryClient()
+
   // Danh sách khách hàng tiềm năng
   const careStatusFilter: CareStatusType | undefined =
     activeTab === 'callback' ? 'callback' : activeTab === 'scheduled' ? 'scheduled' : undefined
+
+  // Chiến lược Hover Prefetching cho phân trang khách hàng tiềm năng
+  const handlePrefetchPage = (targetPage: number) => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.customers.list({
+        customer_status: 'potential',
+        care_status: careStatusFilter,
+        search: debouncedQuery || undefined,
+        page: targetPage,
+        page_size: 5,
+      }),
+      queryFn: () =>
+        customerService.getCustomers({
+          customer_status: 'potential',
+          care_status: careStatusFilter,
+          search: debouncedQuery || undefined,
+          page: targetPage,
+          page_size: 5,
+        }),
+      staleTime: 1000 * 60 * 2,
+    })
+  }
 
   const {
     data: customersData,
@@ -186,23 +212,6 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
 
   return (
     <div className="content leads-content">
-      <div className="page-title telesale-title">
-        <div>
-          <p>
-            Quản lý và chăm sóc khách hàng{' '}
-            <span className="live-dot">● {totalItems} khách tiềm năng</span>
-          </p>
-          <h1>Khách tiềm năng</h1>
-        </div>
-        <button
-          className="help"
-          type="button"
-          onClick={() => notify('Hướng dẫn nghiệp vụ chăm sóc khách hàng tiềm năng')}
-        >
-          <CircleHelp size={17} /> Hướng dẫn
-        </button>
-      </div>
-
       <section className="call-stat-grid">
         <article className="call-stat blue">
           <div className="card-icon">
@@ -345,6 +354,19 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
                           key={lead.customer_id}
                           className={clsx({ 'selected-row': isSelected })}
                           onClick={() => setSelectedCustomerId(lead.customer_id)}
+                          onMouseEnter={() => {
+                            // Tải trước chi tiết và lịch sử tương tác của khách hàng khi lướt chuột
+                            queryClient.prefetchQuery({
+                              queryKey: queryKeys.customers.detail(lead.customer_id),
+                              queryFn: () => customerService.getCustomerDetail(lead.customer_id),
+                              staleTime: 1000 * 60 * 5,
+                            })
+                            queryClient.prefetchQuery({
+                              queryKey: queryKeys.customers.history(lead.customer_id),
+                              queryFn: () => customerService.getCustomerHistory(lead.customer_id),
+                              staleTime: 1000 * 60 * 2,
+                            })
+                          }}
                           style={{ cursor: 'pointer' }}
                         >
                           <td>
@@ -398,6 +420,7 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
               pageSize={5}
               total={totalItems}
               onChange={setPage}
+              onPrefetchPage={handlePrefetchPage}
               itemLabel="khách hàng"
             />
           </section>
@@ -505,61 +528,61 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
           {/* Dữ liệu đa phương tiện CSKH (API 19b - Tự động re-fetch Signed URL khi hết hạn 403) */}
           {((customerDetail?.record && customerDetail.record.length > 0) ||
             (customerDetail?.list_images && customerDetail.list_images.some((img) => img.type === 'video'))) && (
-            <section className="call-panel media-panel" style={{ padding: '14px 16px' }}>
-              <div className="call-panel-heading" style={{ marginBottom: '10px' }}>
-                <div>
-                  <p className="eyebrow">DỮ LIỆU ĐA PHƯƠNG TIỆN</p>
-                  <h2 style={{ fontSize: '13px' }}>Ghi âm & Video CSKH</h2>
+              <section className="call-panel media-panel" style={{ padding: '14px 16px' }}>
+                <div className="call-panel-heading" style={{ marginBottom: '10px' }}>
+                  <div>
+                    <p className="eyebrow">DỮ LIỆU ĐA PHƯƠNG TIỆN</p>
+                    <h2 style={{ fontSize: '13px' }}>Ghi âm & Video CSKH</h2>
+                  </div>
                 </div>
-              </div>
 
-              {/* Danh sách ghi âm cuộc gọi */}
-              {customerDetail?.record && customerDetail.record.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
-                    Ghi âm cuộc gọi ({customerDetail.record.length}):
-                  </p>
-                  {customerDetail.record.map((rec) => (
-                    <SecureAudioPlayer
-                      key={rec.recording_id || rec.call_id}
-                      src={rec.url}
-                      title={`Cuộc gọi #${rec.call_id}${rec.at ? ` · ${rec.at}` : ''}`}
-                      onRefreshUrl={async () => {
-                        if (!selectedCustomerId) return null
-                        const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
-                        const matched = refreshed.record?.find((r) => r.recording_id === rec.recording_id)
-                        return matched?.url || null
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Danh sách video hiện trường */}
-              {customerDetail?.list_images &&
-                customerDetail.list_images.filter((img) => img.type === 'video').length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Danh sách ghi âm cuộc gọi */}
+                {customerDetail?.record && customerDetail.record.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                     <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
-                      Video bảo dưỡng / lắp ráp:
+                      Ghi âm cuộc gọi ({customerDetail.record.length}):
                     </p>
-                    {customerDetail.list_images
-                      .filter((img) => img.type === 'video')
-                      .map((vid) => (
-                        <SecureVideoPlayer
-                          key={vid.image_id}
-                          src={vid.url}
-                          onRefreshUrl={async () => {
-                            if (!selectedCustomerId) return null
-                            const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
-                            const matched = refreshed.list_images?.find((img) => img.image_id === vid.image_id)
-                            return matched?.url || null
-                          }}
-                        />
-                      ))}
+                    {customerDetail.record.map((rec) => (
+                      <SecureAudioPlayer
+                        key={rec.recording_id || rec.call_id}
+                        src={rec.url}
+                        title={`Cuộc gọi #${rec.call_id}${rec.at ? ` · ${rec.at}` : ''}`}
+                        onRefreshUrl={async () => {
+                          if (!selectedCustomerId) return null
+                          const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
+                          const matched = refreshed.record?.find((r) => r.recording_id === rec.recording_id)
+                          return matched?.url || null
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
-            </section>
-          )}
+
+                {/* Danh sách video hiện trường */}
+                {customerDetail?.list_images &&
+                  customerDetail.list_images.filter((img) => img.type === 'video').length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
+                        Video bảo dưỡng / lắp ráp:
+                      </p>
+                      {customerDetail.list_images
+                        .filter((img) => img.type === 'video')
+                        .map((vid) => (
+                          <SecureVideoPlayer
+                            key={vid.image_id}
+                            src={vid.url}
+                            onRefreshUrl={async () => {
+                              if (!selectedCustomerId) return null
+                              const refreshed = await customerService.getCustomerDetail(selectedCustomerId)
+                              const matched = refreshed.list_images?.find((img) => img.image_id === vid.image_id)
+                              return matched?.url || null
+                            }}
+                          />
+                        ))}
+                    </div>
+                  )}
+              </section>
+            )}
 
           {/* Form Cập nhật kết quả chăm sóc */}
           <section className="call-panel care-form">

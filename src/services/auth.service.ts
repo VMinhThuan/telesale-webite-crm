@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from '../constants/apiEndpoints'
 import { UserProfile } from '../store/useAuthStore'
-import apiClient, { clearStoredAuth, setStoredToken } from './apiClient'
+import apiClient, { clearStoredAuth, setStoredToken, setStoredUser } from './apiClient'
 
 export interface LoginCredentials {
   username: string
@@ -89,15 +89,36 @@ export const authService = {
    */
   async getUserInfo(): Promise<UserProfile> {
     const response = await apiClient.post<any, any>(API_ENDPOINTS.USER_INFO)
-    const raw = response.result || response.user || response
+    const raw =
+      response.result?.user_info ||
+      response.result?.user ||
+      response.result ||
+      response.user_info ||
+      response.user ||
+      response
 
-    return {
+    const userProfile: UserProfile = {
       id: raw.id || raw.user_id || 1,
-      name: raw.name || raw.full_name || 'Nhân viên Telesale',
-      username: raw.username || '',
-      role: raw.role_name || raw.role || 'Telesale',
+      name: raw.full_name || raw.name || 'Nhân viên Telesale',
+      username: raw.username || raw.contact_number || '',
+      role: raw.chuc_vu || raw.role_name || raw.role || 'Nhân viên',
       department: raw.department_name || raw.department || 'Phòng Telesale',
       branchId: raw.branch_id || 3,
+      avatarUrl: raw.avatar || undefined,
+      email: raw.email || '',
+      contactNumber: raw.contact_number || raw.username || '',
+      surname: raw.surname || '',
+      userExtension: raw.user_extension || '',
+      chucVu: raw.chuc_vu || '',
+      status: raw.status || 'active',
+      bankName: raw.bank_name || '',
+      bankAccountNumber: raw.bank_account_number || '',
+      bankAccountName: raw.bank_account_name || '',
+      bankQrImageUrl: raw.bank_qr_image_url || null,
+      frontImageUrl: raw.front_image_url || null,
+      leftImageUrl: raw.left_image_url || null,
+      rightImageUrl: raw.right_image_url || null,
+      isVerified: Boolean(raw.front_image_url && raw.left_image_url && raw.right_image_url),
       sipConfig: raw.sip_config || (raw.impi ? {
         impi: raw.impi,
         impu: raw.impu,
@@ -106,6 +127,9 @@ export const authService = {
         iceServerUrl: raw.ice_server_url,
       } : undefined),
     }
+
+    setStoredUser(userProfile)
+    return userProfile
   },
 
   /**

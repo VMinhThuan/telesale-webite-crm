@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import authService, { LoginCredentials } from '../services/auth.service'
 import { useAuthStore } from '../store/useAuthStore'
+import { queryKeys } from '../constants/queryKeys'
 import { notify } from '../utils/notify'
 
-export const USER_INFO_QUERY_KEY = ['user_info']
-export const USER_LISTS_QUERY_KEY = ['user_lists']
+// Giữ alias query key để đảm bảo tương thích ngược 100%
+export const USER_INFO_QUERY_KEY = queryKeys.auth.user()
+export const USER_LISTS_QUERY_KEY = queryKeys.auth.all
 
 export function useUserLists(params?: {
   phong_ban?: number
@@ -12,7 +14,7 @@ export function useUserLists(params?: {
   branch_id?: number
 }) {
   return useQuery({
-    queryKey: [...USER_LISTS_QUERY_KEY, params?.phong_ban, params?.bo_phan, params?.branch_id],
+    queryKey: queryKeys.auth.userLists(params),
     queryFn: () => authService.getUserLists(params),
     staleTime: 1000 * 60 * 10,
   })
@@ -24,7 +26,7 @@ export function useAuth() {
 
   // Query lấy thông tin cá nhân và cấu hình SIP
   const userInfoQuery = useQuery({
-    queryKey: USER_INFO_QUERY_KEY,
+    queryKey: queryKeys.auth.user(),
     queryFn: () => authService.getUserInfo(),
     enabled: isAuthenticated,
     staleTime: 1000 * 60 * 15, // 15 phút
@@ -35,7 +37,7 @@ export function useAuth() {
     mutationFn: (credentials: LoginCredentials) => authService.login(credentials),
     onSuccess: (data) => {
       login(data.access_token, data.user)
-      queryClient.invalidateQueries({ queryKey: USER_INFO_QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
       notify(`Đăng nhập thành công! Xin chào ${data.user.name}`)
     },
     onError: (err: any) => {
@@ -57,7 +59,7 @@ export function useAuth() {
   const updateInfoMutation = useMutation({
     mutationFn: (formData: FormData) => authService.updateUserInfo(formData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: USER_INFO_QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
       notify('Đã cập nhật thông tin thành công!')
     },
     onError: (err: any) => {
@@ -78,5 +80,3 @@ export function useAuth() {
     updateUser,
   }
 }
-
-export default useAuth

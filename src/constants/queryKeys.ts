@@ -1,6 +1,6 @@
 /**
- * Query Key Factory tập trung cho React Query
- * Giúp quản lý cache tập trung, tránh lỗi sai sót chuỗi và hỗ trợ invalidate chính xác
+ * Query Key Factory tập trung cho TanStack React Query
+ * Giúp quản lý cache tập trung, tránh lỗi sai sót chuỗi và hỗ trợ hierarchical invalidation chính xác
  */
 
 export const queryKeys = {
@@ -42,6 +42,7 @@ export const queryKeys = {
     all: ['telesale'] as const,
     campaigns: () => [...queryKeys.telesale.all, 'campaigns'] as const,
     dailyResults: (date?: string) => [...queryKeys.telesale.all, 'dailyResults', date] as const,
+    dailyResultsList: (params?: any) => [...queryKeys.telesale.all, 'dailyResultsList', params] as const,
   },
 
   // 6. Báo cáo & Chấm công
@@ -56,4 +57,23 @@ export const queryKeys = {
     all: ['notifications'] as const,
     list: () => [...queryKeys.notifications.all, 'list'] as const,
   },
+
+  // 8. Chat nội bộ
+  chat: {
+    all: ['chat'] as const,
+    threads: () => [...queryKeys.chat.all, 'threads'] as const,
+    threadList: (page?: number, perPage?: number) =>
+      [...queryKeys.chat.threads(), 'list', page, perPage] as const,
+    threadInfinite: (perPage?: number) =>
+      [...queryKeys.chat.threads(), 'infinite', perPage] as const,
+    thread: (threadId?: number | string) =>
+      [...queryKeys.chat.all, 'thread', threadId] as const,
+    messages: (threadId?: number | string) =>
+      [...queryKeys.chat.thread(threadId), 'messages'] as const,
+    contacts: () => [...queryKeys.chat.all, 'contacts'] as const,
+    search: (threadId?: number | string, keyword?: string) =>
+      [...queryKeys.chat.thread(threadId), 'search', keyword] as const,
+  },
 } as const
+
+export default queryKeys

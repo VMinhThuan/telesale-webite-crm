@@ -157,15 +157,7 @@ const AppShell: React.FC = () => {
             </Routes>
           </Suspense>
         </ErrorBoundary>
-
-        <footer>
-          <span>
-            <i /> Hệ thống hoạt động ổn định
-          </span>
-          <span>© 2026 SalesFlow CRM</span>
-        </footer>
       </main>
-
       <div
         className={`overlay ${open ? 'show' : ''}`}
         onClick={() => setOpen(false)}

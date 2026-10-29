@@ -88,8 +88,7 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
     <div className="content training-content">
       <div className="page-title training-title">
         <div>
-          <p>Kiến thức và hướng dẫn dành cho nhân viên telesale</p>
-          <h1>Tài liệu đào tạo</h1>
+          <h2>Kiến thức và hướng dẫn dành cho nhân viên telesale</h2>
         </div>
         <label className="training-search">
           <Search size={18} />

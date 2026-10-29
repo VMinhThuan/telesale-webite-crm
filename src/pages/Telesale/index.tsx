@@ -36,7 +36,7 @@ import {
   useNextCustomerMutation,
   useSaveCallResultMutation,
 } from '../../hooks/useTelesale'
-import { useCallStore } from '../../store/useCallStore'
+import { useCallStore, CallDurationText } from '../../store/useCallStore'
 import {
   CallResultOutcome,
   NextCustomerDto,
@@ -62,7 +62,15 @@ const resultOptions: {
 
 export const Telesale: React.FC = () => {
   // Lấy dữ liệu danh mục Enums hệ thống
-  const { data: enums } = useEnums()
+  const {
+    enums,
+    services: serviceOptions,
+    doCanMang: doCanMangOptions,
+    machineProblems: machineProblemOptions,
+    moreRequest: moreRequestOptions,
+    painPoint: painPointOptions,
+    deniedReasons,
+  } = useEnums()
 
   // 1. Quản lý danh sách chiến dịch
   const { data: campaignsData, isLoading: isLoadingCampaigns } = useCampaigns()
@@ -101,7 +109,13 @@ export const Telesale: React.FC = () => {
   const [callbackDate, setCallbackDate] = useState('')
   const [callbackTime, setCallbackTime] = useState('14:30')
   const [note, setNote] = useState('')
-  const [deniedReason, setDeniedReason] = useState('')
+
+  // Cây lý do từ chối 3 tầng & Nỗi đau KH
+  const [deniedLevel1, setDeniedLevel1] = useState<string>('')
+  const [deniedLevel2, setDeniedLevel2] = useState<string>('')
+  const [deniedLevel3, setDeniedLevel3] = useState<string>('')
+  const [deniedCustomText, setDeniedCustomText] = useState<string>('')
+  const [selectedPainPoint, setSelectedPainPoint] = useState<string>('')
 
   // Các trường khi chốt đơn (closed)
   const [orderDate, setOrderDate] = useState('')
@@ -109,24 +123,110 @@ export const Telesale: React.FC = () => {
   const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [selectedDoCanMang, setSelectedDoCanMang] = useState<string[]>([])
+  const [selectedMachineProblem, setSelectedMachineProblem] = useState<string>('')
+  const [otherMachineProblem, setOtherMachineProblem] = useState<string>('')
+  const [selectedMoreRequest, setSelectedMoreRequest] = useState<string>('')
+  const [otherMoreRequest, setOtherMoreRequest] = useState<string>('')
+  const [serviceSearch, setServiceSearch] = useState<string>('')
 
-  // 5. Quản lý trạng thái cuộc gọi toàn cục (Zustand Store)
-  const {
-    status,
-    caller,
-    durationSec,
-    isMuted,
-    isHeld,
-    isAutoDial,
-    startCall,
-    connectCall,
-    toggleMute,
-    toggleHold,
-    endCall,
-    tickDuration,
-    setAutoDial,
-    resetCall,
-  } = useCallStore()
+  // Xử lý cây lý do từ chối 3 tầng
+  const level1Options = useMemo(() => deniedReasons || [], [deniedReasons])
+  const selectedL1Node = useMemo(() => {
+    return level1Options.find((node) => node.code === deniedLevel1)
+  }, [level1Options, deniedLevel1])
+
+  const level2Options = useMemo(() => {
+    return selectedL1Node?.children || []
+  }, [selectedL1Node])
+
+  const selectedL2Node = useMemo(() => {
+    return level2Options.find((node) => node.code === deniedLevel2)
+  }, [level2Options, deniedLevel2])
+
+  const level3Options = useMemo(() => {
+    return selectedL2Node?.children || []
+  }, [selectedL2Node])
+
+  const selectedL3Node = useMemo(() => {
+    return level3Options.find((node) => node.code === deniedLevel3)
+  }, [level3Options, deniedLevel3])
+
+  const needsTextInput =
+    selectedL2Node?.input === 'text' ||
+    selectedL3Node?.input === 'text' ||
+    deniedLevel2 === 'Out vùng' ||
+    deniedLevel2 === 'Khác' ||
+    deniedLevel2 === 'Lí do khác'
+
+  // Tự động khởi tạo giá trị mặc định cho tầng từ chối khi danh mục sẵn sàng
+  useEffect(() => {
+    if (level1Options.length > 0 && !deniedLevel1) {
+      const defaultL1 = level1Options[1] || level1Options[0]
+      setDeniedLevel1(defaultL1.code)
+      if (defaultL1.children && defaultL1.children.length > 0) {
+        setDeniedLevel2(defaultL1.children[0].code)
+      }
+    }
+  }, [level1Options, deniedLevel1])
+
+  const handleLevel1Change = (newCode: string) => {
+    setDeniedLevel1(newCode)
+    const node = level1Options.find((n) => n.code === newCode)
+    const firstChild = node?.children?.[0]
+    setDeniedLevel2(firstChild ? firstChild.code : '')
+    setDeniedLevel3(firstChild?.children?.[0] ? firstChild.children[0].code : '')
+    setDeniedCustomText('')
+  }
+
+  const handleLevel2Change = (newCode: string) => {
+    setDeniedLevel2(newCode)
+    const node = level2Options.find((n) => n.code === newCode)
+    const firstGrandChild = node?.children?.[0]
+    setDeniedLevel3(firstGrandChild ? firstGrandChild.code : '')
+    setDeniedCustomText('')
+  }
+
+  const handleLevel3Change = (newCode: string) => {
+    setDeniedLevel3(newCode)
+    setDeniedCustomText('')
+  }
+
+  // Danh sách dịch vụ lọc theo ô tìm kiếm
+  const filteredServices = useMemo(() => {
+    if (!serviceSearch.trim()) return serviceOptions
+    const s = serviceSearch.toLowerCase()
+    return serviceOptions.filter(
+      (srv) =>
+        srv.label.toLowerCase().includes(s) ||
+        (srv.group && srv.group.toLowerCase().includes(s)) ||
+        (srv.description && srv.description.toLowerCase().includes(s)),
+    )
+  }, [serviceOptions, serviceSearch])
+
+  // Toggle đồ cần mang
+  const handleToggleDoCanMang = (itemCode: string) => {
+    if (selectedDoCanMang.includes(itemCode)) {
+      setSelectedDoCanMang(selectedDoCanMang.filter((c) => c !== itemCode))
+    } else {
+      setSelectedDoCanMang([...selectedDoCanMang, itemCode])
+    }
+  }
+
+  // 5. Quản lý trạng thái cuộc gọi toàn cục (Zustand Store) với Atomic Selectors
+  // Tuyệt đối không subscribe trực tiếp durationSec để tránh re-render toàn bộ 900+ dòng trang mỗi giây
+  const status = useCallStore((s) => s.status)
+  const caller = useCallStore((s) => s.caller)
+  const isMuted = useCallStore((s) => s.isMuted)
+  const isHeld = useCallStore((s) => s.isHeld)
+  const isAutoDial = useCallStore((s) => s.isAutoDial)
+  const startCall = useCallStore((s) => s.startCall)
+  const connectCall = useCallStore((s) => s.connectCall)
+  const toggleMute = useCallStore((s) => s.toggleMute)
+  const toggleHold = useCallStore((s) => s.toggleHold)
+  const endCall = useCallStore((s) => s.endCall)
+  const tickDuration = useCallStore((s) => s.tickDuration)
+  const setAutoDial = useCallStore((s) => s.setAutoDial)
+  const resetCall = useCallStore((s) => s.resetCall)
 
   // 6. Slot ca hẹn chi nhánh cho chiến dịch đang chọn
   const branchId = selectedCampaign?.branch_id || 3
@@ -177,6 +277,13 @@ export const Telesale: React.FC = () => {
       setCallbackDate('')
       setSelectedServices([])
       setSelectedDoCanMang([])
+      setSelectedMachineProblem('')
+      setOtherMachineProblem('')
+      setSelectedMoreRequest('')
+      setOtherMoreRequest('')
+      setDeniedCustomText('')
+      setSelectedPainPoint('')
+      setServiceSearch('')
       notify(`Đã nạp khách hàng: ${nextCust.customer_name}`)
     } catch {
       // Error handled in hook
@@ -252,7 +359,18 @@ export const Telesale: React.FC = () => {
         payload.callback_at = `${callbackDate} ${callbackTime}:00`
       }
     } else if (selectedOutcome === 'not_interested') {
-      payload.denied_note = deniedReason || 'Khách không có nhu cầu'
+      payload.denied_note = deniedLevel1 || 'Không xử lý được từ chối'
+      if (deniedLevel2) {
+        payload.sub_denied_note = deniedLevel2
+      }
+      if (deniedCustomText.trim()) {
+        payload.sub_sub_denied_note = deniedCustomText.trim()
+      } else if (deniedLevel3) {
+        payload.sub_sub_denied_note = deniedLevel3
+      }
+      if (selectedPainPoint) {
+        payload.pain_point = selectedPainPoint
+      }
     } else if (selectedOutcome === 'closed') {
       if (!orderDate) {
         notify('Vui lòng chọn ngày hẹn khi chốt đơn')
@@ -268,6 +386,18 @@ export const Telesale: React.FC = () => {
       payload.branch_id = branchId
       payload.services = selectedServices
       payload.do_can_mang = selectedDoCanMang
+      if (selectedMachineProblem) {
+        payload.machine_problem = selectedMachineProblem
+        if (selectedMachineProblem === 'Khác' && otherMachineProblem.trim()) {
+          payload.other_machine_problem = otherMachineProblem.trim()
+        }
+      }
+      if (selectedMoreRequest) {
+        payload.more_request = selectedMoreRequest
+        if (selectedMoreRequest === 'Khác' && otherMoreRequest.trim()) {
+          payload.other_more_request = otherMoreRequest.trim()
+        }
+      }
     }
 
     isSubmittingResultRef.current = true
@@ -300,9 +430,6 @@ export const Telesale: React.FC = () => {
       isSubmittingResultRef.current = false
     }
   }
-
-  // Danh mục dịch vụ thực tế từ API (GET /api/telesale/enums)
-  const serviceOptions = enums?.services || []
 
   return (
     <div className="content telesale-content">
@@ -543,7 +670,9 @@ export const Telesale: React.FC = () => {
                       <MapPin size={14} /> {currentCustomer.masked_address || 'Địa chỉ bảo mật'}
                     </p>
                   </div>
-                  <strong>{formatDuration(durationSec)}</strong>
+                  <strong>
+                    <CallDurationText />
+                  </strong>
                 </div>
 
                 <div className="caller-number" style={{ padding: '0 16px 10px' }}>
@@ -781,29 +910,139 @@ export const Telesale: React.FC = () => {
 
             {/* Nếu là từ chối / không có nhu cầu */}
             {selectedOutcome === 'not_interested' && (
-              <div style={{ padding: '0 16px 12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Lý do từ chối:
-                </label>
-                <select
-                  value={deniedReason}
-                  onChange={(e) => setDeniedReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '36px',
-                    border: '1px solid #dce5f0',
-                    borderRadius: '6px',
-                    padding: '0 10px',
-                    fontSize: '11px',
-                    color: '#334155',
-                    background: '#fff',
-                  }}
-                >
-                  <option value="Khách tự thay thế hoặc người nhà thay">Khách tự thay thế / người nhà thay</option>
-                  <option value="Chê giá cao / không đồng ý chi phí">Chê giá cao / không đồng ý chi phí</option>
-                  <option value="Out vùng / Quá xa chi nhánh">Out vùng / Quá xa chi nhánh</option>
-                  <option value="Đã dùng hãng khác / Bán máy cũ">Đã dùng hãng khác / Bán máy cũ</option>
-                </select>
+              <div style={{ padding: '0 16px 12px', display: 'grid', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    1. Nhóm từ chối (Cấp 1):
+                  </label>
+                  <select
+                    value={deniedLevel1}
+                    onChange={(e) => handleLevel1Change(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      border: '1px solid #dce5f0',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      color: '#334155',
+                      background: '#fff',
+                    }}
+                  >
+                    {level1Options.map((n) => (
+                      <option key={n.code} value={n.code}>
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {level2Options.length > 0 && (
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      2. Lý do chi tiết (Cấp 2):
+                    </label>
+                    <select
+                      value={deniedLevel2}
+                      onChange={(e) => handleLevel2Change(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '34px',
+                        border: '1px solid #dce5f0',
+                        borderRadius: '6px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        background: '#fff',
+                      }}
+                    >
+                      {level2Options.map((n) => (
+                        <option key={n.code} value={n.code}>
+                          {n.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {level3Options.length > 0 && (
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      3. Phân loại sâu (Cấp 3):
+                    </label>
+                    <select
+                      value={deniedLevel3}
+                      onChange={(e) => handleLevel3Change(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '34px',
+                        border: '1px solid #dce5f0',
+                        borderRadius: '6px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        background: '#fff',
+                      }}
+                    >
+                      {level3Options.map((n) => (
+                        <option key={n.code} value={n.code}>
+                          {n.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {needsTextInput && (
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Chi tiết cụ thể (Out vùng / Khác):
+                    </label>
+                    <input
+                      type="text"
+                      value={deniedCustomText}
+                      onChange={(e) => setDeniedCustomText(e.target.value)}
+                      placeholder="Ghi rõ khu vực out vùng hoặc chi tiết lý do..."
+                      style={{
+                        width: '100%',
+                        height: '34px',
+                        border: '1px solid #dce5f0',
+                        borderRadius: '6px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        background: '#fff',
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Nỗi đau khách hàng (Pain Point):
+                  </label>
+                  <select
+                    value={selectedPainPoint}
+                    onChange={(e) => setSelectedPainPoint(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      border: '1px solid #dce5f0',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      color: '#334155',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">-- Không xác định nỗi đau --</option>
+                    {painPointOptions.map((p) => (
+                      <option key={p.code} value={p.code}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -842,12 +1081,30 @@ export const Telesale: React.FC = () => {
                   </label>
                 </div>
 
+                {/* Chọn gói dịch vụ */}
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                    Gói dịch vụ:
+                    Gói dịch vụ ({selectedServices.length} đã chọn):
                   </label>
-                  <div style={{ display: 'grid', gap: '4px' }}>
-                    {serviceOptions.map((srv) => {
+                  <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="🔍 Tìm nhanh gói dịch vụ hoặc lõi lọc..."
+                    style={{
+                      width: '100%',
+                      height: '30px',
+                      border: '1px solid #dce5f0',
+                      borderRadius: '5px',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      color: '#334155',
+                      background: '#fff',
+                      marginBottom: '6px',
+                    }}
+                  />
+                  <div style={{ display: 'grid', gap: '4px', maxHeight: '170px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {filteredServices.map((srv) => {
                       const isSelected = selectedServices.includes(srv.code)
                       return (
                         <label
@@ -864,7 +1121,7 @@ export const Telesale: React.FC = () => {
                             background: isSelected ? '#f0fdf4' : '#fff',
                           }}
                         >
-                          <span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
                             <input
                               type="checkbox"
                               checked={isSelected}
@@ -875,15 +1132,153 @@ export const Telesale: React.FC = () => {
                                   setSelectedServices(selectedServices.filter((s) => s !== srv.code))
                                 }
                               }}
-                              style={{ marginRight: '6px' }}
                             />
-                            {srv.label}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={srv.label}>
+                              {srv.label}
+                            </span>
                           </span>
-                          {srv.price ? <b>{formatVND(srv.price)}</b> : <span style={{ color: '#16a34a' }}>Miễn phí</span>}
+                          {srv.price ? (
+                            <b style={{ whiteSpace: 'nowrap', marginLeft: '6px' }}>{formatVND(srv.price)}</b>
+                          ) : (
+                            <span style={{ color: '#16a34a', whiteSpace: 'nowrap', marginLeft: '6px' }}>Miễn phí</span>
+                          )}
                         </label>
                       )
                     })}
                   </div>
+                </div>
+
+                {/* Đồ KTV cần mang đi (do_can_mang) */}
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Đồ / Thiết bị KTV cần mang ({selectedDoCanMang.length}):
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', maxHeight: '130px', overflowY: 'auto' }}>
+                    {doCanMangOptions.map((item) => {
+                      const isChecked = selectedDoCanMang.includes(item.code)
+                      return (
+                        <label
+                          key={item.code}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid #e2e8f0',
+                            background: isChecked ? '#eff6ff' : '#fff',
+                            fontSize: '10.5px',
+                            cursor: 'pointer',
+                            color: isChecked ? '#1d4ed8' : '#334155',
+                            fontWeight: isChecked ? 600 : 400,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleDoCanMang(item.code)}
+                          />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.label}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Tình trạng lỗi máy (machine_problem) */}
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Tình trạng lỗi máy (nếu có):
+                  </label>
+                  <select
+                    value={selectedMachineProblem}
+                    onChange={(e) => setSelectedMachineProblem(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      border: '1px solid #dce5f0',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      color: '#334155',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">-- Máy hoạt động bình thường --</option>
+                    {machineProblemOptions.map((m) => (
+                      <option key={m.code} value={m.code}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedMachineProblem === 'Khác' && (
+                    <input
+                      type="text"
+                      value={otherMachineProblem}
+                      onChange={(e) => setOtherMachineProblem(e.target.value)}
+                      placeholder="Nhập mô tả lỗi máy khác..."
+                      style={{
+                        width: '100%',
+                        height: '32px',
+                        border: '1px solid #dce5f0',
+                        borderRadius: '5px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        background: '#fff',
+                        marginTop: '4px',
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Yêu cầu thêm (more_request) */}
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Yêu cầu kỹ thuật viên (more_request):
+                  </label>
+                  <select
+                    value={selectedMoreRequest}
+                    onChange={(e) => setSelectedMoreRequest(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      border: '1px solid #dce5f0',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      fontSize: '11px',
+                      color: '#334155',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">-- Không có yêu cầu đặc biệt --</option>
+                    {moreRequestOptions.map((req) => (
+                      <option key={req.code} value={req.code}>
+                        {req.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedMoreRequest === 'Khác' && (
+                    <input
+                      type="text"
+                      value={otherMoreRequest}
+                      onChange={(e) => setOtherMoreRequest(e.target.value)}
+                      placeholder="Nhập yêu cầu thêm khác..."
+                      style={{
+                        width: '100%',
+                        height: '32px',
+                        border: '1px solid #dce5f0',
+                        borderRadius: '5px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        color: '#334155',
+                        background: '#fff',
+                        marginTop: '4px',
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             )}

@@ -190,21 +190,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ period }) => {
 
   return (
     <div className="content">
-      <div className="page-title">
-        <div>
-          <p>
-            Xin chào, {user?.name || user?.username || 'Nhân viên'} <span>👋</span>
-          </p>
-          <h1>Tổng quan công việc</h1>
-        </div>
-        <button
-          className="help"
-          type="button"
-          onClick={() => notify('Hướng dẫn sử dụng Dashboard SalesFlow')}
-        >
-          <CircleHelp size={17} /> Hướng dẫn
-        </button>
-      </div>
 
       <section className="summary-section">
         <div className="section-caption">

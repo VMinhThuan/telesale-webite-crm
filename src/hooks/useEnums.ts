@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import enumsService from '../services/enums.service'
 import { EnumsCatalog } from '../types/api'
+import { queryKeys } from '../constants/queryKeys'
 
-export const ENUMS_QUERY_KEY = ['enums_catalog']
+export const ENUMS_QUERY_KEY = queryKeys.enums.all
 
 /**
  * Hook tải và cache danh mục mã ERP toàn cục
@@ -10,7 +11,7 @@ export const ENUMS_QUERY_KEY = ['enums_catalog']
  */
 export function useEnums(types?: string[]) {
   const query = useQuery<EnumsCatalog>({
-    queryKey: [...ENUMS_QUERY_KEY, types?.join(',') || 'all'],
+    queryKey: queryKeys.enums.types(types),
     queryFn: () => enumsService.getEnums(types),
     staleTime: Infinity,
   })
@@ -44,6 +45,15 @@ export function useEnums(types?: string[]) {
     machineProblems: enums.machine_problem || [],
     deniedReasons: enums.denied_reason || [],
     branches: enums.phong_ban || [],
+    huyNote: enums.huy_note || [],
+    traVeNote: enums.tra_ve_note || [],
+    moreRequest: enums.more_request || [],
+    painPoint: enums.pain_point || [],
+    luiHuyType: enums.lui_huy_type || [],
+    callStatuses: enums.call_status || [],
+    callDirections: enums.call_direction || [],
+    departments: enums.bo_phan || [],
+    teams: enums.to || [],
   }
 }
 

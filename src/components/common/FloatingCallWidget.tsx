@@ -9,7 +9,7 @@ import {
   PhoneOff,
   Play,
 } from 'lucide-react'
-import { useCallStore } from '../../store/useCallStore'
+import { useCallStore, CallDurationText } from '../../store/useCallStore'
 import { formatDuration } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 
@@ -17,16 +17,13 @@ export const FloatingCallWidget: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const {
-    status,
-    caller,
-    durationSec,
-    isMuted,
-    isHeld,
-    toggleMute,
-    toggleHold,
-    endCall,
-  } = useCallStore()
+  const status = useCallStore((s) => s.status)
+  const caller = useCallStore((s) => s.caller)
+  const isMuted = useCallStore((s) => s.isMuted)
+  const isHeld = useCallStore((s) => s.isHeld)
+  const toggleMute = useCallStore((s) => s.toggleMute)
+  const toggleHold = useCallStore((s) => s.toggleHold)
+  const endCall = useCallStore((s) => s.endCall)
 
   // Chỉ hiển thị widget nổi khi có cuộc gọi đang diễn ra và người dùng KHÔNG ở màn hình /telesale
   const isCallActive = status === 'calling' || status === 'connected' || status === 'paused'
@@ -123,7 +120,7 @@ export const FloatingCallWidget: React.FC = () => {
             {caller?.phoneMasked || '*** *** ***'}
           </span>
           <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 700, fontFamily: 'monospace' }}>
-            {formatDuration(durationSec)}
+            <CallDurationText />
           </span>
         </div>
       </div>

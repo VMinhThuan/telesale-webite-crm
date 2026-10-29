@@ -6,6 +6,7 @@ interface PaginationProps {
   pageSize: number
   total: number
   onChange: (newPage: number) => void
+  onPrefetchPage?: (targetPage: number) => void
   itemLabel?: string
 }
 
@@ -14,6 +15,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   pageSize,
   total,
   onChange,
+  onPrefetchPage,
   itemLabel = 'bản ghi',
 }) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -51,6 +53,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           type="button"
           onClick={() => onChange(page - 1)}
+          onMouseEnter={() => page > 1 && onPrefetchPage?.(page - 1)}
           disabled={page <= 1}
           style={{ opacity: page <= 1 ? 0.4 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
           aria-label="Trang trước"
@@ -64,6 +67,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             type="button"
             className={clsx({ active: p === page })}
             onClick={() => onChange(p)}
+            onMouseEnter={() => p !== page && onPrefetchPage?.(p)}
           >
             {p}
           </button>
@@ -72,6 +76,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           type="button"
           onClick={() => onChange(page + 1)}
+          onMouseEnter={() => page < totalPages && onPrefetchPage?.(page + 1)}
           disabled={page >= totalPages}
           style={{
             opacity: page >= totalPages ? 0.4 : 1,

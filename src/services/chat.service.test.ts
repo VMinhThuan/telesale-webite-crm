@@ -155,5 +155,60 @@ describe('Chat Service Unit Tests (API 39a - 39e)', () => {
     await chatService.uploadAttachment(999, dummyFile, 'document')
     expect(docSpy).toHaveBeenCalledWith(999, dummyFile)
   })
+
+  it('API 37: getThreadDetail trích xuất chính xác thread.participants cho nhóm trao đổi', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      result: {
+        thread: {
+          id: '9fafe945-bfa8-4b8d-8f88-3490f81aef30',
+          type: 2,
+          subject: 'Khách cần nhắn Zalo',
+          participants: [
+            { id: 87, name: 'Nguyễn Thị Hường', admin: true },
+            { id: 1219, name: 'Nguyễn Thị Thu', admin: true },
+            { id: 476, name: 'Giáp Văn Anh', admin: false },
+          ],
+          participants_count: 3,
+        },
+        messages: [
+          {
+            id: 'm1',
+            type: 0,
+            body: 'Tin nhắn nhóm',
+            is_mine: false,
+            created_at: '2026-10-28 10:00:00',
+          },
+        ],
+      },
+    } as any)
+
+    const detail = await chatService.getThreadDetail('9fafe945-bfa8-4b8d-8f88-3490f81aef30')
+
+    expect(detail.thread).toBeDefined()
+    expect(detail.thread.type).toBe(2)
+    expect(detail.participants).toHaveLength(3)
+    expect(detail.participants[0].name).toBe('Nguyễn Thị Hường')
+    expect(detail.participants[0].admin).toBe(true)
+    expect(detail.messages).toHaveLength(1)
+    expect(detail.messages[0].content).toBe('Tin nhắn nhóm')
+  })
+
+  it('API 37: getThreadDetail tự động sắp xếp tin nhắn theo thứ tự thời gian tăng dần (cũ ở trên, mới nhất ở dưới)', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      result: {
+        messages: [
+          // BE trả về mới nhất ở đầu (DESC)
+          { id: 'm_new', body: 'Tin mới nhất', created_at: '2026-10-28 17:26:00' },
+          { id: 'm_mid', body: 'Tin trung gian', created_at: '2026-10-28 17:12:00' },
+          { id: 'm_old', body: 'Tin cũ nhất', created_at: '2026-10-14 09:58:00' },
+        ],
+      },
+    } as any)
+
+    const detail = await chatService.getThreadDetail('any_thread')
+    expect(detail.messages[0].content).toBe('Tin cũ nhất')
+    expect(detail.messages[1].content).toBe('Tin trung gian')
+    expect(detail.messages[2].content).toBe('Tin mới nhất')
+  })
 })
 

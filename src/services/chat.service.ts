@@ -6,17 +6,84 @@ export const chatService = {
   /**
    * Lấy danh sách cuộc trò chuyện (API 35: GET /api/chats?page=1&per_page=20)
    */
-  async getThreads(page = 1, perPage = 20): Promise<{ threads: any[]; total?: number }> {
+  async getThreads(page = 1, perPage = 20): Promise<{
+    threads: any[]
+    total: number
+    pagination?: {
+      total: number
+      per_page: number | string
+      current_page: number
+      last_page: number
+    }
+  }> {
     const response: any = await apiClient.get(
       `${API_ENDPOINTS.CHATS}?page=${page}&per_page=${perPage}`,
     )
     const result = response?.result || response?.data || response || {}
     if (Array.isArray(result)) {
-      return { threads: result, total: result.length }
+      return {
+        threads: result,
+        total: result.length,
+        pagination: { total: result.length, per_page: perPage, current_page: page, last_page: 1 },
+      }
     }
+
+    const pagination = result.pagination || {}
+    const total = Number(pagination.total ?? result.total ?? (result.threads?.length || 0))
+    const currentPage = Number(pagination.current_page ?? page)
+    const lastPage = Number(
+      pagination.last_page ?? (Math.ceil(total / (Number(perPage) || 20)) || 1),
+    )
+    const parsedPerPage = pagination.per_page ?? perPage
+
     return {
       threads: result.threads || result.items || [],
-      total: result.total ?? (result.threads?.length || 0),
+      total,
+      pagination: {
+        total,
+        per_page: parsedPerPage,
+        current_page: currentPage,
+        last_page: lastPage,
+      },
+    }
+  },
+
+  /**
+   * Chuẩn hóa tin nhắn từ cấu trúc của ERP (RTippin Laravel Messenger)
+   */
+  normalizeMessage(m: any): ChatMessageItem {
+    // RTippin Messenger type: 0 = MESSAGE (text), 1 = IMAGE, 2 = DOCUMENT, 3 = AUDIO, 4 = VIDEO
+    let type: ChatMessageType = 'text'
+    if (m.type === 1 || m.type === 'image') type = 'image'
+    else if (m.type === 2 || m.type === 'document') type = 'document'
+    else if (m.type === 3 || m.type === 'audio') type = 'audio'
+    else if (m.type === 4 || m.type === 'video') type = 'video'
+
+    const rawBody = m.body || m.content || m.message || ''
+    let fileUrl = m.file_url || m.url
+    if (!fileUrl && type !== 'text' && typeof rawBody === 'string') {
+      if (rawBody.startsWith('http')) fileUrl = rawBody
+      else if (rawBody.startsWith('/')) fileUrl = `https://locnuoc365.xyz${rawBody}`
+    }
+
+    const senderName =
+      m.owner_name ||
+      m.owner?.name ||
+      m.sender_name ||
+      m.user_name ||
+      m.from ||
+      'Đồng nghiệp'
+
+    return {
+      id: m.id || m.message_id || `msg_${Date.now()}_${Math.random()}`,
+      sender_name: senderName,
+      is_outgoing: Boolean(m.is_mine ?? m.is_outgoing ?? m.outgoing ?? false),
+      type,
+      content: rawBody,
+      file_url: fileUrl,
+      file_name: m.file_name || m.name || (type !== 'text' ? rawBody : undefined),
+      file_size: m.file_size || m.size,
+      created_at: m.created_at || m.time || new Date().toISOString(),
     }
   },
 
@@ -40,47 +107,24 @@ export const chatService = {
           ? result.items
           : []
 
-    const participants = Array.isArray(result.participants)
-      ? result.participants
-      : Array.isArray(result.recent_participants)
-        ? result.recent_participants
-        : []
+    const thread = result.thread || null
 
-    const messages = rawList.map((m: any): ChatMessageItem => {
-      // RTippin Messenger type: 0 = MESSAGE (text), 1 = IMAGE, 2 = DOCUMENT, 3 = AUDIO, 4 = VIDEO
-      let type: ChatMessageType = 'text'
-      if (m.type === 1 || m.type === 'image') type = 'image'
-      else if (m.type === 2 || m.type === 'document') type = 'document'
-      else if (m.type === 3 || m.type === 'audio') type = 'audio'
-      else if (m.type === 4 || m.type === 'video') type = 'video'
+    const participants =
+      (thread && Array.isArray(thread.participants) ? thread.participants : null) ||
+      (Array.isArray(result.participants) ? result.participants : null) ||
+      (thread && Array.isArray(thread.recent_participants) ? thread.recent_participants : null) ||
+      (Array.isArray(result.recent_participants) ? result.recent_participants : null) ||
+      []
 
-      const rawBody = m.body || m.content || m.message || ''
-      let fileUrl = m.file_url || m.url
-      if (!fileUrl && type !== 'text' && typeof rawBody === 'string') {
-        if (rawBody.startsWith('http')) fileUrl = rawBody
-        else if (rawBody.startsWith('/')) fileUrl = `https://locnuoc365.xyz${rawBody}`
-      }
-
-      const senderName =
-        m.owner_name ||
-        m.owner?.name ||
-        m.sender_name ||
-        m.user_name ||
-        m.from ||
-        'Đồng nghiệp'
-
-      return {
-        id: m.id || m.message_id || `msg_${Date.now()}_${Math.random()}`,
-        sender_name: senderName,
-        is_outgoing: Boolean(m.is_outgoing ?? m.outgoing ?? false),
-        type,
-        content: rawBody,
-        file_url: fileUrl,
-        file_name: m.file_name || m.name || (type !== 'text' ? rawBody : undefined),
-        file_size: m.file_size || m.size,
-        created_at: m.created_at || m.time || new Date().toISOString(),
-      }
-    })
+    // ERP (RTippin Laravel Messenger) trả về danh sách tin nhắn mới nhất trước (DESC: index 0 là mới nhất).
+    // Chuẩn luồng UI Chat (cũ ở trên đỉnh, mới nhất ở dưới đáy): sắp xếp theo thời gian tăng dần (ASC)
+    const messages = rawList
+      .map((m: any) => this.normalizeMessage(m))
+      .sort((a: ChatMessageItem, b: ChatMessageItem) => {
+        const timeA = new Date(a.created_at || 0).getTime()
+        const timeB = new Date(b.created_at || 0).getTime()
+        return timeA - timeB
+      })
 
     return {
       messages,
@@ -107,14 +151,23 @@ export const chatService = {
   },
 
   /**
-   * Tìm kiếm tin nhắn trong hội thoại (API 38: GET /api/chats/{thread_id}/search)
+   * Tìm kiếm tin nhắn trong hội thoại (API 38: GET /api/chats/{thread_id}/search?keyword=...)
    */
   async searchMessages(threadId: number | string, keyword: string): Promise<ChatMessageItem[]> {
+    if (!keyword || !keyword.trim()) return []
     const response: any = await apiClient.get(
-      `${API_ENDPOINTS.CHAT_SEARCH(threadId)}?keyword=${encodeURIComponent(keyword)}`,
+      `${API_ENDPOINTS.CHAT_SEARCH(threadId)}?keyword=${encodeURIComponent(keyword.trim())}`,
     )
-    const result = response?.result || response?.data || response || []
-    return Array.isArray(result) ? result : result.messages || []
+    const result = response?.result || response?.data || response || {}
+    const rawList = Array.isArray(result)
+      ? result
+      : Array.isArray(result.messages)
+        ? result.messages
+        : Array.isArray(result.items)
+          ? result.items
+          : []
+
+    return rawList.map((m: any) => this.normalizeMessage(m))
   },
 
   /**

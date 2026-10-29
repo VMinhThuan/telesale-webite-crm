@@ -253,8 +253,7 @@ export const Reports: React.FC = () => {
     <div className="content reports-content">
       <div className="page-title report-title">
         <div>
-          <p>Dành cho quản lý · Dữ liệu báo cáo hiệu suất</p>
-          <h1>Báo cáo tổng hợp</h1>
+          <h2>Dành cho quản lý · Dữ liệu báo cáo hiệu suất</h2>
         </div>
         <div className="report-filters">
           <label className="report-select">

@@ -1,4 +1,6 @@
+import React from 'react'
 import { create } from 'zustand'
+import { formatDuration } from '../utils/formatters'
 
 export type CallStatus = 'idle' | 'calling' | 'connected' | 'paused' | 'ended'
 
@@ -73,5 +75,18 @@ export const useCallStore = create<CallState>((set) => ({
       isHeld: false,
     }),
 }))
+
+/**
+ * Component hiển thị thời lượng cuộc gọi nguyên tử (Atomic Component).
+ * Chỉ re-render duy nhất phần text thời gian mỗi giây, giúp component cha (Telesale, Widget)
+ * KHÔNG bị re-render toàn bộ khi durationSec tăng.
+ */
+export const CallDurationText: React.FC<{
+  className?: string
+  style?: React.CSSProperties
+}> = React.memo(({ className, style }) => {
+  const durationSec = useCallStore((state) => state.durationSec)
+  return React.createElement('span', { className, style }, formatDuration(durationSec))
+})
 
 export default useCallStore
