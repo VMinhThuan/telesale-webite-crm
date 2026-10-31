@@ -207,58 +207,10 @@ export const Telesale: React.FC = () => {
       setSipRegStatus(status)
     })
 
-    const unsubscribeCall = sipService.onCallStateChange((event) => {
-      const lineId = event.lineId
-      if (event.status === 'calling' || event.status === 'progress') {
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === lineId ? { ...t, status: 'calling' } : t,
-          ),
-        )
-      } else if (event.status === 'connected') {
-        if (lineId === activeTabId) {
-          useCallStore.getState().connectCall()
-        }
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === lineId ? { ...t, status: 'connected', isHeld: false } : t,
-          ),
-        )
-      } else if (event.status === 'paused') {
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === lineId ? { ...t, status: 'paused', isHeld: true } : t,
-          ),
-        )
-      } else if (event.status === 'ended') {
-        if (lineId === activeTabId) {
-          useCallStore.getState().endCall()
-        }
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === lineId ? { ...t, status: 'ended', isHeld: false } : t,
-          ),
-        )
-      } else if (event.status === 'failed') {
-        if (lineId === activeTabId) {
-          useCallStore.getState().endCall()
-        }
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === lineId ? { ...t, status: 'ended', isHeld: false } : t,
-          ),
-        )
-        if (event.cause) {
-          notify(`Cuộc gọi Line ${lineId} kết thúc: ${event.cause}`)
-        }
-      }
-    })
-
     return () => {
       unsubscribeReg()
-      unsubscribeCall()
     }
-  }, [effectiveSipConfig, activeTabId, setTabs])
+  }, [effectiveSipConfig])
 
   // Chuyển đổi giữa 3 tab cuộc gọi
   const handleSelectTab = (newTabId: number) => {

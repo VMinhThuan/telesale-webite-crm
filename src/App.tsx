@@ -21,6 +21,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType, PeriodType } from '@/types'
+import { notify } from '@/utils/notify'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
 const LoginPage = lazy(() =>
@@ -70,6 +71,48 @@ const AppShell: React.FC = () => {
       useTelesaleCallStore.getState().tickDurations()
     }, 1000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Lắng nghe và đồng bộ sự kiện cuộc gọi SIP toàn cục xuyên suốt các trang (kể cả khi rời trang Telesale)
+  useEffect(() => {
+    const unsubscribeCall = sipService.onCallStateChange((event) => {
+      const lineId = event.lineId
+      const activeTabId = useTelesaleCallStore.getState().activeTabId
+
+      if (event.status === 'calling' || event.status === 'progress') {
+        useTelesaleCallStore.getState().updateTab(lineId, { status: 'calling' })
+      } else if (event.status === 'connected') {
+        useTelesaleCallStore.getState().updateTab(lineId, { status: 'connected', isHeld: false })
+        if (lineId === activeTabId) {
+          useCallStore.getState().connectCall()
+        }
+      } else if (event.status === 'paused') {
+        useTelesaleCallStore.getState().updateTab(lineId, { status: 'paused', isHeld: true })
+        if (lineId === activeTabId && !useCallStore.getState().isHeld) {
+          useCallStore.getState().toggleHold()
+        }
+      } else if (event.status === 'ended' || event.status === 'failed') {
+        useTelesaleCallStore.getState().updateTab(lineId, { status: 'ended', isHeld: false })
+
+        // Kiểm tra nếu line kết thúc là line active HOẶC không còn line nào đang gọi/kết nối/giữ máy
+        const currentTabs = useTelesaleCallStore.getState().tabs
+        const hasActiveLine = currentTabs.some(
+          (t) => t.status === 'calling' || t.status === 'connected' || t.status === 'paused',
+        )
+
+        if (lineId === activeTabId || !hasActiveLine) {
+          useCallStore.getState().endCall()
+        }
+
+        if (event.status === 'failed' && event.cause) {
+          notify(`Cuộc gọi Line ${lineId} kết thúc: ${event.cause}`)
+        }
+      }
+    })
+
+    return () => {
+      unsubscribeCall()
+    }
   }, [])
 
   // Đảm bảo gác máy mọi cuộc gọi và ngắt kết nối SIP UA khi đóng tab/trình duyệt hoặc unmount AppShell
