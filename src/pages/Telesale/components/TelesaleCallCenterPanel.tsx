@@ -41,6 +41,16 @@ export interface TelesaleCallCenterPanelProps {
   onEndCall: () => void
   onFetchCustomerForTab: (tabId: number) => void
   isFetchingCustomer: boolean
+  // Trạng thái SIP Softphone tổng đài
+  sipRegStatus?:
+    | 'disconnected'
+    | 'connecting'
+    | 'connected'
+    | 'registered'
+    | 'unregistered'
+    | 'registrationFailed'
+  sipExtension?: string
+  onReconnectSip?: () => void
   // Các props tương thích ngược và cache IDE
   currentCustomer?: NextCustomerDto | null
   onFetchNextCustomer?: () => void
@@ -57,6 +67,9 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   onEndCall,
   onFetchCustomerForTab,
   isFetchingCustomer,
+  sipRegStatus = 'registered',
+  sipExtension,
+  onReconnectSip,
 }) => {
   // Lấy tab đang active
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
@@ -71,18 +84,82 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
             <p className="eyebrow">PHIÊN ĐÀM THOẠI</p>
             <h2>Điều khiển cuộc gọi</h2>
           </div>
-          <span className="calling-status">
-            <i />{' '}
-            {activeTab.status === 'connected'
-              ? 'Đang đàm thoại'
-              : activeTab.status === 'paused'
-                ? 'Đang giữ máy'
-                : activeTab.status === 'calling'
-                  ? 'Đang đổ chuông...'
-                  : activeTab.customer
-                    ? 'Sẵn sàng quay số'
-                    : 'Chờ nạp khách'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Badge chỉ báo kết nối SIP máy nhánh tổng đài */}
+            <span
+              onClick={
+                sipRegStatus === 'registrationFailed' ||
+                sipRegStatus === 'disconnected'
+                  ? onReconnectSip
+                  : undefined
+              }
+              title={
+                sipRegStatus === 'registered'
+                  ? `Máy nhánh #${sipExtension || '1126'} đã đăng ký online với tổng đài Grandstream`
+                  : sipRegStatus === 'connecting'
+                    ? 'Đang bắt tay kết nối WebSocket WSS tới tổng đài...'
+                    : 'Bấm để kết nối lại máy nhánh SIP'
+              }
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '4px 9px',
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background:
+                  sipRegStatus === 'registered'
+                    ? '#dcfce7'
+                    : sipRegStatus === 'connecting'
+                      ? '#fef3c7'
+                      : '#fee2e2',
+                color:
+                  sipRegStatus === 'registered'
+                    ? '#15803d'
+                    : sipRegStatus === 'connecting'
+                      ? '#b45309'
+                      : '#b91c1c',
+                cursor:
+                  sipRegStatus === 'registrationFailed' ||
+                  sipRegStatus === 'disconnected'
+                    ? 'pointer'
+                    : 'default',
+              }}
+            >
+              <i
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background:
+                    sipRegStatus === 'registered'
+                      ? '#16a34a'
+                      : sipRegStatus === 'connecting'
+                        ? '#f59e0b'
+                        : '#ef4444',
+                }}
+              />
+              {sipRegStatus === 'registered'
+                ? `SIP #${sipExtension || '1126'}: Sẵn sàng`
+                : sipRegStatus === 'connecting'
+                  ? `SIP #${sipExtension || '1126'}: Đang kết nối...`
+                  : `SIP #${sipExtension || '1126'}: Mất kết nối (Thử lại)`}
+            </span>
+
+            <span className="calling-status">
+              <i />{' '}
+              {activeTab.status === 'connected'
+                ? 'Đang đàm thoại'
+                : activeTab.status === 'paused'
+                  ? 'Đang giữ máy'
+                  : activeTab.status === 'calling'
+                    ? 'Đang đổ chuông...'
+                    : activeTab.customer
+                      ? 'Sẵn sàng quay số'
+                      : 'Chờ nạp khách'}
+            </span>
+          </div>
         </div>
 
         {/* Thanh 3 Tab / 3 Line cuộc gọi theo mẫu thiết kế ban đầu */}

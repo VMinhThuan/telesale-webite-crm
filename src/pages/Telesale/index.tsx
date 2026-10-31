@@ -225,11 +225,25 @@ export const Telesale: React.FC = () => {
     return () => clearInterval(intervalId)
   }, [])
 
+  // Trạng thái đăng ký SIP của máy nhánh tổng đài
+  const [sipRegStatus, setSipRegStatus] = useState<
+    | 'disconnected'
+    | 'connecting'
+    | 'connected'
+    | 'registered'
+    | 'unregistered'
+    | 'registrationFailed'
+  >(() => sipService.getRegistrationStatus())
+
   // Tự động kết nối và đăng ký máy nhánh SIP khi vào màn hình Telesale
   useEffect(() => {
     if (effectiveSipConfig) {
       sipService.init(effectiveSipConfig)
     }
+
+    const unsubscribeReg = sipService.onRegistrationStatusChange((status) => {
+      setSipRegStatus(status)
+    })
 
     const unsubscribeCall = sipService.onCallStateChange((event) => {
       if (event.status === 'calling' || event.status === 'progress') {
@@ -272,6 +286,7 @@ export const Telesale: React.FC = () => {
     })
 
     return () => {
+      unsubscribeReg()
       unsubscribeCall()
     }
   }, [effectiveSipConfig, activeTabId])
@@ -606,6 +621,12 @@ export const Telesale: React.FC = () => {
           onEndCall={handleEndCall}
           onFetchCustomerForTab={handleFetchCustomerForTab}
           isFetchingCustomer={nextCustomerMutation.isPending}
+          sipRegStatus={sipRegStatus}
+          sipExtension={effectiveSipConfig.impi}
+          onReconnectSip={() => {
+            sipService.init(effectiveSipConfig)
+            notify('Đang gửi lệnh kết nối lại tổng đài...')
+          }}
           currentCustomer={currentCustomer}
           onFetchNextCustomer={() => handleFetchCustomerForTab(activeTabId)}
         />
