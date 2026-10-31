@@ -9,10 +9,10 @@ import {
   GraduationCap,
   Info,
   Loader2,
-  MessageCircle,
   MonitorPlay,
   Phone,
   Play,
+  Pencil,
   Search,
   Trash2,
   UploadCloud,
@@ -24,8 +24,10 @@ import {
   useTrainingManifest,
 } from '../../hooks/useTraining'
 import { notify } from '../../utils/notify'
+import { formatDate } from '../../utils/formatters'
 import { TrainingUploadModal } from './components/TrainingUploadModal'
 import { TrainingViewerModal } from './components/TrainingViewerModal'
+import { TrainingEditModal } from './components/TrainingEditModal'
 
 interface TrainingProps {
   onOpenDialog?: (dialog: DialogState) => void
@@ -46,6 +48,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
   // State quản lý Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [viewerMaterial, setViewerMaterial] = useState<TrainingMaterial | null>(null)
+  const [editingMaterial, setEditingMaterial] = useState<TrainingMaterial | null>(null)
 
   // Truy vấn danh mục và tài liệu từ Cloudflare R2
   const { data: manifest, isLoading } = useTrainingManifest()
@@ -160,7 +163,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
   ) => {
     e.stopPropagation()
     const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa tài liệu "${item.title}" khỏi Cloudflare R2?`,
+      `Bạn có chắc chắn muốn xóa tài liệu "${item.title}"?`,
     )
     if (confirmed) {
       await deleteMutation.mutateAsync({ id: item.id, fileKey: item.fileKey })
@@ -231,8 +234,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
           <section className="call-panel materials-panel">
             <div className="call-panel-heading">
               <div>
-                <p className="eyebrow">THƯ VIỆN ĐÀO TẠO (R2 STORAGE)</p>
-                <h2>{category === 'Tất cả' ? 'Tài liệu dành cho bạn' : category}</h2>
+                <p className="eyebrow">THƯ VIỆN ĐÀO TẠO</p>
               </div>
               <span className="materials-count">
                 {isLoading ? (
@@ -258,7 +260,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
                     className="animate-spin"
                     style={{ margin: '0 auto 12px', color: '#3b82f6' }}
                   />
-                  Đang đồng bộ tài liệu từ Cloudflare R2...
+                  Đang đồng bộ tài liệu...
                 </div>
               ) : visibleMaterials.length > 0 ? (
                 visibleMaterials.map((item) => {
@@ -277,39 +279,80 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
                           }}
                         >
                           <h3>{item.title}</h3>
-                          {/* Nút xóa tài liệu */}
-                          <button
-                            type="button"
-                            title="Xóa tài liệu"
-                            onClick={(e) => handleDeleteMaterial(e, item)}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#94a3b8',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              borderRadius: '4px',
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.color = '#ef4444')
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.color = '#94a3b8')
-                            }
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {/* Nút chỉnh sửa tài liệu */}
+                            <button
+                              type="button"
+                              title="Chỉnh sửa tài liệu"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingMaterial(item)
+                              }}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#94a3b8',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px',
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.color = '#3b82f6')
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.color = '#94a3b8')
+                              }
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            {/* Nút xóa tài liệu */}
+                            <button
+                              type="button"
+                              title="Xóa tài liệu"
+                              onClick={(e) => handleDeleteMaterial(e, item)}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#94a3b8',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px',
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.color = '#ef4444')
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.color = '#94a3b8')
+                              }
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </div>
                         <p>{item.desc}</p>
-                        <div>
-                          <span>
-                            {item.type === 'video' ? (
-                              <FileVideo size={14} />
-                            ) : (
-                              <FileText size={14} />
-                            )}
-                            {item.meta}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                            <span>
+                              {item.type === 'video' ? (
+                                <FileVideo size={14} />
+                              ) : (
+                                <FileText size={14} />
+                              )}
+                              {item.meta}
+                            </span>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                color: '#64748b',
+                                fontSize: '12px',
+                              }}
+                            >
+                              <CalendarDays size={13} />
+                              {formatDate(item.publishedAt || item.updatedAt)}
+                            </span>
+                          </div>
                           <button
                             onClick={() => handleOpenMaterial(item)}
                             type="button"
@@ -403,36 +446,31 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
                 >
                   <Icon size={16} />
                   <span>{item.title}</span>
-                  <time>{item.updatedAt || 'Hôm nay'}</time>
+                  <time>{formatDate(item.publishedAt || item.updatedAt)}</time>
                 </div>
               )
             })}
           </section>
 
-          <section className="training-help">
-            <MessageCircle size={21} />
-            <div>
-              <strong>Cần hỗ trợ?</strong>
-              <span>Trao đổi với quản lý hoặc nhóm nội bộ.</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (setPage) setPage('chat')
-                notify('Đã chuyển sang Chat nội bộ')
-              }}
-            >
-              <MessageCircle size={16} /> Mở Chat
-            </button>
-          </section>
+
         </aside>
       </div>
 
-      {/* Modal Tải tài liệu lên Cloudflare R2 */}
+      {/* Modal Tải tài liệu lên */}
       {isUploadOpen && (
         <TrainingUploadModal
           categories={categories}
+          activeCategory={category}
           onClose={() => setIsUploadOpen(false)}
+        />
+      )}
+
+      {/* Modal Chỉnh sửa thông tin tài liệu */}
+      {editingMaterial && (
+        <TrainingEditModal
+          material={editingMaterial}
+          categories={categories}
+          onClose={() => setEditingMaterial(null)}
         />
       )}
 

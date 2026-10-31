@@ -108,8 +108,13 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const handleLogout = async () => {
     setProfileOpen(false)
-    await logout()
-    navigate('/login')
+    try {
+      await logout()
+    } catch (e) {
+      console.warn('Lỗi khi đăng xuất:', e)
+    } finally {
+      navigate('/login')
+    }
   }
 
   // 4. Lọc thông báo theo Tab (Tất cả / Chưa đọc)

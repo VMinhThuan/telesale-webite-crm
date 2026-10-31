@@ -592,6 +592,7 @@ class SipService {
         console.warn(`[SIP Line ${lineId}] Lỗi khi gác máy:`, e)
       }
       this.cleanupAudio(lineId)
+      this.updateCallStatus({ lineId, status: 'ended', session: null })
     })
     this.sessions.clear()
     this.lineStatuses.clear()

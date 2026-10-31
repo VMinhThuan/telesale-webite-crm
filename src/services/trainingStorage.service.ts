@@ -8,10 +8,9 @@ import {
 // Cấu hình Cloudflare R2 từ biến môi trường
 export const R2_CONFIG = {
   publicUrl:
-    (import.meta as any).env?.VITE_R2_PUBLIC_URL ||
-    'https://pub-65ce68b4edeb48d1a892501f47359478.r2.dev',
+    (import.meta as any).env?.VITE_R2_PUBLIC_URL,
   bucketName:
-    (import.meta as any).env?.VITE_R2_BUCKET_NAME || 'telesale-training',
+    (import.meta as any).env?.VITE_R2_BUCKET_NAME,
   accountId: (import.meta as any).env?.VITE_R2_ACCOUNT_ID || '',
   accessKeyId: (import.meta as any).env?.VITE_R2_ACCESS_KEY_ID || '',
   secretAccessKey: (import.meta as any).env?.VITE_R2_SECRET_ACCESS_KEY || '',
@@ -253,6 +252,7 @@ class TrainingStorageService {
       fileSize: sizeStr,
       meta,
       tone,
+      publishedAt: payload.publishedAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
     }
 
@@ -263,8 +263,15 @@ class TrainingStorageService {
       ...currentManifest.materials.filter((m) => m.id !== newMaterial.id),
     ]
 
+    // Nếu category mới chưa có trong danh mục categories, tự động thêm vào
+    const categoriesSet = new Set(currentManifest.categories || [])
+    if (category && !categoriesSet.has(category)) {
+      categoriesSet.add(category)
+    }
+
     const updatedManifest: TrainingManifest = {
       ...currentManifest,
+      categories: Array.from(categoriesSet),
       updatedAt: new Date().toISOString(),
       materials: updatedMaterials,
     }
@@ -283,6 +290,65 @@ class TrainingStorageService {
     )
 
     return newMaterial
+  }
+
+  /**
+   * Cập nhật thông tin tài liệu (tiêu đề, mô tả, chuyển danh mục/tab, ngày phát hành)
+   */
+  async updateMaterial(
+    materialId: string,
+    payload: { title: string; desc: string; category: string; publishedAt?: string },
+  ): Promise<TrainingMaterial> {
+    const s3 = this.getS3Client()
+    const currentManifest = await this.getManifest()
+
+    let updatedMaterial: TrainingMaterial | null = null
+    const updatedMaterials = currentManifest.materials.map((m) => {
+      if (m.id === materialId) {
+        updatedMaterial = {
+          ...m,
+          title: payload.title.trim(),
+          desc: payload.desc.trim(),
+          category: payload.category.trim(),
+          publishedAt: payload.publishedAt || m.publishedAt || m.updatedAt,
+          updatedAt: new Date().toISOString().split('T')[0],
+        }
+        return updatedMaterial
+      }
+      return m
+    })
+
+    if (!updatedMaterial) {
+      throw new Error('Không tìm thấy tài liệu cần cập nhật.')
+    }
+
+    // Tự động bổ sung category mới vào danh mục nếu chưa tồn tại
+    const categoriesSet = new Set(currentManifest.categories || [])
+    if (payload.category && !categoriesSet.has(payload.category)) {
+      categoriesSet.add(payload.category)
+    }
+
+    const updatedManifest: TrainingManifest = {
+      ...currentManifest,
+      categories: Array.from(categoriesSet),
+      updatedAt: new Date().toISOString(),
+      materials: updatedMaterials,
+    }
+
+    const manifestBytes = new TextEncoder().encode(
+      JSON.stringify(updatedManifest, null, 2),
+    )
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: R2_CONFIG.bucketName,
+        Key: 'manifest.json',
+        Body: manifestBytes,
+        ContentType: 'application/json',
+      }),
+    )
+
+    return updatedMaterial
   }
 
   /**

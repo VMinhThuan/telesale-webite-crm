@@ -9,6 +9,7 @@ export interface TrainingMaterial {
   fileSize?: string
   meta: string
   tone?: string
+  publishedAt?: string
   updatedAt?: string
 }
 
@@ -32,5 +33,5 @@ export interface UploadMaterialPayload {
   desc: string
   category: string
   type?: 'pdf' | 'video' | 'doc'
+  publishedAt?: string
 }
-

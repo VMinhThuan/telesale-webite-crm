@@ -4,28 +4,39 @@ import {
   FileText,
   FileVideo,
   Loader2,
+  Plus,
   UploadCloud,
   X,
 } from 'lucide-react'
+import dayjs from '../../../lib/dayjs'
 import { useUploadMaterialMutation } from '../../../hooks/useTraining'
 import { R2_CONFIG } from '../../../services/trainingStorage.service'
 import { notify } from '../../../utils/notify'
 
 interface TrainingUploadModalProps {
   categories: string[]
+  activeCategory?: string
   onClose: () => void
 }
 
 export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
   categories,
+  activeCategory,
   onClose,
 }) => {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [category, setCategory] = useState(
-    categories.find((c) => c !== 'Tất cả') || 'Nghiệp vụ telesale',
+    activeCategory && activeCategory !== 'Tất cả'
+      ? activeCategory
+      : categories.find((c) => c !== 'Tất cả') || 'Nghiệp vụ telesale',
   )
+  const [publishedAt, setPublishedAt] = useState(() =>
+    dayjs().format('YYYY-MM-DD'),
+  )
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +61,10 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    const finalCategory = isAddingNewCategory
+      ? newCategoryName.trim()
+      : category.trim()
+
     if (!file) {
       notify('Vui lòng chọn một tệp tài liệu hoặc video để tải lên.')
       return
@@ -60,12 +75,18 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
       return
     }
 
+    if (!finalCategory) {
+      notify('Vui lòng chọn hoặc nhập tên danh mục / Tab.')
+      return
+    }
+
     try {
       await uploadMutation.mutateAsync({
         file,
         title: title.trim(),
         desc: desc.trim() || 'Tài liệu hướng dẫn nội bộ.',
-        category,
+        category: finalCategory,
+        publishedAt,
       })
       onClose()
     } catch {
@@ -135,7 +156,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
                   color: '#0f172a',
                 }}
               >
-                Tải tài liệu lên Cloudflare R2
+                Tải lên tài liệu mới
               </h3>
               <p
                 style={{
@@ -144,7 +165,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
                   color: '#64748b',
                 }}
               >
-                Lưu trữ tệp đào tạo trực tiếp vào Cloudflare R2
+                Thêm tài liệu hoặc video hướng dẫn nội bộ
               </p>
             </div>
           </div>
@@ -189,7 +210,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
               <strong>Lưu ý:</strong> Bạn cần điền đầy đủ các thông số trong file{' '}
               <code>.env</code> (<code>VITE_R2_ACCOUNT_ID</code>,{' '}
               <code>VITE_R2_ACCESS_KEY_ID</code>,{' '}
-              <code>VITE_R2_SECRET_ACCESS_KEY</code>) để thực hiện tải tệp lên R2.
+              <code>VITE_R2_SECRET_ACCESS_KEY</code>) để thực hiện tải tệp lên hệ thống.
             </div>
           </div>
         )}
@@ -307,6 +328,88 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
 
           {/* Danh mục */}
           <div style={{ marginBottom: '14px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '6px',
+              }}
+            >
+              <label
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#334155',
+                }}
+              >
+                Phân loại danh mục / Tab:
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsAddingNewCategory(!isAddingNewCategory)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#2563eb',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Plus size={12} />
+                {isAddingNewCategory ? 'Chọn danh mục có sẵn' : 'Tạo Tab mới'}
+              </button>
+            </div>
+
+            {isAddingNewCategory ? (
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nhập tên danh mục / Tab mới..."
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: '1px solid #3b82f6',
+                  padding: '0 12px',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  padding: '0 12px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                {categories
+                  .filter((c) => c !== 'Tất cả')
+                  .map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+
+          {/* Ngày phát hành */}
+          <div style={{ marginBottom: '14px' }}>
             <label
               style={{
                 display: 'block',
@@ -316,11 +419,12 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
                 marginBottom: '6px',
               }}
             >
-              Phân loại danh mục
+              Ngày phát hành
             </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+            <input
+              type="date"
+              value={publishedAt}
+              onChange={(e) => setPublishedAt(e.target.value)}
               style={{
                 width: '100%',
                 height: '38px',
@@ -330,17 +434,8 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
                 fontSize: '13px',
                 outline: 'none',
                 background: '#ffffff',
-                cursor: 'pointer',
               }}
-            >
-              {categories
-                .filter((c) => c !== 'Tất cả')
-                .map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-            </select>
+            />
           </div>
 
           {/* Mô tả tóm tắt */}
@@ -418,7 +513,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
             >
               {uploadMutation.isPending ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Đang tải lên R2...
+                  <Loader2 size={16} className="animate-spin" /> Đang tải lên...
                 </>
               ) : (
                 <>

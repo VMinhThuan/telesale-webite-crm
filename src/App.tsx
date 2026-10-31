@@ -16,6 +16,9 @@ import { Toast } from '@/components/common/Toast'
 import { Topbar } from '@/components/common/Topbar'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { useEnums } from '@/hooks/useEnums'
+import sipService from '@/services/sipService'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType, PeriodType } from '@/types'
 
@@ -69,6 +72,30 @@ const AppShell: React.FC = () => {
     return () => clearInterval(timer)
   }, [])
 
+  // Đảm bảo gác máy mọi cuộc gọi và ngắt kết nối SIP UA khi đóng tab/trình duyệt hoặc unmount AppShell
+  useEffect(() => {
+    const handleWindowUnload = () => {
+      try {
+        sipService.destroy()
+      } catch (e) {
+        console.warn('Lỗi khi dọn dẹp SIP lúc đóng trình duyệt:', e)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleWindowUnload)
+    window.addEventListener('pagehide', handleWindowUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleWindowUnload)
+      window.removeEventListener('pagehide', handleWindowUnload)
+      try {
+        sipService.destroy()
+      } catch (e) {
+        console.warn('Lỗi khi dọn dẹp SIP lúc unmount AppShell:', e)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     let timeoutId: number
     const onToast = (event: Event) => {
@@ -81,6 +108,21 @@ const AppShell: React.FC = () => {
     const onUnauthorized = (event: Event) => {
       const customEvent = event as CustomEvent<{ message: string }>
       setToast(customEvent.detail?.message || 'Phiên làm việc hết hạn.')
+
+      // Dọn dẹp SIP session và reset trạng thái cuộc gọi khi hết hạn phiên
+      try {
+        useAuthStore.getState().logout()
+      } catch (e) {
+        console.warn('Lỗi khi đăng xuất trên sự kiện unauthorized:', e)
+        try {
+          sipService.destroy()
+        } catch {
+          // ignore
+        }
+        useTelesaleCallStore.getState().resetTabs()
+        useCallStore.getState().resetCall()
+      }
+
       const current = location.pathname + location.search
       const redirectParam = current !== '/' ? `&redirect=${encodeURIComponent(current)}` : ''
       navigate(`/login?session_expired=true${redirectParam}`, { replace: true })

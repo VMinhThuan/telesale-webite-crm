@@ -61,10 +61,10 @@ export function useAuth() {
     },
   })
 
-  // Mutation đăng xuất
+  // Mutation đăng xuất (luôn dọn dẹp state và hủy SIP dù API logout thành công hay thất bại)
   const logoutMutation = useMutation({
     mutationFn: () => authService.logout(),
-    onSuccess: () => {
+    onSettled: () => {
       logout()
       queryClient.clear()
       notify('Đã đăng xuất khỏi hệ thống.')

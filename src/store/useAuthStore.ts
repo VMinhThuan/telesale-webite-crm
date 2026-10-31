@@ -7,6 +7,9 @@ import {
   setStoredToken,
   setStoredUser,
 } from '../services/apiClient'
+import sipService from '../services/sipService'
+import { useTelesaleCallStore } from './useTelesaleCallStore'
+import { useCallStore } from './useCallStore'
 
 export interface UserProfile {
   id: number | string
@@ -78,6 +81,22 @@ export const useAuthStore = create<AuthState>()(
         },
 
         logout: () => {
+          // 1. Hủy kết nối tổng đài SIP, gác máy toàn bộ các line
+          try {
+            sipService.destroy()
+          } catch (e) {
+            console.warn('Lỗi khi hủy SIP Service trong logout:', e)
+          }
+
+          // 2. Xóa sạch dữ liệu cuộc gọi và các tab Telesale
+          try {
+            useTelesaleCallStore.getState().resetTabs()
+            useCallStore.getState().resetCall()
+          } catch {
+            // ignore
+          }
+
+          // 3. Xóa token và auth storage
           clearStoredAuth()
           set({ token: null, user: null, isAuthenticated: false }, false, 'auth/logout')
         },

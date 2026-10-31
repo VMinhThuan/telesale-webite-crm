@@ -17,7 +17,7 @@ export function useTrainingManifest() {
 }
 
 /**
- * Mutation tải tệp lên Cloudflare R2 và cập nhật manifest
+ * Mutation tải tệp lên hệ thống lưu trữ và cập nhật danh mục
  */
 export function useUploadMaterialMutation() {
   const queryClient = useQueryClient()
@@ -30,13 +30,37 @@ export function useUploadMaterialMutation() {
       notify(`Đã tải lên tài liệu thành công: "${newMaterial.title}"`)
     },
     onError: (err: any) => {
-      notify(err.message || 'Lỗi khi tải lên tệp lên Cloudflare R2.')
+      notify(err.message || 'Lỗi khi tải lên tệp tài liệu.')
     },
   })
 }
 
 /**
- * Mutation xóa tài liệu khỏi Cloudflare R2
+ * Mutation cập nhật thông tin tài liệu
+ */
+export function useUpdateMaterialMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string
+      payload: { title: string; desc: string; category: string; publishedAt?: string }
+    }) => trainingStorageService.updateMaterial(id, payload),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: TRAINING_QUERY_KEY })
+      notify(`Đã cập nhật tài liệu "${updated.title}" thành công!`)
+    },
+    onError: (err: any) => {
+      notify(err.message || 'Không thể cập nhật tài liệu.')
+    },
+  })
+}
+
+/**
+ * Mutation xóa tài liệu đào tạo
  */
 export function useDeleteMaterialMutation() {
   const queryClient = useQueryClient()
@@ -49,7 +73,7 @@ export function useDeleteMaterialMutation() {
       notify('Đã xóa tài liệu đào tạo thành công!')
     },
     onError: (err: any) => {
-      notify(err.message || 'Không thể xóa tài liệu trên Cloudflare R2.')
+      notify(err.message || 'Không thể xóa tài liệu.')
     },
   })
 }
