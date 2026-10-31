@@ -29,7 +29,7 @@ export class AppApiError extends Error {
  * Địa chỉ máy chủ ERP chính thức: https://locnuoc365.xyz
  */
 export const API_BASE_URL: string =
-  (import.meta as any).env?.VITE_API_BASE_URL || 'https://locnuoc365.xyz'
+  import.meta.env.VITE_API_BASE_URL || 'https://locnuoc365.xyz'
 
 // Tự động dọn dẹp key lưu instance cũ trong localStorage nếu có
 try {
@@ -137,7 +137,7 @@ export const generateIdempotencyKey = (): string => {
 /**
  * Khởi tạo Axios Instance theo chuẩn API_TELESALE_APP.md
  */
-const timeout = Number((import.meta as any).env?.VITE_API_TIMEOUT) || 15000
+const timeout = Number(import.meta.env.VITE_API_TIMEOUT) || 15000
 
 export const apiClient = axios.create({
   baseURL: getCurrentInstanceUrl(),

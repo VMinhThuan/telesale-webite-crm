@@ -8,12 +8,12 @@ import {
 // Cấu hình Cloudflare R2 từ biến môi trường
 export const R2_CONFIG = {
   publicUrl:
-    (import.meta as any).env?.VITE_R2_PUBLIC_URL,
-  bucketName:
-    (import.meta as any).env?.VITE_R2_BUCKET_NAME,
-  accountId: (import.meta as any).env?.VITE_R2_ACCOUNT_ID || '',
-  accessKeyId: (import.meta as any).env?.VITE_R2_ACCESS_KEY_ID || '',
-  secretAccessKey: (import.meta as any).env?.VITE_R2_SECRET_ACCESS_KEY || '',
+    import.meta.env.VITE_R2_PUBLIC_URL ||
+    'https://pub-65ce68b4edeb48d1a892501f47359478.r2.dev',
+  bucketName: import.meta.env.VITE_R2_BUCKET_NAME || 'telesale',
+  accountId: import.meta.env.VITE_R2_ACCOUNT_ID || '',
+  accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID || '',
+  secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY || '',
 }
 
 // Dữ liệu khung ban đầu khi chưa tải được hoặc khi R2 mới khởi tạo
