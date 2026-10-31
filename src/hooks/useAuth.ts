@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import authService, { LoginCredentials } from '../services/auth.service'
 import { useAuthStore } from '../store/useAuthStore'
@@ -32,9 +33,24 @@ export function useAuth() {
     staleTime: 1000 * 60 * 15, // 15 phút
   })
 
-  // Mutation đăng nhập
+  // Tự động đồng bộ thông tin SIP và profile vào authStore khi query hoàn tất
+  useEffect(() => {
+    if (userInfoQuery.data) {
+      updateUser(userInfoQuery.data)
+    }
+  }, [userInfoQuery.data, updateUser])
+
+  // Mutation đăng nhập: Đảm bảo nạp ngay profile và cấu hình SIP đầy đủ
   const loginMutation = useMutation({
-    mutationFn: (credentials: LoginCredentials) => authService.login(credentials),
+    mutationFn: async (credentials: LoginCredentials) => {
+      const loginRes = await authService.login(credentials)
+      try {
+        const fullProfile = await authService.getUserInfo()
+        return { access_token: loginRes.access_token, user: fullProfile }
+      } catch {
+        return loginRes
+      }
+    },
     onSuccess: (data) => {
       login(data.access_token, data.user)
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })

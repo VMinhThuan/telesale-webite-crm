@@ -96,7 +96,13 @@ export const getStoredUser = (): any | null => {
 export const setStoredUser = (user: any | null): void => {
   try {
     if (user) {
-      localStorage.setItem(USER_KEY, JSON.stringify(user))
+      // Bảo mật: Tuyệt đối không lưu mật khẩu SIP dạng plain text vào localStorage
+      const sanitized = { ...user }
+      if (sanitized.sipConfig) {
+        const { password: _, ...safeSip } = sanitized.sipConfig
+        sanitized.sipConfig = safeSip
+      }
+      localStorage.setItem(USER_KEY, JSON.stringify(sanitized))
     } else {
       localStorage.removeItem(USER_KEY)
     }

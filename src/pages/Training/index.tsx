@@ -8,98 +8,207 @@ import {
   FileVideo,
   GraduationCap,
   Info,
+  Loader2,
   MessageCircle,
   MonitorPlay,
   Phone,
   Play,
   Search,
+  Trash2,
+  UploadCloud,
 } from 'lucide-react'
-import { DialogState, PageType, TrainingItem } from '../../types'
+import { DialogState, PageType } from '../../types'
+import { TrainingMaterial } from '../../types/training'
+import {
+  useDeleteMaterialMutation,
+  useTrainingManifest,
+} from '../../hooks/useTraining'
 import { notify } from '../../utils/notify'
+import { TrainingUploadModal } from './components/TrainingUploadModal'
+import { TrainingViewerModal } from './components/TrainingViewerModal'
 
 interface TrainingProps {
   onOpenDialog?: (dialog: DialogState) => void
   setPage?: (page: PageType) => void
 }
 
-const materials: TrainingItem[] = [
-  { title: 'Quy trình telesale', desc: 'Các bước gọi, tư vấn và ghi nhận kết quả.', icon: FileText, meta: 'PDF · 12 trang', type: 'pdf', category: 'Nghiệp vụ telesale', tone: 'blue' },
-  { title: 'Kịch bản tư vấn', desc: 'Bảo dưỡng, thay lõi và xử lý từ chối.', icon: FileText, meta: 'PDF · 8 trang', type: 'doc', category: 'Kịch bản tư vấn', tone: 'amber' },
-  { title: 'Kiến thức máy lọc nước', desc: 'Cấu tạo máy và chức năng các lõi lọc.', icon: GraduationCap, meta: 'PDF · 15 trang', type: 'course', category: 'Kiến thức sản phẩm', tone: 'green' },
-  { title: 'Quy trình hẹn đơn', desc: 'Chọn slot và xác nhận lịch với khách.', icon: CalendarDays, meta: 'PDF · 6 trang', type: 'calendar', category: 'Nghiệp vụ telesale', tone: 'rose' },
-  { title: 'Kỹ năng chăm sóc khách hàng', desc: 'Cách khai thác nhu cầu và theo dõi khách.', icon: FileVideo, meta: 'Video · 08:30', type: 'video', category: 'Kịch bản tư vấn', tone: 'video' },
-  { title: 'Hướng dẫn sử dụng hệ thống', desc: 'Dashboard, Telesale, CSKH và Đơn hàng.', icon: MonitorPlay, meta: 'Video · 06:45', type: 'video', category: 'Video hướng dẫn', tone: 'video' },
-  { title: 'Video xử lý từ chối', desc: 'Thực hành các tình huống thường gặp khi tư vấn.', icon: FileVideo, meta: 'Video · 12:10', type: 'video', category: 'Video hướng dẫn', tone: 'video' },
-]
+const getMaterialIcon = (type: string, tone?: string) => {
+  if (type === 'video' || tone === 'video') return FileVideo
+  if (tone === 'green') return GraduationCap
+  if (tone === 'rose') return CalendarDays
+  return FileText
+}
 
-const categories = ['Tất cả', 'Nghiệp vụ telesale', 'Kịch bản tư vấn', 'Kiến thức sản phẩm', 'Video hướng dẫn']
-
-export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => {
+export const Training: React.FC<TrainingProps> = ({ setPage }) => {
   const [category, setCategory] = useState('Tất cả')
   const [query, setQuery] = useState('')
 
+  // State quản lý Modals
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [viewerMaterial, setViewerMaterial] = useState<TrainingMaterial | null>(null)
+
+  // Truy vấn danh mục và tài liệu từ Cloudflare R2
+  const { data: manifest, isLoading } = useTrainingManifest()
+  const deleteMutation = useDeleteMaterialMutation()
+
+  const categories = useMemo(
+    () =>
+      manifest?.categories || [
+        'Tất cả',
+        'Nghiệp vụ telesale',
+        'Kịch bản tư vấn',
+        'Kiến thức sản phẩm',
+        'Video hướng dẫn',
+      ],
+    [manifest?.categories],
+  )
+
+  const materialsList = useMemo(
+    () => manifest?.materials || [],
+    [manifest?.materials],
+  )
+
   const visibleMaterials = useMemo(() => {
-    return materials.filter((item) => {
+    return materialsList.filter((item) => {
       const matchCat = category === 'Tất cả' || item.category === category
       const matchQuery = `${item.title} ${item.desc}`
         .toLocaleLowerCase('vi')
         .includes(query.toLocaleLowerCase('vi'))
       return matchCat && matchQuery
     })
-  }, [category, query])
+  }, [materialsList, category, query])
 
   const journey = useMemo(() => {
+    if (manifest?.journeys && manifest.journeys[category]) {
+      return manifest.journeys[category].map((step) => ({
+        ...step,
+        icon: step.tone === 'green' ? GraduationCap : step.tone === 'amber' ? FileText : BookOpen,
+      }))
+    }
+
     switch (category) {
       case 'Kiến thức sản phẩm':
         return [
-          { title: 'Nắm kiến thức sản phẩm', desc: 'Tìm hiểu cấu tạo máy và chức năng các lõi lọc.', icon: GraduationCap, tone: 'green' },
-          { title: 'Ôn cấu tạo lõi lọc', desc: 'Xem lại các lõi lọc và thời hạn sử dụng.', icon: BookOpen, tone: 'blue' },
+          {
+            title: 'Nắm kiến thức sản phẩm',
+            desc: 'Tìm hiểu cấu tạo máy và chức năng các lõi lọc.',
+            icon: GraduationCap,
+            tone: 'green',
+          },
+          {
+            title: 'Ôn cấu tạo lõi lọc',
+            desc: 'Xem lại các lõi lọc và thời hạn sử dụng.',
+            icon: BookOpen,
+            tone: 'blue',
+          },
         ]
       case 'Video hướng dẫn':
         return [
-          { title: 'Xem hướng dẫn hệ thống', desc: 'Làm quen Dashboard, Telesale và CSKH.', icon: MonitorPlay, tone: 'blue' },
-          { title: 'Luyện xử lý từ chối', desc: 'Thực hành cách phản hồi khách hàng.', icon: FileVideo, tone: 'amber' },
+          {
+            title: 'Xem hướng dẫn hệ thống',
+            desc: 'Làm quen Dashboard, Telesale và CSKH.',
+            icon: MonitorPlay,
+            tone: 'blue',
+          },
+          {
+            title: 'Luyện xử lý từ chối',
+            desc: 'Thực hành cách phản hồi khách hàng.',
+            icon: FileVideo,
+            tone: 'amber',
+          },
         ]
       case 'Kịch bản tư vấn':
         return [
-          { title: 'Luyện kịch bản tư vấn', desc: 'Thực hành các tình huống tư vấn và xử lý từ chối.', icon: FileText, tone: 'amber' },
-          { title: 'Kỹ năng chăm sóc khách', desc: 'Khai thác nhu cầu và theo dõi khách.', icon: Phone, tone: 'green' },
+          {
+            title: 'Luyện kịch bản tư vấn',
+            desc: 'Thực hành các tình huống tư vấn và xử lý từ chối.',
+            icon: FileText,
+            tone: 'amber',
+          },
+          {
+            title: 'Kỹ năng chăm sóc khách',
+            desc: 'Khai thác nhu cầu và theo dõi khách.',
+            icon: Phone,
+            tone: 'green',
+          },
         ]
       default:
         return [
-          { title: 'Đọc quy trình telesale', desc: 'Hiểu các bước gọi, tư vấn và ghi nhận kết quả.', icon: FileText, tone: 'blue' },
-          { title: 'Thực hành hẹn đơn', desc: 'Chọn slot và xác nhận lịch với khách.', icon: CalendarDays, tone: 'rose' },
+          {
+            title: 'Đọc quy trình telesale',
+            desc: 'Hiểu các bước gọi, tư vấn và ghi nhận kết quả.',
+            icon: FileText,
+            tone: 'blue',
+          },
+          {
+            title: 'Thực hành hẹn đơn',
+            desc: 'Chọn slot và xác nhận lịch với khách.',
+            icon: CalendarDays,
+            tone: 'rose',
+          },
         ]
     }
-  }, [category])
+  }, [category, manifest])
 
-  const handleOpenMaterial = (item: TrainingItem) => {
-    if (onOpenDialog) {
-      onOpenDialog({
-        title: item.title,
-        type: item.tone === 'video' ? 'video' : 'document',
-      })
-    } else {
-      notify(`Đang mở: ${item.title}`)
+  const handleOpenMaterial = (item: TrainingMaterial) => {
+    setViewerMaterial(item)
+  }
+
+  const handleDeleteMaterial = async (
+    e: React.MouseEvent,
+    item: TrainingMaterial,
+  ) => {
+    e.stopPropagation()
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa tài liệu "${item.title}" khỏi Cloudflare R2?`,
+    )
+    if (confirmed) {
+      await deleteMutation.mutateAsync({ id: item.id, fileKey: item.fileKey })
     }
   }
 
   return (
     <div className="content training-content">
+      {/* Tiêu đề trang & Nút tải lên R2 */}
       <div className="page-title training-title">
         <div>
           <h2>Kiến thức và hướng dẫn dành cho nhân viên telesale</h2>
         </div>
-        <label className="training-search">
-          <Search size={18} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm tài liệu, video, kịch bản..."
-          />
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <label className="training-search" style={{ margin: 0 }}>
+            <Search size={18} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm tài liệu, video, kịch bản..."
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => setIsUploadOpen(true)}
+            style={{
+              height: '38px',
+              padding: '0 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#2563eb',
+              color: '#ffffff',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            <UploadCloud size={16} /> Tải tài liệu lên
+          </button>
+        </div>
       </div>
 
+      {/* Tabs danh mục */}
       <div className="training-tabs">
         {categories.map((item) => (
           <button
@@ -116,39 +225,101 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
         ))}
       </div>
 
+      {/* Grid nội dung */}
       <div className="training-grid">
         <div className="material-column">
           <section className="call-panel materials-panel">
             <div className="call-panel-heading">
               <div>
-                <p className="eyebrow">THƯ VIỆN</p>
+                <p className="eyebrow">THƯ VIỆN ĐÀO TẠO (R2 STORAGE)</p>
                 <h2>{category === 'Tất cả' ? 'Tài liệu dành cho bạn' : category}</h2>
               </div>
               <span className="materials-count">
-                {visibleMaterials.length.toString().padStart(2, '0')} tài liệu
+                {isLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  `${visibleMaterials.length.toString().padStart(2, '0')} tài liệu`
+                )}
               </span>
             </div>
 
             <div className="materials-list">
-              {visibleMaterials.length > 0 ? (
+              {isLoading ? (
+                <div
+                  style={{
+                    padding: '40px',
+                    textAlign: 'center',
+                    color: '#64748b',
+                    fontSize: '13px',
+                  }}
+                >
+                  <Loader2
+                    size={28}
+                    className="animate-spin"
+                    style={{ margin: '0 auto 12px', color: '#3b82f6' }}
+                  />
+                  Đang đồng bộ tài liệu từ Cloudflare R2...
+                </div>
+              ) : visibleMaterials.length > 0 ? (
                 visibleMaterials.map((item) => {
-                  const Icon = item.icon
+                  const Icon = getMaterialIcon(item.type, item.tone)
                   return (
-                    <article className="material-card" key={item.title}>
-                      <div className={`material-icon ${item.tone}`}>
+                    <article className="material-card" key={item.id || item.title}>
+                      <div className={`material-icon ${item.tone || 'blue'}`}>
                         <Icon size={35} />
                       </div>
                       <div className="material-copy">
-                        <h3>{item.title}</h3>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <h3>{item.title}</h3>
+                          {/* Nút xóa tài liệu */}
+                          <button
+                            type="button"
+                            title="Xóa tài liệu"
+                            onClick={(e) => handleDeleteMaterial(e, item)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#94a3b8',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = '#ef4444')
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = '#94a3b8')
+                            }
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                         <p>{item.desc}</p>
                         <div>
                           <span>
-                            <FileText size={14} />
+                            {item.type === 'video' ? (
+                              <FileVideo size={14} />
+                            ) : (
+                              <FileText size={14} />
+                            )}
                             {item.meta}
                           </span>
-                          <button onClick={() => handleOpenMaterial(item)} type="button">
-                            {item.tone === 'video' ? <Play size={14} /> : <Eye size={15} />}{' '}
-                            {item.tone === 'video' ? 'Xem video' : 'Xem tài liệu'}
+                          <button
+                            onClick={() => handleOpenMaterial(item)}
+                            type="button"
+                          >
+                            {item.type === 'video' ? (
+                              <Play size={14} />
+                            ) : (
+                              <Eye size={15} />
+                            )}{' '}
+                            {item.type === 'video' ? 'Xem video' : 'Xem tài liệu'}
                           </button>
                         </div>
                       </div>
@@ -156,7 +327,9 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
                   )
                 })
               ) : (
-                <div className="empty-materials">Không tìm thấy tài liệu phù hợp.</div>
+                <div className="empty-materials">
+                  Không tìm thấy tài liệu phù hợp trong danh mục này.
+                </div>
               )}
             </div>
           </section>
@@ -173,6 +346,7 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
           </div>
         </div>
 
+        {/* Cột Lộ trình học & Mới cập nhật */}
         <aside className="training-side">
           <section className="call-panel getting-started">
             <div className="call-panel-heading">
@@ -213,18 +387,23 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
               <button
                 className="see-all"
                 type="button"
-                onClick={() => notify('Xem tất cả tài liệu cập nhật')}
+                onClick={() => notify('Đang hiển thị các tài liệu mới nhất')}
               >
                 Xem tất cả <ArrowRight size={13} />
               </button>
             </div>
-            {visibleMaterials.slice(0, 3).map((item, index) => {
-              const Icon = item.icon
+            {visibleMaterials.slice(0, 3).map((item) => {
+              const Icon = getMaterialIcon(item.type, item.tone)
               return (
-                <div className="updated-row" key={item.title}>
+                <div
+                  className="updated-row"
+                  key={item.id || item.title}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => handleOpenMaterial(item)}
+                >
                   <Icon size={16} />
                   <span>{item.title}</span>
-                  <time>{`${String(4 - index).padStart(2, '0')}/10/2026`}</time>
+                  <time>{item.updatedAt || 'Hôm nay'}</time>
                 </div>
               )
             })}
@@ -248,6 +427,24 @@ export const Training: React.FC<TrainingProps> = ({ onOpenDialog, setPage }) => 
           </section>
         </aside>
       </div>
+
+      {/* Modal Tải tài liệu lên Cloudflare R2 */}
+      {isUploadOpen && (
+        <TrainingUploadModal
+          categories={categories}
+          onClose={() => setIsUploadOpen(false)}
+        />
+      )}
+
+      {/* Modal Xem Video / Đọc PDF tài liệu thực tế từ R2 */}
+      {viewerMaterial && (
+        <TrainingViewerModal
+          material={viewerMaterial}
+          onClose={() => setViewerMaterial(null)}
+        />
+      )}
     </div>
   )
 }
+
+export default Training

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -78,12 +78,31 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [fetchedMessages])
 
+  const handleCloseInChatSearch = useCallback(() => {
+    setIsSearchInChatOpen(false)
+    setSearchResults(null)
+    setInChatSearchKeyword('')
+    setSearchedKeyword('')
+    setCurrentResultIndex(0)
+    setHighlightedMessageId(null)
+  }, [])
+
+  const handleCancelPendingFile = useCallback(() => {
+    setPreviewUrl((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev)
+      }
+      return null
+    })
+    setPendingFile(null)
+  }, [])
+
   // Reset tìm kiếm khi chuyển hội thoại
   useEffect(() => {
     handleCloseInChatSearch()
     handleCancelPendingFile()
     setMessage('')
-  }, [activeContact?.id])
+  }, [activeContact?.id, handleCloseInChatSearch, handleCancelPendingFile])
 
   // Đóng menu đính kèm khi click ngoài
   useEffect(() => {
@@ -158,15 +177,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     }
   }
 
-  const handleCloseInChatSearch = () => {
-    setIsSearchInChatOpen(false)
-    setSearchResults(null)
-    setInChatSearchKeyword('')
-    setSearchedKeyword('')
-    setCurrentResultIndex(0)
-    setHighlightedMessageId(null)
-  }
-
   // Hợp nhất fetchedMessages với searchResults để giữ ngữ cảnh và cho phép scroll
   const displayMessages = useMemo(() => {
     const list =
@@ -227,14 +237,6 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
     }
 
     e.target.value = ''
-  }
-
-  const handleCancelPendingFile = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
-    }
-    setPendingFile(null)
   }
 
   const handleSend = async () => {

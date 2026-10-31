@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
   BarChart3,
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
-  CircleHelp,
   ClipboardCheck,
   Clock3,
   DollarSign,
-  ExternalLink,
   History,
   Info,
   MapPin,
@@ -90,7 +87,6 @@ interface ReasonOption {
 }
 
 export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
-  const navigate = useNavigate()
   const { traVeNote, huyNote } = useEnums()
 
   const returnReasonOptions = useMemo<ReasonOption[]>(() => {

@@ -337,7 +337,7 @@ export const SettingsPage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '11px' }}>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Số máy lẻ:</span>
-                <b style={{ color: '#0f172a', fontSize: '14px' }}>#{user?.userExtension || '1126'}</b>
+                <b style={{ color: '#0f172a', fontSize: '14px' }}>{user?.userExtension ? `#${user.userExtension}` : 'Chưa cấp'}</b>
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Giao thức kết nối:</span>

@@ -4,13 +4,13 @@ import type { UAConfiguration, CallOptions } from 'jssip/lib/UA'
 import { notify } from '../utils/notify'
 
 export interface SipAccountConfig {
-  impi: string // e.g. "1126" (Extension máy nhánh)
-  impu: string // e.g. "sip:1126@tongdai.zozin.vn"
-  password: string // e.g. "locnuoc365"
-  websocketProxyUrl: string // e.g. "wss://tongdai.zozin.vn:7443/ws"
-  iceServerUrl?: string // e.g. "stun:stun.l.google.com:19302"
-  realm?: string // e.g. "grandstream"
-  displayName?: string // e.g. "1126"
+  impi: string // Extension máy nhánh được cấp từ ERP
+  impu: string // SIP AOR URI (sip:<extension>@<domain>)
+  password: string // Mật khẩu SIP được cấp từ ERP
+  websocketProxyUrl: string // Địa chỉ WebSocket WSS tổng đài
+  iceServerUrl?: string // STUN / TURN server
+  realm?: string // SIP authentication realm
+  displayName?: string // Tên hiển thị caller ID
 }
 
 export type SipRegistrationStatus =
@@ -31,6 +31,7 @@ export type SipCallStatus =
   | 'failed' // Bận máy, từ chối, lỗi mạng
 
 export interface SipCallStateEvent {
+  lineId: number
   status: SipCallStatus
   session?: RTCSession | null
   direction?: 'incoming' | 'outgoing'
@@ -46,44 +47,81 @@ type CallStateListener = (event: SipCallStateEvent) => void
 
 /**
  * Service quản lý Softphone SIP WebRTC trên trình duyệt
- * Tương thích chuẩn RFC 7118 (JsSIP) kết nối tổng đài Grandstream / Asterisk PBX
+ * Hỗ trợ mô hình Call Center nhiều line (Line Pool Session Registry)
+ * Tương thích chuẩn RFC 7118 (JsSIP) kết nối tổng đài Grandstream / Asterisk / FreeSWITCH PBX
  */
 class SipService {
   private ua: JsSIP.UA | null = null
-  private currentSession: RTCSession | null = null
-  private audioElement: HTMLAudioElement | null = null
+  // Map quản lý từng RTCSession độc lập theo lineId (1, 2, 3...)
+  private sessions: Map<number, RTCSession> = new Map()
+  // Map quản lý trạng thái đàm thoại của từng line
+  private lineStatuses: Map<number, SipCallStatus> = new Map()
+  // Line hiện tại đang được nhân viên tương tác/nghe nói
+  private activeLineId: number = 1
+  // Map quản lý Audio Element riêng cho từng line
+  private audioElements: Map<number, HTMLAudioElement> = new Map()
+
   private currentConfig: SipAccountConfig | null = null
   private ringToneAudioContext: AudioContext | null = null
   private ringOscillatorNode: OscillatorNode | null = null
   private ringGainNode: GainNode | null = null
 
   private registrationStatus: SipRegistrationStatus = 'disconnected'
-  private callStatus: SipCallStatus = 'idle'
 
   private registrationListeners: Set<RegistrationListener> = new Set()
   private callStateListeners: Set<CallStateListener> = new Set()
 
   /**
-   * Tạo hoặc lấy thẻ <audio> phát âm thanh cuộc gọi từ khách hàng
+   * Đặt line đang active
    */
-  private getOrCreateAudioElement(): HTMLAudioElement {
-    if (this.audioElement && document.body.contains(this.audioElement)) {
-      return this.audioElement
+  public setActiveLineId(lineId: number): void {
+    this.activeLineId = lineId
+  }
+
+  public getActiveLineId(): number {
+    return this.activeLineId
+  }
+
+  /**
+   * Tạo hoặc lấy thẻ <audio> phát âm thanh cuộc gọi riêng biệt cho từng line
+   */
+  private getOrCreateAudioElement(lineId: number): HTMLAudioElement {
+    const existingAudio = this.audioElements.get(lineId)
+    if (existingAudio && document.body.contains(existingAudio)) {
+      return existingAudio
     }
 
-    let existing = document.getElementById(
-      'sip-remote-audio',
-    ) as HTMLAudioElement | null
+    const elementId = `sip-remote-audio-line-${lineId}`
+    let existing = document.getElementById(elementId) as HTMLAudioElement | null
     if (!existing) {
       existing = document.createElement('audio')
-      existing.id = 'sip-remote-audio'
+      existing.id = elementId
       existing.autoplay = true
       existing.style.display = 'none'
       document.body.appendChild(existing)
     }
 
-    this.audioElement = existing
+    this.audioElements.set(lineId, existing)
     return existing
+  }
+
+  /**
+   * Dọn dẹp luồng audio của line chỉ định
+   */
+  private cleanupAudio(lineId: number): void {
+    const audio = this.audioElements.get(lineId)
+    if (audio) {
+      audio.srcObject = null
+    }
+  }
+
+  /**
+   * Dọn dẹp toàn bộ luồng audio
+   */
+  private cleanupAllAudio(): void {
+    this.audioElements.forEach((audio) => {
+      audio.srcObject = null
+    })
   }
 
   /**
@@ -175,7 +213,7 @@ class SipService {
       // 1. Khởi tạo WebSocket Interface
       const socket = new JsSIP.WebSocketInterface(config.websocketProxyUrl)
 
-      // 2. Cấu hình User Agent (UA) chuẩn Grandstream / Asterisk
+      // 2. Cấu hình User Agent (UA) chuẩn Grandstream / Asterisk / FreeSWITCH
       const configuration: UAConfiguration = {
         sockets: [socket],
         uri: config.impu,
@@ -215,12 +253,18 @@ class SipService {
         })
       })
 
-      // 4. Lắng nghe cuộc gọi (cuộc gọi đến nếu có)
+      // 4. Lắng nghe cuộc gọi đến (nếu có) -> Gán vào line rảnh đầu tiên
       this.ua.on('newRTCSession', (data: any) => {
         const session: RTCSession = data.session
-        // Nếu là cuộc gọi đến (remote), gắn lắng nghe
         if (data.originator === 'remote') {
-          this.bindSessionEvents(session, 'incoming')
+          let freeLineId = 1
+          for (let i = 1; i <= 3; i++) {
+            if (!this.sessions.has(i)) {
+              freeLineId = i
+              break
+            }
+          }
+          this.bindSessionEvents(session, freeLineId, 'incoming')
         }
       })
 
@@ -246,7 +290,11 @@ class SipService {
    */
   public onCallStateChange(listener: CallStateListener): () => void {
     this.callStateListeners.add(listener)
-    listener({ status: this.callStatus, session: this.currentSession })
+    listener({
+      lineId: this.activeLineId,
+      status: this.getCallStatus(this.activeLineId),
+      session: this.getCurrentSession(),
+    })
     return () => this.callStateListeners.delete(listener)
   }
 
@@ -259,28 +307,29 @@ class SipService {
   }
 
   private updateCallStatus(event: SipCallStateEvent) {
-    this.callStatus = event.status
+    this.lineStatuses.set(event.lineId, event.status)
     this.callStateListeners.forEach((l) => l(event))
   }
 
   /**
-   * Gắn các sự kiện WebRTC của một phiên đàm thoại RTCSession
+   * Gắn các sự kiện WebRTC của một phiên đàm thoại RTCSession theo lineId
    */
   private bindSessionEvents(
     session: RTCSession,
+    lineId: number,
     direction: 'incoming' | 'outgoing',
   ) {
-    this.currentSession = session
+    this.sessions.set(lineId, session)
 
     // Gắn luồng âm thanh từ khách hàng khi kết nối WebRTC PeerConnection được thiết lập
     session.on('peerconnection', (data: any) => {
       const pc: RTCPeerConnection = data.peerconnection
       pc.addEventListener('track', (e: RTCTrackEvent) => {
         if (e.streams && e.streams[0]) {
-          const audio = this.getOrCreateAudioElement()
+          const audio = this.getOrCreateAudioElement(lineId)
           audio.srcObject = e.streams[0]
           audio.play().catch((err) => {
-            console.warn('Lỗi tự động phát âm thanh cuộc gọi:', err)
+            console.warn(`[SIP Line ${lineId}] Lỗi tự động phát âm thanh cuộc gọi:`, err)
           })
         }
       })
@@ -289,6 +338,7 @@ class SipService {
     // Khi cuộc gọi bắt đầu kết nối
     session.on('connecting', () => {
       this.updateCallStatus({
+        lineId,
         status: 'calling',
         session,
         direction,
@@ -300,6 +350,7 @@ class SipService {
     session.on('progress', () => {
       this.startRingbackTone()
       this.updateCallStatus({
+        lineId,
         status: 'progress',
         session,
         direction,
@@ -311,6 +362,7 @@ class SipService {
     session.on('confirmed', () => {
       this.stopRingbackTone()
       this.updateCallStatus({
+        lineId,
         status: 'connected',
         session,
         direction,
@@ -321,6 +373,7 @@ class SipService {
     // Đang giữ máy
     session.on('hold', () => {
       this.updateCallStatus({
+        lineId,
         status: 'paused',
         session,
         direction,
@@ -330,6 +383,7 @@ class SipService {
     // Tiếp tục đàm thoại sau khi giữ máy
     session.on('unhold', () => {
       this.updateCallStatus({
+        lineId,
         status: 'connected',
         session,
         direction,
@@ -339,9 +393,10 @@ class SipService {
     // Kết thúc cuộc gọi bình thường
     session.on('ended', (e: any) => {
       this.stopRingbackTone()
-      this.cleanupAudio()
-      this.currentSession = null
+      this.cleanupAudio(lineId)
+      this.sessions.delete(lineId)
       this.updateCallStatus({
+        lineId,
         status: 'ended',
         session: null,
         direction,
@@ -352,9 +407,10 @@ class SipService {
     // Cuộc gọi thất bại (bận, từ chối, sai số)
     session.on('failed', (e: any) => {
       this.stopRingbackTone()
-      this.cleanupAudio()
-      this.currentSession = null
+      this.cleanupAudio(lineId)
+      this.sessions.delete(lineId)
       this.updateCallStatus({
+        lineId,
         status: 'failed',
         session: null,
         direction,
@@ -363,23 +419,23 @@ class SipService {
     })
   }
 
-  private cleanupAudio() {
-    if (this.audioElement) {
-      this.audioElement.srcObject = null
-    }
-  }
-
   /**
-   * Thực hiện cuộc gọi tới chuỗi số dial_number (đã có đầu số nhà mạng 15/17)
+   * Thực hiện cuộc gọi tới chuỗi số dialNumber gắn với lineId chỉ định
    */
-  public async call(dialNumber: string): Promise<RTCSession> {
+  public async call(lineId: number, dialNumber: string): Promise<RTCSession>
+  public async call(dialNumber: string): Promise<RTCSession>
+  public async call(arg1: number | string, arg2?: string): Promise<RTCSession> {
+    const targetLineId = typeof arg1 === 'number' ? arg1 : this.activeLineId
+    const dialNumber = typeof arg1 === 'number' ? (arg2 || '') : arg1
+
     if (!this.ua) {
       throw new Error('Softphone SIP chưa được khởi tạo. Vui lòng kiểm tra lại cấu hình.')
     }
 
     if (!this.ua.isRegistered()) {
-      notify('Máy nhánh SIP đang kết nối lại, vui lòng thử lại sau giây lát...')
+      notify('Máy nhánh SIP đang kết nối lại tới tổng đài. Vui lòng đợi trong giây lát...')
       this.ua.register()
+      throw new Error('Máy nhánh SIP chưa hoàn tất đăng ký với tổng đài. Vui lòng thử lại sau giây lát.')
     }
 
     // 1. Yêu cầu cấp quyền Microphone từ trình duyệt
@@ -390,7 +446,7 @@ class SipService {
     } catch (micErr: any) {
       notify('Trình duyệt chưa được cấp quyền Microphone để thực hiện cuộc gọi.')
       const err = new Error('Chưa cấp quyền Microphone: ' + (micErr?.message || micErr))
-      ;(err as any).cause = micErr
+        ; (err as any).cause = micErr
       throw err
     }
 
@@ -408,97 +464,137 @@ class SipService {
       },
     }
 
-    // 3. Thực hiện quay số qua SIP INVITE
-    const targetUri = `sip:${dialNumber}@${this.currentConfig?.realm || 'grandstream'}`
+    // 3. Trích xuất SIP Domain chuẩn từ impu nếu có (e.g. sip:1126@tongdai.zozin.vn -> tongdai.zozin.vn)
+    let sipDomain = this.currentConfig?.realm || 'grandstream'
+    if (this.currentConfig?.impu) {
+      const match = this.currentConfig.impu.match(/@([^:;\s>]+)/)
+      if (match && match[1]) {
+        sipDomain = match[1]
+      }
+    }
+
+    // 4. Thực hiện quay số qua SIP INVITE
+    const targetUri = `sip:${dialNumber}@${sipDomain}`
     const session = this.ua.call(targetUri, callOptions)
 
-    this.bindSessionEvents(session, 'outgoing')
+    this.bindSessionEvents(session, targetLineId, 'outgoing')
     this.startRingbackTone()
 
     return session
   }
 
   /**
-   * Bật/Tắt Mic của cuộc gọi hiện tại
+   * Bật/Tắt Mic của cuộc gọi (theo lineId hoặc line active)
    */
-  public toggleMute(): boolean {
-    if (!this.currentSession) return false
-    const isMuted = this.currentSession.isMuted().audio
+  public toggleMute(lineId?: number): boolean {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (!session) return false
+    const isMuted = session.isMuted().audio
     if (isMuted) {
-      this.currentSession.unmute({ audio: true })
+      session.unmute({ audio: true })
       return false
     } else {
-      this.currentSession.mute({ audio: true })
+      session.mute({ audio: true })
       return true
     }
   }
 
   /**
-   * Tắt Micro (Mute)
+   * Tắt Micro (Mute) theo lineId
    */
-  public mute(): void {
-    if (this.currentSession && !this.currentSession.isMuted().audio) {
-      this.currentSession.mute({ audio: true })
+  public mute(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (session && !session.isMuted().audio) {
+      session.mute({ audio: true })
     }
   }
 
   /**
-   * Bật lại Micro (Unmute)
+   * Bật lại Micro (Unmute) theo lineId
    */
-  public unmute(): void {
-    if (this.currentSession && this.currentSession.isMuted().audio) {
-      this.currentSession.unmute({ audio: true })
+  public unmute(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (session && session.isMuted().audio) {
+      session.unmute({ audio: true })
     }
   }
 
   /**
-   * Bật/Tắt Giữ máy (Hold / Unhold)
+   * Bật/Tắt Giữ máy (Hold / Unhold) theo lineId
    */
-  public toggleHold(): boolean {
-    if (!this.currentSession) return false
-    const isOnHold = this.currentSession.isOnHold().local
+  public toggleHold(lineId?: number): boolean {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (!session) return false
+    const isOnHold = session.isOnHold().local
     if (isOnHold) {
-      this.currentSession.unhold()
+      session.unhold()
       return false
     } else {
-      this.currentSession.hold()
+      session.hold()
       return true
     }
   }
 
   /**
-   * Giữ máy (Hold)
+   * Giữ máy (Hold) theo lineId
    */
-  public hold(): void {
-    if (this.currentSession && !this.currentSession.isOnHold().local) {
-      this.currentSession.hold()
+  public hold(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (session && !session.isOnHold().local) {
+      session.hold()
     }
   }
 
   /**
-   * Tiếp tục cuộc gọi sau khi giữ máy (Unhold)
+   * Tiếp tục cuộc gọi sau khi giữ máy (Unhold) theo lineId
    */
-  public unhold(): void {
-    if (this.currentSession && this.currentSession.isOnHold().local) {
-      this.currentSession.unhold()
+  public unhold(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (session && session.isOnHold().local) {
+      session.unhold()
     }
   }
 
   /**
-   * Kết thúc cuộc gọi (Gác máy - BYE)
+   * Kết thúc cuộc gọi theo lineId (Gác máy - BYE)
    */
-  public hangup(): void {
+  public hangup(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
     this.stopRingbackTone()
-    if (this.currentSession) {
+    if (session) {
       try {
-        this.currentSession.terminate()
+        session.terminate()
       } catch (e) {
-        console.warn('Lỗi khi kết thúc cuộc gọi:', e)
+        console.warn(`[SIP Line ${targetLineId}] Lỗi khi kết thúc cuộc gọi:`, e)
       }
-      this.currentSession = null
+      this.sessions.delete(targetLineId)
     }
-    this.cleanupAudio()
-    this.updateCallStatus({ status: 'ended', session: null })
+    this.cleanupAudio(targetLineId)
+    this.updateCallStatus({ lineId: targetLineId, status: 'ended', session: null })
+  }
+
+  /**
+   * Kết thúc toàn bộ cuộc gọi trên tất cả các line (Dùng khi logout hoặc đóng app)
+   */
+  public hangupAll(): void {
+    this.stopRingbackTone()
+    this.sessions.forEach((session, lineId) => {
+      try {
+        session.terminate()
+      } catch (e) {
+        console.warn(`[SIP Line ${lineId}] Lỗi khi gác máy:`, e)
+      }
+      this.cleanupAudio(lineId)
+    })
+    this.sessions.clear()
+    this.lineStatuses.clear()
   }
 
   /**
@@ -512,19 +608,25 @@ class SipService {
     return this.registrationStatus
   }
 
-  public getCallStatus(): SipCallStatus {
-    return this.callStatus
+  public getCallStatus(lineId?: number): SipCallStatus {
+    const targetLineId = lineId ?? this.activeLineId
+    return this.lineStatuses.get(targetLineId) || 'idle'
   }
 
-  public getCurrentSession(): RTCSession | null {
-    return this.currentSession
+  public getCurrentSession(lineId?: number): RTCSession | null {
+    const targetLineId = lineId ?? this.activeLineId
+    return this.sessions.get(targetLineId) || null
+  }
+
+  public getAllSessions(): Map<number, RTCSession> {
+    return this.sessions
   }
 
   /**
-   * Hủy kết nối và dọn dẹp tài nguyên
+   * Hủy kết nối và dọn dẹp toàn bộ tài nguyên
    */
   public destroy(): void {
-    this.hangup()
+    this.hangupAll()
     if (this.ua) {
       try {
         this.ua.stop()
@@ -534,6 +636,7 @@ class SipService {
       this.ua = null
     }
     this.currentConfig = null
+    this.cleanupAllAudio()
     this.updateRegistrationStatus('disconnected')
   }
 }

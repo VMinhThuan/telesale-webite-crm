@@ -10,7 +10,7 @@ import {
   Play,
 } from 'lucide-react'
 import { useCallStore, CallDurationText } from '../../store/useCallStore'
-import { formatDuration } from '../../utils/formatters'
+import sipService from '../../services/sipService'
 import { notify } from '../../utils/notify'
 
 export const FloatingCallWidget: React.FC = () => {
@@ -130,6 +130,7 @@ export const FloatingCallWidget: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            sipService.toggleMute()
             toggleMute()
             notify(!isMuted ? 'Đã tắt mic' : 'Đã bật mic')
           }}
@@ -152,6 +153,7 @@ export const FloatingCallWidget: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            sipService.toggleHold()
             toggleHold()
             notify(!isHeld ? 'Đang giữ máy' : 'Tiếp tục cuộc gọi')
           }}
@@ -174,6 +176,7 @@ export const FloatingCallWidget: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            sipService.hangup()
             endCall()
             notify('Đã kết thúc cuộc gọi')
           }}

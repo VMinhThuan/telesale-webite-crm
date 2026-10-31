@@ -34,13 +34,13 @@ export const resultOptions: {
   icon: any
   tone: string
 }[] = [
-  { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
-  { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
-  { key: 'callback', label: 'Hẹn gọi lại', icon: Timer, tone: 'amber' },
-  { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
-  { key: 'no_answer', label: 'Không nghe máy', icon: Voicemail, tone: 'gray' },
-  { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
-]
+    { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
+    { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
+    { key: 'callback', label: 'Hẹn gọi lại', icon: Timer, tone: 'amber' },
+    { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
+    { key: 'no_answer', label: 'Không nghe máy', icon: Voicemail, tone: 'gray' },
+    { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
+  ]
 
 export interface TelesaleCustomerPanelProps {
   currentCustomer: NextCustomerDto | null
@@ -371,7 +371,6 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       <section className="call-panel outcome-panel">
         <div className="call-panel-heading">
           <div>
-            <p className="eyebrow">KẾT QUẢ CUỘC GỌI</p>
             <h2>Ghi nhận kết quả</h2>
           </div>
         </div>

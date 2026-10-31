@@ -16,6 +16,7 @@ import { Toast } from '@/components/common/Toast'
 import { Topbar } from '@/components/common/Topbar'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { useEnums } from '@/hooks/useEnums'
+import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType, PeriodType } from '@/types'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
@@ -59,6 +60,14 @@ const AppShell: React.FC = () => {
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
   useEnums()
+
+  // Theo dõi bộ đếm thời lượng đàm thoại 3 line trên toàn ứng dụng (kể cả khi chuyển trang)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      useTelesaleCallStore.getState().tickDurations()
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     let timeoutId: number

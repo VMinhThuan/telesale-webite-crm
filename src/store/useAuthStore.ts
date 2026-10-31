@@ -95,8 +95,22 @@ export const useAuthStore = create<AuthState>()(
       }),
       {
         name: 'salesflow_auth_storage',
-        // Chỉ lưu token và user vào persistent storage
-        partialize: (state) => ({ token: state.token, user: state.user, isAuthenticated: state.isAuthenticated }),
+        // Chỉ lưu token và user an toàn (loại bỏ mật khẩu SIP plain text) vào persistent storage
+        partialize: (state) => {
+          if (!state.user) {
+            return { token: state.token, user: null, isAuthenticated: state.isAuthenticated }
+          }
+          const safeUser = { ...state.user }
+          if (safeUser.sipConfig) {
+            const { password: _, ...safeSip } = safeUser.sipConfig
+            safeUser.sipConfig = safeSip
+          }
+          return {
+            token: state.token,
+            user: safeUser,
+            isAuthenticated: state.isAuthenticated,
+          }
+        },
       },
     ),
     { name: 'AuthStore' },

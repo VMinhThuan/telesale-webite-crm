@@ -2,6 +2,7 @@ import React from 'react'
 import {
   ChevronDown,
   Lightbulb,
+  Loader2,
   MapPin,
   Mic,
   MicOff,
@@ -10,6 +11,7 @@ import {
   PhoneCall,
   PhoneOff,
   Play,
+  RotateCw,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -43,12 +45,12 @@ export interface TelesaleCallCenterPanelProps {
   isFetchingCustomer: boolean
   // Trạng thái SIP Softphone tổng đài
   sipRegStatus?:
-    | 'disconnected'
-    | 'connecting'
-    | 'connected'
-    | 'registered'
-    | 'unregistered'
-    | 'registrationFailed'
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'registered'
+  | 'unregistered'
+  | 'registrationFailed'
   sipExtension?: string
   onReconnectSip?: () => void
   // Các props tương thích ngược và cache IDE
@@ -89,16 +91,18 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
             <span
               onClick={
                 sipRegStatus === 'registrationFailed' ||
-                sipRegStatus === 'disconnected'
+                  sipRegStatus === 'disconnected'
                   ? onReconnectSip
                   : undefined
               }
               title={
-                sipRegStatus === 'registered'
-                  ? `Máy nhánh #${sipExtension || '1126'} đã đăng ký online với tổng đài Grandstream`
-                  : sipRegStatus === 'connecting'
-                    ? 'Đang bắt tay kết nối WebSocket WSS tới tổng đài...'
-                    : 'Bấm để kết nối lại máy nhánh SIP'
+                !sipExtension
+                  ? 'Chưa nhận được cấu hình máy nhánh SIP từ máy chủ'
+                  : sipRegStatus === 'registered'
+                    ? `Máy nhánh #${sipExtension} đã đăng ký online với tổng đài`
+                    : sipRegStatus === 'connecting'
+                      ? 'Đang bắt tay kết nối tới tổng đài...'
+                      : 'Bấm để kết nối lại máy nhánh SIP'
               }
               style={{
                 fontSize: '11px',
@@ -122,7 +126,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       : '#b91c1c',
                 cursor:
                   sipRegStatus === 'registrationFailed' ||
-                  sipRegStatus === 'disconnected'
+                    sipRegStatus === 'disconnected'
                     ? 'pointer'
                     : 'default',
               }}
@@ -140,11 +144,13 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                         : '#ef4444',
                 }}
               />
-              {sipRegStatus === 'registered'
-                ? `SIP #${sipExtension || '1126'}: Sẵn sàng`
-                : sipRegStatus === 'connecting'
-                  ? `SIP #${sipExtension || '1126'}: Đang kết nối...`
-                  : `SIP #${sipExtension || '1126'}: Mất kết nối (Thử lại)`}
+              {!sipExtension
+                ? 'SIP: Chưa cấu hình'
+                : sipRegStatus === 'registered'
+                  ? `SIP #${sipExtension}: Sẵn sàng`
+                  : sipRegStatus === 'connecting'
+                    ? `SIP #${sipExtension}: Đang kết nối...`
+                    : `SIP #${sipExtension}: Mất kết nối (Thử lại)`}
             </span>
 
             <span className="calling-status">
@@ -409,42 +415,119 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       </div>
                     )}
 
-                  {/* TRẠNG THÁI 1: CHƯA GỌI -> Hiển thị nút Gọi nổi bật, telesale chủ động bấm khi sẵn sàng */}
+                  {/* TRẠNG THÁI 1: CHƯA GỌI -> Điều chỉnh UX chống xung đột theo trạng thái SIP */}
                   {isIdle && (
                     <div style={{ padding: '6px 16px 14px' }}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onDial(
-                            activeTab.selectedMemberId ||
-                            selectedMember?.member_id,
-                          )
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '11px 18px',
-                          borderRadius: '8px',
-                          background: '#16a34a', // Màu xanh lá cây viễn thông chuẩn
-                          color: '#ffffff',
-                          border: 'none',
-                          fontSize: '13.5px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <PhoneCall size={18} />
-                        <span>
-                          Bắt đầu gọi cho{' '}
-                          {selectedMember?.name ||
-                            currentCustomer.customer_name}
-                        </span>
-                      </button>
+                      {sipRegStatus === 'connecting' ? (
+                        <button
+                          type="button"
+                          disabled
+                          title="Hệ thống đang bắt tay kết nối WebSocket WSS với tổng đài, nút gọi sẽ tự động sẵn sàng sau giây lát"
+                          style={{
+                            width: '100%',
+                            padding: '11px 18px',
+                            borderRadius: '8px',
+                            background: '#f1f5f9',
+                            color: '#64748b',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'not-allowed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <Loader2
+                            size={18}
+                            style={{
+                              color: '#2563eb',
+                              animation: 'spin 1s linear infinite',
+                            }}
+                          />
+                          <span>
+                            Đang kết nối tổng đài... Vui lòng đợi
+                          </span>
+                        </button>
+                      ) : sipRegStatus === 'registered' ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onDial(
+                              activeTab.selectedMemberId ||
+                              selectedMember?.member_id,
+                            )
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '11px 18px',
+                            borderRadius: '8px',
+                            background: '#16a34a', // Màu xanh lá cây viễn thông chuẩn
+                            color: '#ffffff',
+                            border: 'none',
+                            fontSize: '13.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <PhoneCall size={18} />
+                          <span>
+                            Bắt đầu gọi
+                          </span>
+                        </button>
+                      ) : !sipExtension ? (
+                        <div
+                          style={{
+                            width: '100%',
+                            padding: '11px 18px',
+                            borderRadius: '8px',
+                            background: '#fff1f2',
+                            color: '#b91c1c',
+                            border: '1.5px solid #fecdd3',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <PhoneOff size={17} style={{ color: '#b91c1c' }} />
+                          <span>Chưa cấu hình máy nhánh SIP từ máy chủ</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onReconnectSip}
+                          title="Bấm để kích hoạt kết nối lại máy nhánh SIP với tổng đài"
+                          style={{
+                            width: '100%',
+                            padding: '11px 18px',
+                            borderRadius: '8px',
+                            background: '#fff1f2',
+                            color: '#e11d48',
+                            border: '1.5px solid #fecdd3',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 8px rgba(225, 29, 72, 0.1)',
+                          }}
+                        >
+                          <RotateCw size={17} style={{ color: '#e11d48' }} />
+                          <span>Tổng đài chưa kết nối — Bấm để kết nối lại</span>
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -536,28 +619,50 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
+                        disabled={sipRegStatus === 'connecting'}
+                        onClick={() => {
+                          if (sipRegStatus !== 'registered') {
+                            onReconnectSip?.()
+                            return
+                          }
                           onDial(
                             activeTab.selectedMemberId ||
                             selectedMember?.member_id,
                           )
-                        }
+                        }}
                         style={{
                           padding: '7px 16px',
                           borderRadius: '6px',
-                          background: '#2563eb',
+                          background:
+                            sipRegStatus === 'connecting'
+                              ? '#94a3b8'
+                              : '#2563eb',
                           color: '#fff',
                           border: 'none',
                           fontSize: '12px',
                           fontWeight: 600,
-                          cursor: 'pointer',
+                          cursor:
+                            sipRegStatus === 'connecting'
+                              ? 'not-allowed'
+                              : 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
                         }}
                       >
-                        <PhoneCall size={14} />
-                        <span>Gọi lại</span>
+                        {sipRegStatus === 'connecting' ? (
+                          <Loader2
+                            size={14}
+                            style={{ animation: 'spin 1s linear infinite' }}
+                          />
+                        ) : (
+                          <PhoneCall size={14} />
+                        )}
+                        <span>
+                          {sipRegStatus === 'connecting'
+                            ? 'Đang kết nối lại tổng đài...'
+                            : 'Gọi lại'}
+                        </span>
                       </button>
                     </div>
                   )}

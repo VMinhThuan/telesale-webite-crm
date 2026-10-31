@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import { PeriodType, SummaryCardItem } from '../../types'
 import { notify } from '../../utils/notify'
-import { useAuth } from '../../hooks/useAuth'
 import { useDailyResults } from '../../hooks/useTelesale'
 import { useOrdersList } from '../../hooks/useOrders'
 import { useCustomersList } from '../../hooks/useCustomers'
@@ -375,9 +374,8 @@ function CallConversionFunnel({
   )
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ period }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
   const navigate = useNavigate()
-  const { user } = useAuth()
 
   // 1. Quản lý trạng thái Bộ lọc thời gian (Date Range Filter)
   const [dateRange, setDateRange] = useState<DateRangeState>(() => {

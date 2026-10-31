@@ -158,7 +158,7 @@ export const Reports: React.FC = () => {
     })
 
     return Array.from(map.values())
-  }, [userListsData, dailyResults])
+  }, [userListsData])
 
   // 3. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn (API 11b: POST /api/telesale/orders)
   const upcomingStartDate = dayjs().format('YYYY-MM-DD')
