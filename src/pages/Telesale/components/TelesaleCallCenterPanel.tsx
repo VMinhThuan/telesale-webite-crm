@@ -43,6 +43,7 @@ export interface TelesaleCallCenterPanelProps {
   onEndCall: () => void
   onFetchCustomerForTab: (tabId: number) => void
   isFetchingCustomer: boolean
+  isDialing?: boolean
   // Trạng thái SIP Softphone tổng đài
   sipRegStatus?:
   | 'disconnected'
@@ -69,6 +70,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   onEndCall,
   onFetchCustomerForTab,
   isFetchingCustomer,
+  isDialing = false,
   sipRegStatus = 'registered',
   sipExtension,
   onReconnectSip,
@@ -453,6 +455,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       ) : sipRegStatus === 'registered' ? (
                         <button
                           type="button"
+                          disabled={isDialing || activeTab.status === 'calling'}
                           onClick={() =>
                             onDial(
                               activeTab.selectedMemberId ||
@@ -463,24 +466,39 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                             width: '100%',
                             padding: '11px 18px',
                             borderRadius: '8px',
-                            background: '#16a34a', // Màu xanh lá cây viễn thông chuẩn
+                            background: isDialing ? '#94a3b8' : '#16a34a', // Màu xám khi đang kết nối, xanh lá cây khi sẵn sàng
                             color: '#ffffff',
                             border: 'none',
                             fontSize: '13.5px',
                             fontWeight: 700,
-                            cursor: 'pointer',
+                            cursor: isDialing ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '8px',
-                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                            boxShadow: isDialing
+                              ? 'none'
+                              : '0 4px 12px rgba(22, 163, 74, 0.25)',
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          <PhoneCall size={18} />
-                          <span>
-                            Bắt đầu gọi
-                          </span>
+                          {isDialing ? (
+                            <>
+                              <Loader2
+                                size={18}
+                                style={{
+                                  color: '#ffffff',
+                                  animation: 'spin 1s linear infinite',
+                                }}
+                              />
+                              <span>Đang kết nối...</span>
+                            </>
+                          ) : (
+                            <>
+                              <PhoneCall size={18} />
+                              <span>Bắt đầu gọi</span>
+                            </>
+                          )}
                         </button>
                       ) : !sipExtension ? (
                         <div
@@ -619,7 +637,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       </div>
                       <button
                         type="button"
-                        disabled={sipRegStatus === 'connecting'}
+                        disabled={sipRegStatus === 'connecting' || isDialing}
                         onClick={() => {
                           if (sipRegStatus !== 'registered') {
                             onReconnectSip?.()
@@ -634,7 +652,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                           padding: '7px 16px',
                           borderRadius: '6px',
                           background:
-                            sipRegStatus === 'connecting'
+                            sipRegStatus === 'connecting' || isDialing
                               ? '#94a3b8'
                               : '#2563eb',
                           color: '#fff',
@@ -642,7 +660,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                           fontSize: '12px',
                           fontWeight: 600,
                           cursor:
-                            sipRegStatus === 'connecting'
+                            sipRegStatus === 'connecting' || isDialing
                               ? 'not-allowed'
                               : 'pointer',
                           display: 'inline-flex',
@@ -650,7 +668,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                           gap: '6px',
                         }}
                       >
-                        {sipRegStatus === 'connecting' ? (
+                        {sipRegStatus === 'connecting' || isDialing ? (
                           <Loader2
                             size={14}
                             style={{ animation: 'spin 1s linear infinite' }}
@@ -661,7 +679,9 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                         <span>
                           {sipRegStatus === 'connecting'
                             ? 'Đang kết nối lại tổng đài...'
-                            : 'Gọi lại'}
+                            : isDialing
+                              ? 'Đang kết nối...'
+                              : 'Gọi lại'}
                         </span>
                       </button>
                     </div>

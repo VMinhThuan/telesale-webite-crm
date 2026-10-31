@@ -191,17 +191,45 @@ class SipService {
    * Khởi tạo và đăng ký kết nối SIP UA tới tổng đài qua WebSocket WSS
    */
   public init(config: SipAccountConfig): void {
-    if (
-      this.ua &&
+    const isSameConfig =
       this.currentConfig &&
       this.currentConfig.impi === config.impi &&
       this.currentConfig.websocketProxyUrl === config.websocketProxyUrl &&
-      this.registrationStatus === 'registered'
-    ) {
-      return // Đã đăng ký với cấu hình này
+      this.currentConfig.password === config.password
+
+    // 1. Nếu đã có UA với cùng cấu hình tài khoản
+    if (this.ua && isSameConfig) {
+      // Bảo vệ: Nếu đang có cuộc gọi hoạt động trên bất kỳ line nào -> TUYỆT ĐỐI KHÔNG destroy!
+      if (this.hasActiveCalls()) {
+        if (!this.ua.isRegistered()) {
+          try {
+            this.ua.register()
+          } catch (e) {
+            console.warn('[SIP] Lỗi re-register khi đang có cuộc gọi:', e)
+          }
+        }
+        return
+      }
+
+      // Nếu đã đăng ký thành công hoặc đang trong tiến trình kết nối -> Không làm gì cả
+      if (
+        this.registrationStatus === 'registered' ||
+        this.registrationStatus === 'connecting'
+      ) {
+        return
+      }
+
+      // Nếu mất kết nối nhưng không có cuộc gọi -> Thử re-register lại trước khi tạo mới
+      try {
+        this.updateRegistrationStatus('connecting')
+        this.ua.register()
+        return
+      } catch {
+        // Nếu không gửi lại được, tiếp tục bên dưới để tạo lại UA mới
+      }
     }
 
-    // Nếu đang có UA cũ, dừng trước khi tạo mới
+    // 2. Chỉ destroy khi tài khoản thực sự thay đổi (đổi user khác) hoặc chưa từng có UA
     if (this.ua) {
       this.destroy()
     }
@@ -253,17 +281,35 @@ class SipService {
         })
       })
 
-      // 4. Lắng nghe cuộc gọi đến (nếu có) -> Gán vào line rảnh đầu tiên
+      // 4. Lắng nghe cuộc gọi đến (nếu có) -> Gán vào line rảnh đầu tiên hoặc từ chối 486 Busy Here khi cả 3 line bận
       this.ua.on('newRTCSession', (data: any) => {
         const session: RTCSession = data.session
         if (data.originator === 'remote') {
-          let freeLineId = 1
+          let freeLineId: number | null = null
           for (let i = 1; i <= 3; i++) {
             if (!this.sessions.has(i)) {
               freeLineId = i
               break
             }
           }
+
+          // Phòng thủ: Khi cả 3 line đều đang bận, từ chối cuộc gọi đến với mã chuẩn SIP 486 Busy Here
+          if (freeLineId === null) {
+            console.warn(
+              '[SIP] Cả 3 line đều đang bận. Từ chối cuộc gọi đến (486 Busy Here) từ:',
+              session.remote_identity?.uri?.user,
+            )
+            try {
+              session.terminate({
+                status_code: 486,
+                reason_phrase: 'Busy Here',
+              })
+            } catch (err) {
+              console.warn('[SIP] Lỗi khi gửi 486 Busy Here:', err)
+            }
+            return
+          }
+
           this.bindSessionEvents(session, freeLineId, 'incoming')
         }
       })
@@ -562,6 +608,28 @@ class SipService {
   }
 
   /**
+   * Trả lời cuộc gọi đến (theo lineId chỉ định hoặc line active)
+   */
+  public answer(lineId?: number): void {
+    const targetLineId = lineId ?? this.activeLineId
+    const session = this.sessions.get(targetLineId)
+    if (!session) return
+
+    const iceServers = this.currentConfig?.iceServerUrl
+      ? [{ urls: this.currentConfig.iceServerUrl }]
+      : [{ urls: 'stun:stun.l.google.com:19302' }]
+
+    try {
+      session.answer({
+        mediaConstraints: { audio: true, video: false },
+        pcConfig: { iceServers },
+      })
+    } catch (err) {
+      console.warn(`[SIP Line ${targetLineId}] Lỗi khi trả lời cuộc gọi:`, err)
+    }
+  }
+
+  /**
    * Kết thúc cuộc gọi theo lineId (Gác máy - BYE)
    */
   public hangup(lineId?: number): void {
@@ -621,6 +689,25 @@ class SipService {
 
   public getAllSessions(): Map<number, RTCSession> {
     return this.sessions
+  }
+
+  /**
+   * Kiểm tra xem hiện tại có cuộc gọi nào đang hoạt động trên bất kỳ line nào không
+   */
+  public hasActiveCalls(): boolean {
+    for (const session of this.sessions.values()) {
+      if (session && !session.isEnded()) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * Kiểm tra xem WebSocket WSS có đang duy trì kết nối hay không
+   */
+  public isConnected(): boolean {
+    return this.ua ? this.ua.isConnected() : false
   }
 
   /**

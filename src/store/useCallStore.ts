@@ -1,6 +1,7 @@
 import React from 'react'
 import { create } from 'zustand'
 import { formatDuration } from '../utils/formatters'
+import { useTelesaleCallStore } from './useTelesaleCallStore'
 
 export type CallStatus = 'idle' | 'calling' | 'connected' | 'paused' | 'ended'
 
@@ -50,7 +51,7 @@ export const useCallStore = create<CallState>((set) => ({
       isHeld: false,
     }),
 
-  connectCall: () => set({ status: 'connected' }),
+  connectCall: () => set({ status: 'connected', isHeld: false }),
 
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
 
@@ -78,14 +79,20 @@ export const useCallStore = create<CallState>((set) => ({
 
 /**
  * Component hiển thị thời lượng cuộc gọi nguyên tử (Atomic Component).
+ * Tùy chọn truyền tabId để hiển thị thời lượng chuẩn xác của từng line trong 3 line.
  * Chỉ re-render duy nhất phần text thời gian mỗi giây, giúp component cha (Telesale, Widget)
  * KHÔNG bị re-render toàn bộ khi durationSec tăng.
  */
 export const CallDurationText: React.FC<{
+  tabId?: number
   className?: string
   style?: React.CSSProperties
-}> = React.memo(({ className, style }) => {
-  const durationSec = useCallStore((state) => state.durationSec)
+}> = React.memo(({ tabId, className, style }) => {
+  const legacyDuration = useCallStore((state) => state.durationSec)
+  const tabDuration = useTelesaleCallStore((state) =>
+    tabId ? state.tabs.find((t) => t.id === tabId)?.durationSec : undefined,
+  )
+  const durationSec = tabDuration !== undefined ? tabDuration : legacyDuration
   return React.createElement('span', { className, style }, formatDuration(durationSec))
 })
 

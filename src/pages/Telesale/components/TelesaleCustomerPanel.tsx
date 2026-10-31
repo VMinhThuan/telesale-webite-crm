@@ -19,6 +19,7 @@ import clsx from 'clsx'
 import dayjs from '../../../lib/dayjs'
 import { useEnums } from '../../../hooks/useEnums'
 import { useSaveCallResultMutation } from '../../../hooks/useTelesale'
+import { useTelesaleCallStore } from '../../../store/useTelesaleCallStore'
 import {
   CallResultOutcome,
   NextCustomerDto,
@@ -51,6 +52,10 @@ export interface TelesaleCustomerPanelProps {
   orderTime: string
   onOrderTimeChange: (time: string) => void
   orderSlotId?: number
+  onOrderSlotIdChange?: (slotId?: number) => void
+  activeTabId?: number
+  activeTabLabel?: string
+  activeTabStatus?: string
   onFetchNextCustomer: () => void
   onSaveResultSuccess: () => void
 }
@@ -64,9 +69,15 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   orderTime,
   onOrderTimeChange,
   orderSlotId,
+  onOrderSlotIdChange,
+  activeTabId = 1,
+  activeTabLabel,
+  activeTabStatus,
   onFetchNextCustomer,
   onSaveResultSuccess,
 }) => {
+  // Đồng bộ bản nháp đa tab với useTelesaleCallStore
+  const updateTabDraft = useTelesaleCallStore((s) => s.updateTabDraft)
   // Lấy dữ liệu danh mục Enums hệ thống
   const {
     services: serviceOptions,
@@ -105,22 +116,104 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   const [otherMoreRequest, setOtherMoreRequest] = useState<string>('')
   const [serviceSearch, setServiceSearch] = useState<string>('')
 
-  // Reset form khi chuyển sang khách hàng khác
+  // Cờ nhận biết đang tải dữ liệu nháp của tab (tránh auto-sync ghi đè dữ liệu cũ khi vừa đổi tab)
+  const isHydratingRef = useRef(false)
+
+  // 1. Khi activeTabId hoặc customer_id thay đổi: Hydrate dữ liệu nháp của Tab đó từ Store
   useEffect(() => {
-    currentOrderKeyRef.current = generateIdempotencyKey()
-    setNote('')
-    setCallbackDate('')
-    setCallbackTime('14:30')
-    setSelectedServices([])
-    setSelectedDoCanMang([])
-    setSelectedMachineProblem('')
-    setOtherMachineProblem('')
-    setSelectedMoreRequest('')
-    setOtherMoreRequest('')
-    setDeniedCustomText('')
-    setSelectedPainPoint('')
+    isHydratingRef.current = true
+
+    const draft = useTelesaleCallStore.getState().getTabDraft(activeTabId)
+
+    setSelectedOutcome(draft.outcome)
+    setCallbackDate(draft.callbackDate)
+    setCallbackTime(draft.callbackTime)
+    setNote(draft.note)
+    setDeniedLevel1(draft.deniedLevel1)
+    setDeniedLevel2(draft.deniedLevel2)
+    setDeniedLevel3(draft.deniedLevel3)
+    setDeniedCustomText(draft.deniedCustomText)
+    setSelectedPainPoint(draft.selectedPainPoint)
+    setSelectedServices(draft.selectedServices)
+    setSelectedDoCanMang(draft.selectedDoCanMang)
+    setSelectedMachineProblem(draft.selectedMachineProblem)
+    setOtherMachineProblem(draft.otherMachineProblem)
+    setSelectedMoreRequest(draft.selectedMoreRequest)
+    setOtherMoreRequest(draft.otherMoreRequest)
     setServiceSearch('')
-  }, [currentCustomer?.customer_id])
+
+    // Đồng bộ ngày hẹn/giờ hẹn/slot sang parent nếu tab có lưu sẵn
+    if (draft.orderDate) {
+      onOrderDateChange(draft.orderDate)
+    }
+    if (draft.orderTime) {
+      onOrderTimeChange(draft.orderTime)
+    }
+    if (onOrderSlotIdChange && draft.orderSlotId !== undefined) {
+      onOrderSlotIdChange(draft.orderSlotId)
+    }
+
+    currentOrderKeyRef.current = generateIdempotencyKey()
+
+    const timer = setTimeout(() => {
+      isHydratingRef.current = false
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [
+    activeTabId,
+    currentCustomer?.customer_id,
+    onOrderDateChange,
+    onOrderTimeChange,
+    onOrderSlotIdChange,
+  ])
+
+  // 2. Tự động lưu mọi thay đổi form vào bản nháp của activeTabId trong Store
+  useEffect(() => {
+    if (isHydratingRef.current) return
+
+    updateTabDraft(activeTabId, {
+      outcome: selectedOutcome,
+      callbackDate,
+      callbackTime,
+      note,
+      deniedLevel1,
+      deniedLevel2,
+      deniedLevel3,
+      deniedCustomText,
+      selectedPainPoint,
+      selectedServices,
+      selectedDoCanMang,
+      selectedMachineProblem,
+      otherMachineProblem,
+      selectedMoreRequest,
+      otherMoreRequest,
+      orderDate,
+      orderTime,
+      orderSlotId,
+    })
+  }, [
+    activeTabId,
+    selectedOutcome,
+    callbackDate,
+    callbackTime,
+    note,
+    deniedLevel1,
+    deniedLevel2,
+    deniedLevel3,
+    deniedCustomText,
+    selectedPainPoint,
+    selectedServices,
+    selectedDoCanMang,
+    selectedMachineProblem,
+    otherMachineProblem,
+    selectedMoreRequest,
+    otherMoreRequest,
+    orderDate,
+    orderTime,
+    orderSlotId,
+    updateTabDraft,
+  ])
 
   // Xử lý cây lý do từ chối 3 tầng
   const level1Options = useMemo(() => deniedReasons || [], [deniedReasons])
@@ -326,14 +419,34 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       <section className="call-panel customer-panel">
         <div className="call-panel-heading">
           <div>
-            <p className="eyebrow">HỒ SƠ KHÁCH HÀNG</p>
+            <p className="eyebrow">
+              HỒ SƠ KHÁCH HÀNG {activeTabLabel ? `(${activeTabLabel})` : ''}
+            </p>
             <h2>Thông tin liên hệ</h2>
           </div>
           <button
             className="icon-button"
             type="button"
-            onClick={onFetchNextCustomer}
-            title="Đổi sang khách khác"
+            onClick={() => {
+              if (
+                activeTabStatus === 'calling' ||
+                activeTabStatus === 'connected' ||
+                activeTabStatus === 'paused'
+              ) {
+                notify(
+                  `${activeTabLabel || 'Tab này'} đang có cuộc gọi. Vui lòng chuyển sang Tab khác để nạp khách mới!`,
+                )
+                return
+              }
+              onFetchNextCustomer()
+            }}
+            title={
+              activeTabStatus === 'calling' ||
+              activeTabStatus === 'connected' ||
+              activeTabStatus === 'paused'
+                ? `Đang có cuộc gọi tại ${activeTabLabel || 'tab này'} — Chuyển sang Tab khác để nạp khách mới`
+                : 'Đổi sang khách khác'
+            }
           >
             <RotateCw size={16} />
           </button>

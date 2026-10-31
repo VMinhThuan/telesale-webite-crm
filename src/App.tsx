@@ -69,6 +69,7 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       useTelesaleCallStore.getState().tickDurations()
+      useCallStore.getState().tickDuration()
     }, 1000)
     return () => clearInterval(timer)
   }, [])
@@ -81,27 +82,41 @@ const AppShell: React.FC = () => {
 
       if (event.status === 'calling' || event.status === 'progress') {
         useTelesaleCallStore.getState().updateTab(lineId, { status: 'calling' })
+        if (lineId === activeTabId) {
+          useCallStore.setState({ status: 'calling' })
+        }
       } else if (event.status === 'connected') {
         useTelesaleCallStore.getState().updateTab(lineId, { status: 'connected', isHeld: false })
         if (lineId === activeTabId) {
-          useCallStore.getState().connectCall()
+          useCallStore.setState({ status: 'connected', isHeld: false })
         }
       } else if (event.status === 'paused') {
         useTelesaleCallStore.getState().updateTab(lineId, { status: 'paused', isHeld: true })
-        if (lineId === activeTabId && !useCallStore.getState().isHeld) {
-          useCallStore.getState().toggleHold()
+        if (lineId === activeTabId) {
+          useCallStore.setState({ status: 'paused', isHeld: true })
         }
       } else if (event.status === 'ended' || event.status === 'failed') {
         useTelesaleCallStore.getState().updateTab(lineId, { status: 'ended', isHeld: false })
 
         // Kiểm tra nếu line kết thúc là line active HOẶC không còn line nào đang gọi/kết nối/giữ máy
         const currentTabs = useTelesaleCallStore.getState().tabs
-        const hasActiveLine = currentTabs.some(
-          (t) => t.status === 'calling' || t.status === 'connected' || t.status === 'paused',
+        const remainingActiveTab = currentTabs.find(
+          (t) => t.id !== lineId && (t.status === 'calling' || t.status === 'connected' || t.status === 'paused'),
         )
 
-        if (lineId === activeTabId || !hasActiveLine) {
+        if (!remainingActiveTab) {
           useCallStore.getState().endCall()
+        } else if (lineId === activeTabId) {
+          useCallStore.setState({
+            status: remainingActiveTab.status,
+            isHeld: remainingActiveTab.isHeld,
+            isMuted: remainingActiveTab.isMuted,
+            caller: {
+              customerName: remainingActiveTab.customer?.customer_name || 'Khách hàng',
+              phoneMasked: remainingActiveTab.callerNumber || '*** *** ***',
+            },
+            durationSec: remainingActiveTab.durationSec,
+          })
         }
 
         if (event.status === 'failed' && event.cause) {

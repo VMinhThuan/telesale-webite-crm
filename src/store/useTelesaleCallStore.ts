@@ -1,5 +1,47 @@
 import { create } from 'zustand'
-import { NextCustomerDto } from '../types/api'
+import { CallResultOutcome, NextCustomerDto } from '../types/api'
+
+export interface TelesaleDraftResult {
+  outcome: CallResultOutcome
+  callbackDate: string
+  callbackTime: string
+  note: string
+  deniedLevel1: string
+  deniedLevel2: string
+  deniedLevel3: string
+  deniedCustomText: string
+  selectedPainPoint: string
+  selectedServices: string[]
+  selectedDoCanMang: string[]
+  selectedMachineProblem: string
+  otherMachineProblem: string
+  selectedMoreRequest: string
+  otherMoreRequest: string
+  orderDate: string
+  orderTime: string
+  orderSlotId?: number
+}
+
+export const createDefaultDraftResult = (defaultOrderDate = ''): TelesaleDraftResult => ({
+  outcome: 'potential',
+  callbackDate: '',
+  callbackTime: '14:30',
+  note: '',
+  deniedLevel1: '',
+  deniedLevel2: '',
+  deniedLevel3: '',
+  deniedCustomText: '',
+  selectedPainPoint: '',
+  selectedServices: [],
+  selectedDoCanMang: [],
+  selectedMachineProblem: '',
+  otherMachineProblem: '',
+  selectedMoreRequest: '',
+  otherMoreRequest: '',
+  orderDate: defaultOrderDate,
+  orderTime: '08:30',
+  orderSlotId: undefined,
+})
 
 export interface TelesaleCallTab {
   id: number
@@ -11,6 +53,7 @@ export interface TelesaleCallTab {
   isMuted: boolean
   isHeld: boolean
   callerNumber?: string
+  draftResult?: TelesaleDraftResult
 }
 
 const initialTabs: TelesaleCallTab[] = [
@@ -46,6 +89,7 @@ const initialTabs: TelesaleCallTab[] = [
 interface TelesaleCallState {
   tabs: TelesaleCallTab[]
   activeTabId: number
+  drafts: Record<number, TelesaleDraftResult>
 
   // Actions
   setActiveTabId: (id: number) => void
@@ -55,13 +99,21 @@ interface TelesaleCallState {
       | ((prev: TelesaleCallTab[]) => TelesaleCallTab[]),
   ) => void
   updateTab: (tabId: number, partial: Partial<TelesaleCallTab>) => void
+  updateTabDraft: (tabId: number, partialDraft: Partial<TelesaleDraftResult>) => void
+  resetTabDraft: (tabId: number, defaultOrderDate?: string) => void
+  getTabDraft: (tabId: number) => TelesaleDraftResult
   tickDurations: () => void
   resetTabs: () => void
 }
 
-export const useTelesaleCallStore = create<TelesaleCallState>((set) => ({
+export const useTelesaleCallStore = create<TelesaleCallState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: 1,
+  drafts: {
+    1: createDefaultDraftResult(),
+    2: createDefaultDraftResult(),
+    3: createDefaultDraftResult(),
+  },
 
   setActiveTabId: (id: number) => set({ activeTabId: id }),
 
@@ -78,6 +130,29 @@ export const useTelesaleCallStore = create<TelesaleCallState>((set) => ({
       tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, ...partial } : t)),
     })),
 
+  updateTabDraft: (tabId: number, partialDraft: Partial<TelesaleDraftResult>) =>
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [tabId]: {
+          ...(state.drafts[tabId] || createDefaultDraftResult()),
+          ...partialDraft,
+        },
+      },
+    })),
+
+  resetTabDraft: (tabId: number, defaultOrderDate = '') =>
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [tabId]: createDefaultDraftResult(defaultOrderDate),
+      },
+    })),
+
+  getTabDraft: (tabId: number) => {
+    return get().drafts[tabId] || createDefaultDraftResult()
+  },
+
   tickDurations: () =>
     set((state) => {
       const hasConnected = state.tabs.some((t) => t.status === 'connected')
@@ -91,7 +166,16 @@ export const useTelesaleCallStore = create<TelesaleCallState>((set) => ({
       }
     }),
 
-  resetTabs: () => set({ tabs: initialTabs, activeTabId: 1 }),
+  resetTabs: () =>
+    set({
+      tabs: initialTabs,
+      activeTabId: 1,
+      drafts: {
+        1: createDefaultDraftResult(),
+        2: createDefaultDraftResult(),
+        3: createDefaultDraftResult(),
+      },
+    }),
 }))
 
 export default useTelesaleCallStore
