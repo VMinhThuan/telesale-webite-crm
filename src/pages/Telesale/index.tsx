@@ -15,6 +15,9 @@ import {
   useDialCallMutation,
   useNextCustomerMutation,
 } from '../../hooks/useTelesale'
+import { useAuthStore } from '../../store/useAuthStore'
+import { useCallStore } from '../../store/useCallStore'
+import sipService from '../../services/sipService'
 import { notify } from '../../utils/notify'
 
 // 3 Khối Panels lớn của module Telesale
@@ -37,6 +40,23 @@ export {
 }
 
 export const Telesale: React.FC = () => {
+  // 0. Thông tin user và cấu hình SIP Softphone của nhân viên
+  const { user } = useAuthStore()
+
+  const effectiveSipConfig = useMemo(() => {
+    const rawSip = user?.sipConfig
+    const userExt = user?.userExtension || '1126'
+    return {
+      impi: rawSip?.impi || userExt,
+      impu: rawSip?.impu || `sip:${userExt}@tongdai.zozin.vn`,
+      password: rawSip?.password || 'locnuoc365',
+      websocketProxyUrl: rawSip?.websocketProxyUrl || 'wss://tongdai.zozin.vn:7443/ws',
+      iceServerUrl: rawSip?.iceServerUrl || 'stun:stun.l.google.com:19302',
+      realm: rawSip?.realm || 'grandstream',
+      displayName: rawSip?.displayName || user?.name || userExt,
+    }
+  }, [user])
+
   // 1. Quản lý danh sách chiến dịch đàm thoại
   const { data: campaignsData, isLoading: isLoadingCampaigns } = useCampaigns()
   const campaignsList = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
@@ -205,9 +225,65 @@ export const Telesale: React.FC = () => {
     return () => clearInterval(intervalId)
   }, [])
 
+  // Tự động kết nối và đăng ký máy nhánh SIP khi vào màn hình Telesale
+  useEffect(() => {
+    if (effectiveSipConfig) {
+      sipService.init(effectiveSipConfig)
+    }
+
+    const unsubscribeCall = sipService.onCallStateChange((event) => {
+      if (event.status === 'calling' || event.status === 'progress') {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'calling' } : t,
+          ),
+        )
+      } else if (event.status === 'connected') {
+        useCallStore.getState().connectCall()
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'connected' } : t,
+          ),
+        )
+      } else if (event.status === 'paused') {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'paused', isHeld: true } : t,
+          ),
+        )
+      } else if (event.status === 'ended') {
+        useCallStore.getState().endCall()
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'ended' } : t,
+          ),
+        )
+      } else if (event.status === 'failed') {
+        useCallStore.getState().endCall()
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'ended' } : t,
+          ),
+        )
+        if (event.cause) {
+          notify(`Cuộc gọi kết thúc: ${event.cause}`)
+        }
+      }
+    })
+
+    return () => {
+      unsubscribeCall()
+    }
+  }, [effectiveSipConfig, activeTabId])
+
   // Chuyển đổi giữa 3 tab cuộc gọi
   const handleSelectTab = (newTabId: number) => {
     if (newTabId === activeTabId) return
+
+    // Nếu tab cũ đang đàm thoại, tự động gửi lệnh SIP hold giữ máy khách
+    if (activeTab.status === 'connected') {
+      sipService.hold()
+    }
 
     setTabs((prev) =>
       prev.map((t) => {
@@ -242,12 +318,27 @@ export const Telesale: React.FC = () => {
       memberId || activeTab.selectedMemberId || currentCustomer.members?.[0]?.member_id
 
     try {
+      // 1. Đảm bảo SIP UA đã sẵn sàng với tài khoản nhân viên
+      if (effectiveSipConfig) {
+        sipService.init(effectiveSipConfig)
+      }
+
+      // 2. Gọi API 16: POST /api/telesale/calls với customer_id và member_id để lấy chuỗi quay số thật
       const dialInfo = await dialCallMutation.mutateAsync({
         customer_id: currentCustomer.customer_id,
         member_id: targetMemberId,
       })
 
-      // Đặt tab hiện tại thành 'calling' và tạm giữ máy các tab khác nếu đang connected
+      // 3. Đặt tab hiện tại thành 'calling' và cập nhật callerNumber = dialInfo.phone_masked
+      // Đồng thời đồng bộ Zustand Call Store để hiển thị widget toàn hệ thống
+      useCallStore.getState().startCall({
+        customerId: currentCustomer.customer_id,
+        customerName: currentCustomer.customer_name,
+        phoneMasked: dialInfo.phone_masked,
+        memberId: dialInfo.member_id,
+        memberName: dialInfo.member_name,
+      })
+
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id === activeTabId) {
@@ -268,27 +359,43 @@ export const Telesale: React.FC = () => {
         }),
       )
 
-      // Mô phỏng kết nối cuộc gọi sau 1.5s
-      setTimeout(() => {
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === activeTabId ? { ...t, status: 'connected' } : t,
-          ),
+      // 4. Nếu tab khác đang có cuộc gọi SIP thì giữ máy
+      if (sipService.getCurrentSession() && sipService.getCallStatus() === 'connected') {
+        sipService.hold()
+      }
+
+      // 5. Softphone thực hiện quay số thực tế bằng dial_number
+      if (dialInfo.dial_number) {
+        await sipService.call(dialInfo.dial_number)
+        notify(
+          `Đang quay số tới ${dialInfo.member_name || 'khách hàng'} qua máy nhánh #${effectiveSipConfig.impi}...`,
         )
-      }, 1500)
-    } catch {
-      // Lỗi đã được xử lý trong hook mutation
+      } else {
+        notify('Không nhận được mã quay số từ hệ thống tổng đài.')
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi quay số:', err)
+      useCallStore.getState().endCall()
+      // Nếu lỗi cuộc gọi hoặc lỗi mic, reset trạng thái tab
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId && t.status === 'calling'
+            ? { ...t, status: 'idle' }
+            : t,
+        ),
+      )
     }
   }
 
   // Bật/tắt micro của tab đang active
   const handleToggleMute = () => {
+    const isNowMuted = sipService.toggleMute()
+    useCallStore.getState().toggleMute()
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id === activeTabId) {
-          const nextMuted = !t.isMuted
-          notify(!nextMuted ? 'Đã bật micro' : 'Đã tắt micro')
-          return { ...t, isMuted: nextMuted }
+          notify(isNowMuted ? 'Đã tắt micro' : 'Đã bật micro')
+          return { ...t, isMuted: isNowMuted }
         }
         return t
       }),
@@ -297,15 +404,16 @@ export const Telesale: React.FC = () => {
 
   // Giữ máy / Tiếp tục cuộc gọi của tab đang active
   const handleToggleHold = () => {
+    const isNowHeld = sipService.toggleHold()
+    useCallStore.getState().toggleHold()
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id === activeTabId) {
-          const nextHeld = !t.isHeld
-          notify(nextHeld ? 'Đang giữ máy khách hàng' : 'Tiếp tục cuộc gọi')
+          notify(isNowHeld ? 'Đang giữ máy khách hàng' : 'Tiếp tục cuộc gọi')
           return {
             ...t,
-            isHeld: nextHeld,
-            status: nextHeld ? 'paused' : 'connected',
+            isHeld: isNowHeld,
+            status: isNowHeld ? 'paused' : 'connected',
           }
         }
         return t
@@ -315,10 +423,12 @@ export const Telesale: React.FC = () => {
 
   // Kết thúc cuộc gọi của tab đang active
   const handleEndCall = () => {
+    sipService.hangup()
+    useCallStore.getState().endCall()
+    notify('Đã kết thúc cuộc gọi')
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id === activeTabId) {
-          notify('Đã kết thúc cuộc gọi')
           return { ...t, status: 'ended' }
         }
         return t

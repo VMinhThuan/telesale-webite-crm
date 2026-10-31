@@ -154,113 +154,339 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
         {/* Thông tin khách hàng & thời lượng cuộc gọi của tab đang chọn */}
         {currentCustomer ? (
           <>
-            <div className="caller">
-              <div className="customer-avatar">
-                <UserRound size={35} />
-              </div>
-              <div>
-                <h3>{currentCustomer.customer_name}</h3>
-                <p>
-                  <MapPin size={14} />{' '}
-                  {currentCustomer.masked_address || 'Địa chỉ bảo mật'}
-                </p>
-              </div>
-              <strong style={{ letterSpacing: '0.5px' }}>
-                {formatDuration(activeTab.durationSec)}
-              </strong>
-            </div>
+            {(() => {
+              const isInCall =
+                activeTab.status === 'calling' ||
+                activeTab.status === 'connected' ||
+                activeTab.status === 'paused'
+              const isCallEnded = activeTab.status === 'ended'
+              const isIdle = activeTab.status === 'idle'
+              const selectedMember =
+                currentCustomer.members?.find(
+                  (m) =>
+                    m.member_id ===
+                    (activeTab.selectedMemberId ||
+                      currentCustomer.members?.[0]?.member_id),
+                ) || currentCustomer.members?.[0]
 
-            <div className="caller-number" style={{ padding: '0 16px 10px' }}>
-              <Phone size={15} />{' '}
-              {activeTab.callerNumber ||
-                currentCustomer.members?.[0]?.phone_masked ||
-                'Số điện thoại bảo mật'}
-            </div>
-
-            {/* Danh sách thành viên liên hệ để chọn quay số */}
-            {currentCustomer.members && currentCustomer.members.length > 0 && (
-              <div style={{ padding: '0 16px 12px' }}>
-                <p
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#475569',
-                    margin: '0 0 6px 0',
-                  }}
-                >
-                  Thành viên liên hệ ({activeTab.label}):
-                </p>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {currentCustomer.members.map((m) => {
-                    const isChosen = activeTab.selectedMemberId === m.member_id
-                    return (
-                      <button
-                        key={m.member_id}
-                        type="button"
-                        onClick={() => {
-                          onSelectMemberId(m.member_id)
-                          onDial(m.member_id)
-                        }}
+              return (
+                <>
+                  <div className="caller">
+                    <div className="customer-avatar">
+                      <UserRound size={35} />
+                    </div>
+                    <div>
+                      <div
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          background: isChosen ? '#eff6ff' : '#fff',
-                          color: isChosen ? '#1d4ed8' : '#334155',
-                          fontSize: '11px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <h3 style={{ margin: 0 }}>
+                          {currentCustomer.customer_name}
+                        </h3>
+                        {isInCall && (
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color:
+                                activeTab.status === 'connected'
+                                  ? '#16a34a'
+                                  : activeTab.status === 'paused'
+                                    ? '#d97706'
+                                    : '#2563eb',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ●{' '}
+                            {activeTab.status === 'connected'
+                              ? 'Đang đàm thoại'
+                              : activeTab.status === 'paused'
+                                ? 'Đang giữ máy'
+                                : 'Đang đổ chuông...'}
+                          </span>
+                        )}
+                        {isIdle && (
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              color: '#64748b',
+                              background: '#f1f5f9',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            Chưa gọi
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: '4px 0 0' }}>
+                        <MapPin size={14} />{' '}
+                        {currentCustomer.masked_address || 'Địa chỉ bảo mật'}
+                      </p>
+                    </div>
+
+                    {/* Chỉ hiển thị đồng hồ thời gian khi cuộc gọi đang diễn ra */}
+                    {isInCall && (
+                      <strong
+                        style={{
+                          letterSpacing: '0.5px',
+                          fontSize: '18px',
+                          color: '#0f172a',
+                        }}
+                      >
+                        {formatDuration(activeTab.durationSec)}
+                      </strong>
+                    )}
+                  </div>
+
+                  <div
+                    className="caller-number"
+                    style={{ padding: '0 16px 10px' }}
+                  >
+                    <Phone size={15} />{' '}
+                    {selectedMember?.phone_masked ||
+                      activeTab.callerNumber ||
+                      currentCustomer.members?.[0]?.phone_masked ||
+                      'Số điện thoại bảo mật'}
+                  </div>
+
+                  {/* Danh sách thành viên liên hệ để chọn trước khi quay số */}
+                  {currentCustomer.members &&
+                    currentCustomer.members.length > 0 && (
+                      <div style={{ padding: '0 16px 10px' }}>
+                        <p
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            margin: '0 0 6px 0',
+                          }}
+                        >
+                          Người nghe máy ({activeTab.label}):
+                        </p>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          {currentCustomer.members.map((m) => {
+                            const isChosen =
+                              (activeTab.selectedMemberId ||
+                                currentCustomer.members?.[0]?.member_id) ===
+                              m.member_id
+                            return (
+                              <button
+                                key={m.member_id}
+                                type="button"
+                                disabled={isInCall}
+                                onClick={() => onSelectMemberId(m.member_id)}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  border: isChosen
+                                    ? '1.5px solid #2563eb'
+                                    : '1px solid #cbd5e1',
+                                  background: isChosen ? '#eff6ff' : '#fff',
+                                  color: isChosen ? '#1d4ed8' : '#334155',
+                                  fontSize: '11px',
+                                  cursor: isInCall ? 'default' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  fontWeight: isChosen ? 600 : 400,
+                                }}
+                              >
+                                <PhoneCall
+                                  size={12}
+                                  style={{
+                                    color: isChosen ? '#2563eb' : '#64748b',
+                                  }}
+                                />
+                                <b>{m.name}</b> ({m.phone_masked})
+                                {m.relationship && (
+                                  <span
+                                    style={{
+                                      fontSize: '9.5px',
+                                      background: '#e2e8f0',
+                                      color: '#475569',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px',
+                                    }}
+                                  >
+                                    {m.relationship}
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* TRẠNG THÁI 1: CHƯA GỌI -> Hiển thị nút Gọi nổi bật, telesale chủ động bấm khi sẵn sàng */}
+                  {isIdle && (
+                    <div style={{ padding: '6px 16px 14px' }}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onDial(
+                            activeTab.selectedMemberId ||
+                            selectedMember?.member_id,
+                          )
+                        }
+                        style={{
+                          width: '100%',
+                          padding: '11px 18px',
+                          borderRadius: '8px',
+                          background: '#16a34a', // Màu xanh lá cây viễn thông chuẩn
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '13.5px',
+                          fontWeight: 700,
                           cursor: 'pointer',
                           display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <PhoneCall size={18} />
+                        <span>
+                          Bắt đầu gọi cho{' '}
+                          {selectedMember?.name ||
+                            currentCustomer.customer_name}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* TRẠNG THÁI 2: ĐANG TRONG CUỘC GỌI -> Mới hiển thị bộ 3 nút điều khiển đàm thoại */}
+                  {isInCall && (
+                    <div className="call-controls">
+                      <button
+                        type="button"
+                        onClick={onToggleMute}
+                        className={clsx({ selected: activeTab.isMuted })}
+                      >
+                        <span>
+                          {activeTab.isMuted ? (
+                            <MicOff size={20} />
+                          ) : (
+                            <Mic size={20} />
+                          )}
+                        </span>
+                        {activeTab.isMuted ? 'Bật mic' : 'Tắt mic'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={onToggleHold}
+                        className={clsx({ selected: activeTab.isHeld })}
+                      >
+                        <span>
+                          {activeTab.isHeld ? (
+                            <Play size={20} />
+                          ) : (
+                            <Pause size={20} />
+                          )}
+                        </span>
+                        {activeTab.isHeld ? 'Tiếp tục' : 'Giữ máy'}
+                      </button>
+
+                      <button
+                        className="end"
+                        type="button"
+                        onClick={onEndCall}
+                      >
+                        <span>
+                          <PhoneOff size={20} />
+                        </span>
+                        Kết thúc
+                      </button>
+                    </div>
+                  )}
+
+                  {/* TRẠNG THÁI 3: CUỘC GỌI ĐÃ KẾT THÚC -> Hiển thị kết quả & Nút Gọi lại nếu cần */}
+                  {isCallEnded && (
+                    <div
+                      style={{
+                        padding: '6px 16px 14px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          marginBottom: '10px',
+                          fontSize: '12px',
+                          color: '#475569',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: '#dc2626' }}>
+                          ● Cuộc gọi đã kết thúc
+                        </span>
+                        {activeTab.durationSec > 0 && (
+                          <span>
+                            {' '}
+                            (Thời lượng:{' '}
+                            {formatDuration(activeTab.durationSec)})
+                          </span>
+                        )}
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            color: '#64748b',
+                            fontSize: '11px',
+                          }}
+                        >
+                          Vui lòng ghi nhận kết quả ở cột bên phải để hoàn tất
+                          và nhận khách tiếp theo.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onDial(
+                            activeTab.selectedMemberId ||
+                            selectedMember?.member_id,
+                          )
+                        }
+                        style={{
+                          padding: '7px 16px',
+                          borderRadius: '6px',
+                          background: '#2563eb',
+                          color: '#fff',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
                         }}
                       >
-                        <PhoneCall size={12} />
-                        <b>{m.name}</b> ({m.phone_masked})
+                        <PhoneCall size={14} />
+                        <span>Gọi lại</span>
                       </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Các nút điều khiển cuộc gọi của tab đang chọn */}
-            <div className="call-controls">
-              <button
-                type="button"
-                onClick={onToggleMute}
-                className={clsx({ selected: activeTab.isMuted })}
-                disabled={activeTab.status === 'idle'}
-              >
-                <span>
-                  {activeTab.isMuted ? <MicOff size={20} /> : <Mic size={20} />}
-                </span>
-                {activeTab.isMuted ? 'Bật mic' : 'Tắt mic'}
-              </button>
-
-              <button
-                type="button"
-                onClick={onToggleHold}
-                className={clsx({ selected: activeTab.isHeld })}
-                disabled={activeTab.status === 'idle'}
-              >
-                <span>
-                  {activeTab.isHeld ? <Play size={20} /> : <Pause size={20} />}
-                </span>
-                {activeTab.isHeld ? 'Tiếp tục' : 'Giữ máy'}
-              </button>
-
-              <button
-                className="end"
-                type="button"
-                onClick={onEndCall}
-                disabled={activeTab.status === 'idle'}
-              >
-                <span>
-                  <PhoneOff size={20} />
-                </span>
-                Kết thúc
-              </button>
-            </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </>
         ) : (
           <div style={{ padding: '36px 16px', textAlign: 'center' }}>
