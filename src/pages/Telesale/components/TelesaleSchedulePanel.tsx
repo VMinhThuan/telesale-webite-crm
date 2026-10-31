@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react'
-import { MoreHorizontal, RotateCw } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import dayjs from '../../../lib/dayjs'
 import { useBranchSlots } from '../../../hooks/useOrders'
 import { BranchSlotDto } from '../../../types/api'
-import { notify } from '../../../utils/notify'
 
 export interface TelesaleSchedulePanelProps {
   branchName?: string
@@ -12,9 +11,7 @@ export interface TelesaleSchedulePanelProps {
   orderDate: string
   onDateChange: (date: string) => void
   selectedSlotId?: number
-  onSelectSlot: (slotId: number, slotTime: string) => void
-  isAutoDial: boolean
-  onToggleAutoDial: () => void
+  onSelectSlot: (slotId: number, slotTime: string, date?: string) => void
 }
 
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
@@ -24,179 +21,252 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   onDateChange,
   selectedSlotId,
   onSelectSlot,
-  isAutoDial,
-  onToggleAutoDial,
 }) => {
-  // Lấy danh sách ca hẹn slot theo chi nhánh và ngày chọn
-  const { data: rawSlots = [] } = useBranchSlots(
-    branchId,
-    orderDate || undefined,
-    orderDate || undefined,
-  )
+  // Quản lý ngày bắt đầu của cửa sổ 3 ngày (mặc định từ hôm nay)
+  const [startDateStr, setStartDateStr] = useState<string>(() => {
+    return orderDate ? dayjs(orderDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')
+  })
 
-  // Chuẩn hóa dữ liệu slot luôn là mảng để tránh lỗi không render được
+  // Tính toán danh sách 3 ngày liên tiếp trong cửa sổ hiển thị
+  const dates = useMemo(() => {
+    const start = dayjs(startDateStr)
+    return [0, 1, 2].map((offset) => {
+      const d = start.add(offset, 'day')
+      const dayNum = d.day()
+      const dayOfWeek = dayNum === 0 ? 'CN' : `T${dayNum + 1}`
+      return {
+        dateStr: d.format('YYYY-MM-DD'),
+        displayDate: d.format('DD/MM'),
+        dayOfWeek,
+      }
+    })
+  }, [startDateStr])
+
+  // Khoảng ngày hiển thị (VD: 31/10 - 02/11)
+  const rangeLabel = `${dates[0].displayDate} - ${dates[2].displayDate}`
+
+  // Gọi API lấy toàn bộ slot của cả 3 ngày liên tiếp
+  const fromDate = dates[0].dateStr
+  const toDate = dates[2].dateStr
+  const { data: rawSlots = [], isLoading } = useBranchSlots(branchId, fromDate, toDate)
+
+  // Chuẩn hóa dữ liệu slot luôn là mảng
   const branchSlots: BranchSlotDto[] = useMemo(() => {
     if (Array.isArray(rawSlots)) return rawSlots
     if (Array.isArray((rawSlots as any)?.items)) return (rawSlots as any).items
     return []
   }, [rawSlots])
 
+  // Bản đồ tra cứu slot theo khóa: `${date}_${slot_time}`
+  const slotMap = useMemo(() => {
+    const map = new Map<string, BranchSlotDto>()
+    branchSlots.forEach((slot) => {
+      map.set(`${slot.date}_${slot.slot_time}`, slot)
+    })
+    return map
+  }, [branchSlots])
+
+  // Danh sách các khung giờ cố định phân loại theo Ca Sáng và Ca Chiều
+  const morningTimes = useMemo(() => {
+    const defaultMorning = ['08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30']
+    const timesFromApi = Array.from(
+      new Set(
+        branchSlots
+          .map((s) => s.slot_time)
+          .filter((t) => {
+            const h = parseInt(t.split(':')[0], 10)
+            return h < 12
+          }),
+      ),
+    ).sort()
+    return timesFromApi.length > 0 ? timesFromApi : defaultMorning
+  }, [branchSlots])
+
+  const afternoonTimes = useMemo(() => {
+    const defaultAfternoon = [
+      '14:30',
+      '15:00',
+      '15:30',
+      '16:00',
+      '16:30',
+      '17:00',
+      '17:30',
+      '18:00',
+      '18:30',
+      '19:00',
+      '19:30',
+      '20:00',
+      '20:30',
+    ]
+    const timesFromApi = Array.from(
+      new Set(
+        branchSlots
+          .map((s) => s.slot_time)
+          .filter((t) => {
+            const h = parseInt(t.split(':')[0], 10)
+            return h >= 12
+          }),
+      ),
+    ).sort()
+    return timesFromApi.length > 0 ? timesFromApi : defaultAfternoon
+  }, [branchSlots])
+
+  // Điều hướng cửa sổ 3 ngày (không cho lùi về ngày trước hôm nay)
+  const isPrevDisabled = !dayjs(startDateStr).isAfter(dayjs().startOf('day'))
+  const handlePrev = () => {
+    if (!isPrevDisabled) {
+      setStartDateStr(dayjs(startDateStr).subtract(3, 'day').format('YYYY-MM-DD'))
+    }
+  }
+
+  const handleNext = () => {
+    setStartDateStr(dayjs(startDateStr).add(3, 'day').format('YYYY-MM-DD'))
+  }
+
+  // Render một hàng slot (hàng khung giờ và 3 ô của 3 ngày)
+  const renderSlotRow = (time: string) => {
+    // Kiểm tra xem trong 3 ngày có ô nào đang được chọn tại giờ này không
+    const isRowChecked = dates.some((d) => {
+      const slot = slotMap.get(`${d.dateStr}_${time}`)
+      return slot && slot.slot_id === selectedSlotId && orderDate === d.dateStr
+    })
+
+    return (
+      <div key={time} className="slot-row">
+        <input
+          type="checkbox"
+          readOnly
+          checked={isRowChecked}
+          style={{ cursor: 'pointer' }}
+        />
+        <b>{time}</b>
+        {dates.map((d) => {
+          const slot = slotMap.get(`${d.dateStr}_${time}`)
+          if (!slot) {
+            return (
+              <span
+                key={d.dateStr}
+                style={{ color: '#cbd5e1', fontSize: '11px', textAlign: 'center' }}
+              >
+                —
+              </span>
+            )
+          }
+
+          const conTrong = slot.con_trong ?? 0
+          const isAvailable = conTrong > 0 && !slot.is_expired && !slot.is_inactive
+          const isChosen = selectedSlotId === slot.slot_id && orderDate === d.dateStr
+
+          return (
+            <button
+              key={d.dateStr}
+              type="button"
+              disabled={!isAvailable}
+              className={clsx('slot-count', {
+                available: isAvailable,
+              })}
+              style={{
+                cursor: isAvailable ? 'pointer' : 'not-allowed',
+                opacity: slot.is_expired ? 0.45 : 1,
+                border: 'none',
+                outline: isChosen ? '2px solid #2563eb' : 'none',
+                outlineOffset: '1px',
+                transform: isChosen ? 'scale(1.15)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              onClick={() => {
+                if (isAvailable) {
+                  onSelectSlot(slot.slot_id, slot.slot_time, d.dateStr)
+                  onDateChange(d.dateStr)
+                }
+              }}
+              title={
+                slot.is_expired
+                  ? 'Ca đã quá giờ hẹn hôm nay'
+                  : isAvailable
+                    ? `Ngày ${d.displayDate} lúc ${time}: Còn ${conTrong} chỗ (Bấm để chọn)`
+                    : `Ngày ${d.displayDate} lúc ${time}: Hết chỗ`
+              }
+            >
+              {conTrong}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <section className="call-panel schedule-panel">
+      {/* Tiêu đề Lịch hẹn chi nhánh */}
       <div className="call-panel-heading">
         <div>
           <p className="eyebrow">LỊCH HẸN CHI NHÁNH</p>
           <h2>{branchName || 'Trụ sở Hà Nội'}</h2>
         </div>
+      </div>
+
+      {/* Thanh điều hướng 3 ngày liên tiếp */}
+      <div className="week-control">
         <button
-          className="icon-button"
           type="button"
-          onClick={() => notify('Cập nhật slot chi nhánh')}
-          title="Tùy chọn"
+          onClick={handlePrev}
+          disabled={isPrevDisabled}
+          style={{
+            cursor: isPrevDisabled ? 'not-allowed' : 'pointer',
+            opacity: isPrevDisabled ? 0.35 : 1,
+          }}
+          title="3 ngày trước"
         >
-          <MoreHorizontal size={19} />
+          <ChevronLeft size={16} />
+        </button>
+        <span style={{ fontWeight: 600 }}>{rangeLabel}</span>
+        <button
+          type="button"
+          onClick={handleNext}
+          style={{ cursor: 'pointer' }}
+          title="3 ngày tiếp theo"
+        >
+          <ChevronRight size={16} />
         </button>
       </div>
 
-      <div style={{ padding: '0 14px 10px' }}>
-        <label
-          style={{
-            fontSize: '10px',
-            color: '#6d7f9c',
-            display: 'block',
-            marginBottom: '4px',
-          }}
-        >
-          Xem slot theo ngày:
-        </label>
-        <input
-          type="date"
-          value={orderDate}
-          min={dayjs().format('YYYY-MM-DD')}
-          onChange={(e) => onDateChange(e.target.value)}
-          style={{
-            width: '100%',
-            height: '32px',
-            border: '1px solid #dfe6f0',
-            borderRadius: '6px',
-            padding: '0 8px',
-            fontSize: '11px',
-            color: '#344767',
-            outline: 'none',
-          }}
-        />
+      {/* Tiêu đề các cột trong bảng */}
+      <div className="slot-header">
+        <span></span>
+        <span>Giờ</span>
+        {dates.map((d) => (
+          <span key={d.dateStr}>
+            {d.dayOfWeek} <small>{d.displayDate}</small>
+          </span>
+        ))}
       </div>
 
-      <div
-        className="slot-header"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '55px 1fr 85px',
-          alignItems: 'center',
-          padding: '8px 12px',
-          background: '#f8fafc',
-          borderTop: '1px solid #e2e8f0',
-          borderBottom: '1px solid #e2e8f0',
-          fontSize: '10px',
-          fontWeight: 700,
-          color: '#64748b',
-        }}
-      >
-        <span style={{ textAlign: 'left' }}>Ca hẹn</span>
-        <span style={{ textAlign: 'center' }}>Khung giờ</span>
-        <span style={{ textAlign: 'right' }}>Trạng thái</span>
-      </div>
-
-      <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
-        {branchSlots.length > 0 ? (
-          branchSlots.map((slot, index) => {
-            const isFull = slot.con_trong <= 0 || slot.is_expired
-            const isChosen = selectedSlotId === slot.slot_id
-            return (
-              <div
-                key={slot.slot_id}
-                className="slot-row"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '55px 1fr 85px',
-                  alignItems: 'center',
-                  padding: '8px 12px',
-                  borderBottom: '1px solid #edf1f6',
-                  background: isChosen ? '#eff6ff' : 'transparent',
-                  cursor: isFull ? 'not-allowed' : 'pointer',
-                  transition: 'background 0.15s ease',
-                }}
-                onClick={() => {
-                  if (!isFull) {
-                    onSelectSlot(slot.slot_id, slot.slot_time)
-                  }
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#64748b',
-                    textAlign: 'left',
-                  }}
-                >
-                  Ca #{index + 1}
-                </span>
-                <b
-                  style={{
-                    fontSize: '11px',
-                    color: isChosen ? '#2563eb' : '#334155',
-                    textAlign: 'center',
-                  }}
-                >
-                  {slot.to_time && slot.to_time !== slot.slot_time
-                    ? `${slot.slot_time} - ${slot.to_time}`
-                    : slot.slot_time}
-                </b>
-                <div style={{ textAlign: 'right' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      color: '#fff',
-                      background: isFull ? '#ef4444' : '#10b981',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {isFull ? 'Hết chỗ' : `Còn ${slot.con_trong} chỗ`}
-                  </span>
-                </div>
-              </div>
-            )
-          })
-        ) : (
+      {/* Bảng ma trận slot theo mẫu ban đầu */}
+      <div style={{ paddingBottom: '12px' }}>
+        {isLoading && branchSlots.length === 0 ? (
           <p
             style={{
               textAlign: 'center',
               color: '#94a3b8',
               fontSize: '11px',
-              padding: '20px 0',
+              padding: '24px 0',
             }}
           >
-            {orderDate
-              ? 'Không có ca hẹn nào trong ngày đã chọn'
-              : 'Chọn ngày để kiểm tra slot khả dụng'}
+            Đang tải dữ liệu ca hẹn...
           </p>
+        ) : (
+          <>
+            {/* Nhóm CA SÁNG */}
+            <div className="slot-section">CA SÁNG</div>
+            {morningTimes.map((time) => renderSlotRow(time))}
+
+            {/* Nhóm CA CHIỀU */}
+            <div className="slot-section afternoon">CA CHIỀU</div>
+            {afternoonTimes.map((time) => renderSlotRow(time))}
+          </>
         )}
       </div>
-
-      <button
-        className={clsx('auto-dial', { active: isAutoDial })}
-        onClick={onToggleAutoDial}
-        type="button"
-        style={{ marginTop: '12px' }}
-      >
-        <RotateCw size={18} />{' '}
-        {isAutoDial ? 'Dừng quay tự động' : 'Tự động quay số'}
-      </button>
     </section>
   )
 }

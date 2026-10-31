@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import dayjs from '../../lib/dayjs'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3,
   CheckCircle2,
@@ -9,19 +8,21 @@ import {
   ShoppingCart,
   Users,
 } from 'lucide-react'
+import dayjs from '../../lib/dayjs'
 import {
   useCampaigns,
   useDailyResults,
   useDialCallMutation,
   useNextCustomerMutation,
 } from '../../hooks/useTelesale'
-import { useCallStore } from '../../store/useCallStore'
-import { NextCustomerDto } from '../../types/api'
 import { notify } from '../../utils/notify'
 
 // 3 Khối Panels lớn của module Telesale
 import { TelesaleSchedulePanel } from './components/TelesaleSchedulePanel'
-import { TelesaleCallCenterPanel } from './components/TelesaleCallCenterPanel'
+import {
+  TelesaleCallCenterPanel,
+  TelesaleCallTab,
+} from './components/TelesaleCallCenterPanel'
 import {
   TelesaleCustomerPanel,
   resultOptions,
@@ -57,71 +58,180 @@ export const Telesale: React.FC = () => {
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()
 
-  // 3. Quản lý khách hàng đang tương tác
-  const [currentCustomer, setCurrentCustomer] = useState<NextCustomerDto | null>(null)
-  const [selectedMemberId, setSelectedMemberId] = useState<number | undefined>(undefined)
+  // 3. Quản lý mô hình 3 Tab / 3 Line cuộc gọi độc lập
+  const [tabs, setTabs] = useState<TelesaleCallTab[]>([
+    {
+      id: 1,
+      label: 'Số 1',
+      customer: null,
+      status: 'idle',
+      durationSec: 0,
+      isMuted: false,
+      isHeld: false,
+    },
+    {
+      id: 2,
+      label: 'Số 2',
+      customer: null,
+      status: 'idle',
+      durationSec: 0,
+      isMuted: false,
+      isHeld: false,
+    },
+    {
+      id: 3,
+      label: 'Số 3',
+      customer: null,
+      status: 'idle',
+      durationSec: 0,
+      isMuted: false,
+      isHeld: false,
+    },
+  ])
+  const [activeTabId, setActiveTabId] = useState<number>(1)
+
+  // Tab đang hoạt động
+  const activeTab = useMemo(() => {
+    return tabs.find((t) => t.id === activeTabId) || tabs[0]
+  }, [tabs, activeTabId])
+
+  const currentCustomer = activeTab?.customer
 
   // Ngày và ca hẹn đồng bộ giữa Cột 1 (SchedulePanel) và Cột 3 (CustomerPanel)
   const [orderDate, setOrderDate] = useState(() => dayjs().format('YYYY-MM-DD'))
   const [orderTime, setOrderTime] = useState('08:30')
   const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
 
-  // 4. Trạng thái cuộc gọi toàn cục (Zustand Store)
-  const status = useCallStore((s) => s.status)
-  const isAutoDial = useCallStore((s) => s.isAutoDial)
-  const startCall = useCallStore((s) => s.startCall)
-  const connectCall = useCallStore((s) => s.connectCall)
-  const resetCall = useCallStore((s) => s.resetCall)
-  const setAutoDial = useCallStore((s) => s.setAutoDial)
-  const tickDuration = useCallStore((s) => s.tickDuration)
-
   // Mutations nghiệp vụ Telesale
   const nextCustomerMutation = useNextCustomerMutation()
   const dialCallMutation = useDialCallMutation()
 
-  // Bộ đếm thời gian khi cuộc gọi đang kết nối
+  // Hàm nạp khách hàng từ chiến dịch vào một Tab cụ thể
+  const handleFetchCustomerForTab = React.useCallback(
+    async (targetTabId: number, campaignIdOverride?: number) => {
+      const activeCampId = campaignIdOverride || selectedCampaign?.campaign_id
+      if (!activeCampId) {
+        notify('Vui lòng chọn chiến dịch trước khi lấy khách')
+        return
+      }
+
+      try {
+        const nextCust = await nextCustomerMutation.mutateAsync({
+          campaign_id: activeCampId,
+          call_mode: 'chien_dich',
+        })
+
+        setTabs((prev) =>
+          prev.map((t) => {
+            if (t.id === targetTabId) {
+              return {
+                ...t,
+                customer: nextCust,
+                selectedMemberId: nextCust.members?.[0]?.member_id,
+                status: 'idle',
+                durationSec: 0,
+                isMuted: false,
+                isHeld: false,
+                callerNumber: undefined,
+              }
+            }
+            return t
+          }),
+        )
+
+        notify(`Đã nạp khách hàng cho Số ${targetTabId}: ${nextCust.customer_name}`)
+      } catch {
+        // Lỗi đã được xử lý trong hook mutation
+      }
+    },
+    [nextCustomerMutation, selectedCampaign?.campaign_id],
+  )
+
+  // Nạp khách hàng ban đầu cho Tab 1 khi chiến dịch sẵn sàng (Cách 2: nạp Tab 1 trước)
+  const initializedCampaignIdRef = useRef<number | null>(null)
   useEffect(() => {
-    let intervalId: number | undefined
-    if (status === 'connected') {
-      intervalId = window.setInterval(() => {
-        tickDuration()
-      }, 1000)
+    if (
+      selectedCampaign &&
+      initializedCampaignIdRef.current !== selectedCampaign.campaign_id
+    ) {
+      initializedCampaignIdRef.current = selectedCampaign.campaign_id
+      // Reset cả 3 tab khi chuyển chiến dịch
+      setTabs([
+        {
+          id: 1,
+          label: 'Số 1',
+          customer: null,
+          status: 'idle',
+          durationSec: 0,
+          isMuted: false,
+          isHeld: false,
+        },
+        {
+          id: 2,
+          label: 'Số 2',
+          customer: null,
+          status: 'idle',
+          durationSec: 0,
+          isMuted: false,
+          isHeld: false,
+        },
+        {
+          id: 3,
+          label: 'Số 3',
+          customer: null,
+          status: 'idle',
+          durationSec: 0,
+          isMuted: false,
+          isHeld: false,
+        },
+      ])
+      setActiveTabId(1)
+      handleFetchCustomerForTab(1, selectedCampaign.campaign_id)
     }
-    return () => {
-      if (intervalId) clearInterval(intervalId)
-    }
-  }, [status, tickDuration])
+  }, [handleFetchCustomerForTab, selectedCampaign])
 
-  // Tự động chọn thành viên đầu tiên khi nạp khách hàng
+  // Bộ đếm thời gian khi các tab đang ở trạng thái 'connected'
   useEffect(() => {
-    if (currentCustomer && currentCustomer.members?.length > 0) {
-      setSelectedMemberId(currentCustomer.members[0].member_id)
-    } else {
-      setSelectedMemberId(undefined)
-    }
-  }, [currentCustomer])
-
-  // Hàm lấy khách hàng tiếp theo từ chiến dịch
-  const handleFetchNextCustomer = async () => {
-    if (!selectedCampaign) {
-      notify('Vui lòng chọn chiến dịch trước khi lấy khách')
-      return
-    }
-
-    try {
-      const nextCust = await nextCustomerMutation.mutateAsync({
-        campaign_id: selectedCampaign.campaign_id,
-        call_mode: 'chien_dich',
+    const intervalId = window.setInterval(() => {
+      setTabs((prev) => {
+        const hasConnected = prev.some((t) => t.status === 'connected')
+        if (!hasConnected) return prev
+        return prev.map((t) =>
+          t.status === 'connected' ? { ...t, durationSec: t.durationSec + 1 } : t,
+        )
       })
-      setCurrentCustomer(nextCust)
-      resetCall()
-      notify(`Đã nạp khách hàng: ${nextCust.customer_name}`)
-    } catch {
-      // Lỗi đã được xử lý trong hook mutation
-    }
+    }, 1000)
+
+    return () => clearInterval(intervalId)
+  }, [])
+
+  // Chuyển đổi giữa 3 tab cuộc gọi
+  const handleSelectTab = (newTabId: number) => {
+    if (newTabId === activeTabId) return
+
+    setTabs((prev) =>
+      prev.map((t) => {
+        // Nếu tab cũ đang đàm thoại, tự động chuyển sang trạng thái Giữ máy (Hold)
+        if (t.id === activeTabId && t.status === 'connected') {
+          return { ...t, status: 'paused', isHeld: true }
+        }
+        return t
+      }),
+    )
+
+    setActiveTabId(newTabId)
   }
 
-  // Hàm quay số gọi cho thành viên liên hệ
+  // Chọn thành viên cần gọi của Tab đang active
+  const handleSelectMemberId = (memberId: number) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabId ? { ...t, selectedMemberId: memberId } : t,
+      ),
+    )
+  }
+
+  // Quay số cho thành viên của Tab đang active
   const handleDial = async (memberId?: number) => {
     if (!currentCustomer) {
       notify('Chưa có thông tin khách hàng để gọi')
@@ -129,7 +239,7 @@ export const Telesale: React.FC = () => {
     }
 
     const targetMemberId =
-      memberId || selectedMemberId || currentCustomer.members?.[0]?.member_id
+      memberId || activeTab.selectedMemberId || currentCustomer.members?.[0]?.member_id
 
     try {
       const dialInfo = await dialCallMutation.mutateAsync({
@@ -137,48 +247,110 @@ export const Telesale: React.FC = () => {
         member_id: targetMemberId,
       })
 
-      // Đưa thông tin vào Zustand Call Store
-      startCall({
-        customerId: currentCustomer.customer_id,
-        customerName: currentCustomer.customer_name,
-        phoneMasked: dialInfo.phone_masked,
-        address: currentCustomer.masked_address,
-        memberId: dialInfo.member_id,
-        memberName: dialInfo.member_name,
-        dialNumber: dialInfo.dial_number,
-      })
+      // Đặt tab hiện tại thành 'calling' và tạm giữ máy các tab khác nếu đang connected
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id === activeTabId) {
+            return {
+              ...t,
+              status: 'calling',
+              durationSec: 0,
+              isMuted: false,
+              isHeld: false,
+              callerNumber: dialInfo.phone_masked,
+              selectedMemberId: dialInfo.member_id,
+            }
+          }
+          if (t.status === 'connected') {
+            return { ...t, status: 'paused', isHeld: true }
+          }
+          return t
+        }),
+      )
 
       // Mô phỏng kết nối cuộc gọi sau 1.5s
       setTimeout(() => {
-        connectCall()
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === activeTabId ? { ...t, status: 'connected' } : t,
+          ),
+        )
       }, 1500)
     } catch {
       // Lỗi đã được xử lý trong hook mutation
     }
   }
 
-  // Hàm chuyển đổi chế độ gọi tự động cuốn chiếu
-  const handleToggleAutoDial = () => {
-    const nextState = !isAutoDial
-    setAutoDial(nextState)
-    notify(
-      nextState
-        ? 'Đã bật chế độ tự động quay số cuốn chiếu'
-        : 'Đã tắt chế độ quay số tự động',
+  // Bật/tắt micro của tab đang active
+  const handleToggleMute = () => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === activeTabId) {
+          const nextMuted = !t.isMuted
+          notify(!nextMuted ? 'Đã bật micro' : 'Đã tắt micro')
+          return { ...t, isMuted: nextMuted }
+        }
+        return t
+      }),
     )
-    if (nextState && !currentCustomer) {
-      handleFetchNextCustomer()
-    }
   }
 
-  // Xử lý sau khi lưu kết quả cuộc gọi thành công
+  // Giữ máy / Tiếp tục cuộc gọi của tab đang active
+  const handleToggleHold = () => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === activeTabId) {
+          const nextHeld = !t.isHeld
+          notify(nextHeld ? 'Đang giữ máy khách hàng' : 'Tiếp tục cuộc gọi')
+          return {
+            ...t,
+            isHeld: nextHeld,
+            status: nextHeld ? 'paused' : 'connected',
+          }
+        }
+        return t
+      }),
+    )
+  }
+
+  // Kết thúc cuộc gọi của tab đang active
+  const handleEndCall = () => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === activeTabId) {
+          notify('Đã kết thúc cuộc gọi')
+          return { ...t, status: 'ended' }
+        }
+        return t
+      }),
+    )
+  }
+
+  // Xử lý sau khi lưu kết quả cuộc gọi thành công ở Cột 3
   const handleSaveResultSuccess = () => {
-    resetCall()
-    if (isAutoDial) {
-      setTimeout(() => {
-        handleFetchNextCustomer()
-      }, 800)
-    }
+    // 1. Reset trạng thái của tab vừa lưu
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === activeTabId) {
+          return {
+            ...t,
+            customer: null,
+            status: 'idle',
+            durationSec: 0,
+            isMuted: false,
+            isHeld: false,
+            callerNumber: undefined,
+            selectedMemberId: undefined,
+          }
+        }
+        return t
+      }),
+    )
+
+    // 2. Tự động nạp khách hàng tiếp theo vào chính tab vừa lưu
+    setTimeout(() => {
+      handleFetchCustomerForTab(activeTabId)
+    }, 400)
   }
 
   return (
@@ -190,9 +362,9 @@ export const Telesale: React.FC = () => {
             Bàn làm việc đàm thoại{' '}
             <span className="live-dot">
               ●{' '}
-              {status === 'connected'
+              {activeTab.status === 'connected'
                 ? 'Đang đàm thoại'
-                : status === 'calling'
+                : activeTab.status === 'calling'
                   ? 'Đang đổ chuông'
                   : 'Đang sẵn sàng'}
             </span>
@@ -225,7 +397,7 @@ export const Telesale: React.FC = () => {
             >
               {campaignsList.map((c) => (
                 <option key={c.campaign_id} value={c.campaign_id}>
-                  {c.name} ({c.branch_name})
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -296,32 +468,39 @@ export const Telesale: React.FC = () => {
 
       {/* Layout 3 cột Telesale chuẩn CRM */}
       <div className="telesale-grid">
-        {/* CỘT 1: Lịch Slot hẹn chi nhánh & Nút quay số tự động */}
+        {/* CỘT 1: Lịch Slot hẹn chi nhánh theo ma trận 3 ngày */}
         <TelesaleSchedulePanel
           branchName={selectedCampaign?.branch_name}
           branchId={branchId}
           orderDate={orderDate}
           onDateChange={setOrderDate}
           selectedSlotId={orderSlotId}
-          onSelectSlot={(slotId, slotTime) => {
+          onSelectSlot={(slotId, slotTime, date) => {
             setOrderSlotId(slotId)
             setOrderTime(slotTime)
+            if (date) {
+              setOrderDate(date)
+            }
           }}
-          isAutoDial={isAutoDial}
-          onToggleAutoDial={handleToggleAutoDial}
         />
 
-        {/* CỘT 2: Điều khiển cuộc gọi & Kịch bản tư vấn */}
+        {/* CỘT 2: Điều khiển cuộc gọi theo mô hình 3 Tab độc lập */}
         <TelesaleCallCenterPanel
-          currentCustomer={currentCustomer}
-          selectedMemberId={selectedMemberId}
-          onSelectMemberId={setSelectedMemberId}
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelectTab={handleSelectTab}
+          onSelectMemberId={handleSelectMemberId}
           onDial={handleDial}
-          onFetchNextCustomer={handleFetchNextCustomer}
+          onToggleMute={handleToggleMute}
+          onToggleHold={handleToggleHold}
+          onEndCall={handleEndCall}
+          onFetchCustomerForTab={handleFetchCustomerForTab}
           isFetchingCustomer={nextCustomerMutation.isPending}
+          currentCustomer={currentCustomer}
+          onFetchNextCustomer={() => handleFetchCustomerForTab(activeTabId)}
         />
 
-        {/* CỘT 3: Hồ sơ khách hàng & Form kết quả cuộc gọi */}
+        {/* CỘT 3: Hồ sơ khách hàng & Form kết quả cuộc gọi (đồng bộ theo Tab active) */}
         <TelesaleCustomerPanel
           currentCustomer={currentCustomer}
           selectedCampaignName={selectedCampaign?.name}
@@ -331,7 +510,7 @@ export const Telesale: React.FC = () => {
           orderTime={orderTime}
           onOrderTimeChange={setOrderTime}
           orderSlotId={orderSlotId}
-          onFetchNextCustomer={handleFetchNextCustomer}
+          onFetchNextCustomer={() => handleFetchCustomerForTab(activeTabId)}
           onSaveResultSuccess={handleSaveResultSuccess}
         />
       </div>
