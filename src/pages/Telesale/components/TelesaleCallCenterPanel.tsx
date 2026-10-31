@@ -86,7 +86,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
             <p className="eyebrow">PHIÊN ĐÀM THOẠI</p>
             <h2>Điều khiển cuộc gọi</h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {/* Badge chỉ báo kết nối SIP máy nhánh tổng đài */}
             <span
               onClick={

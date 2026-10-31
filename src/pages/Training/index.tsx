@@ -41,7 +41,7 @@ const getMaterialIcon = (type: string, tone?: string) => {
   return FileText
 }
 
-export const Training: React.FC<TrainingProps> = ({ setPage }) => {
+export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
   const [category, setCategory] = useState('Tất cả')
   const [query, setQuery] = useState('')
 

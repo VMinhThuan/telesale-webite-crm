@@ -425,7 +425,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
@@ -439,11 +439,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 onChange={(e) => handleLevel1Change(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '34px',
+                  height: '36px',
                   border: '1px solid #dce5f0',
                   borderRadius: '6px',
                   padding: '0 8px',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: '#334155',
                   background: '#fff',
                 }}
@@ -460,7 +460,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <div>
                 <label
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     color: '#475569',
                     display: 'block',
@@ -474,11 +474,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                   onChange={(e) => handleLevel2Change(e.target.value)}
                   style={{
                     width: '100%',
-                    height: '34px',
+                    height: '36px',
                     border: '1px solid #dce5f0',
                     borderRadius: '6px',
                     padding: '0 8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: '#334155',
                     background: '#fff',
                   }}
@@ -496,7 +496,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <div>
                 <label
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     color: '#475569',
                     display: 'block',
@@ -510,11 +510,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                   onChange={(e) => handleLevel3Change(e.target.value)}
                   style={{
                     width: '100%',
-                    height: '34px',
+                    height: '36px',
                     border: '1px solid #dce5f0',
                     borderRadius: '6px',
                     padding: '0 8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: '#334155',
                     background: '#fff',
                   }}
@@ -532,7 +532,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <div>
                 <label
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     color: '#475569',
                     display: 'block',
@@ -548,11 +548,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                   placeholder="Ghi rõ khu vực out vùng hoặc chi tiết lý do..."
                   style={{
                     width: '100%',
-                    height: '34px',
+                    height: '36px',
                     border: '1px solid #dce5f0',
                     borderRadius: '6px',
                     padding: '0 8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: '#334155',
                     background: '#fff',
                   }}
@@ -563,7 +563,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
@@ -577,11 +577,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 onChange={(e) => setSelectedPainPoint(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '34px',
+                  height: '36px',
                   border: '1px solid #dce5f0',
                   borderRadius: '6px',
                   padding: '0 8px',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: '#334155',
                   background: '#fff',
                 }}
@@ -599,29 +599,29 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
 
         {/* Nếu là Chốt đơn (closed) */}
         {selectedOutcome === 'closed' && (
-          <div style={{ padding: '0 16px 12px', display: 'grid', gap: '10px' }}>
+          <div style={{ padding: '0 16px 14px', display: 'grid', gap: '12px' }}>
             <div
               style={{
                 background: '#f0fdf4',
-                padding: '8px 10px',
-                borderRadius: '6px',
+                padding: '9px 12px',
+                borderRadius: '7px',
                 border: '1px solid #bbf7d0',
               }}
             >
               <p
                 style={{
                   margin: 0,
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: '#166534',
                   fontWeight: 600,
                 }}
               >
                 <CheckCircle2
-                  size={13}
+                  size={14}
                   style={{
                     display: 'inline',
                     verticalAlign: '-2px',
-                    marginRight: '4px',
+                    marginRight: '6px',
                   }}
                 />
                 Thiết lập đơn hàng hẹn khách
@@ -632,7 +632,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <label>
                 Ngày hẹn <b style={{ color: '#e11d48' }}>*</b>
                 <span>
-                  <CalendarCheck size={15} />
+                  <CalendarCheck size={16} />
                   <input
                     type="date"
                     value={orderDate}
@@ -644,7 +644,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <label>
                 Giờ hẹn <b style={{ color: '#e11d48' }}>*</b>
                 <span>
-                  <Clock3 size={15} />
+                  <Clock3 size={16} />
                   <input
                     type="time"
                     value={orderTime}
@@ -658,11 +658,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
-                  marginBottom: '4px',
+                  marginBottom: '5px',
                 }}
               >
                 Gói dịch vụ ({selectedServices.length} đã chọn) <b style={{ color: '#e11d48' }}>*</b>:
@@ -674,11 +674,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 placeholder="🔍 Tìm nhanh gói dịch vụ hoặc lõi lọc..."
                 style={{
                   width: '100%',
-                  height: '30px',
+                  height: '35px',
                   border: '1px solid #dce5f0',
-                  borderRadius: '5px',
-                  padding: '0 8px',
-                  fontSize: '11px',
+                  borderRadius: '6px',
+                  padding: '0 10px',
+                  fontSize: '12px',
                   color: '#334155',
                   background: '#fff',
                   marginBottom: '6px',
@@ -687,8 +687,8 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               <div
                 style={{
                   display: 'grid',
-                  gap: '4px',
-                  maxHeight: '170px',
+                  gap: '5px',
+                  maxHeight: '190px',
                   overflowY: 'auto',
                   paddingRight: '2px',
                 }}
@@ -702,10 +702,10 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '6px 8px',
+                        padding: '7px 10px',
                         border: '1px solid #e2e8f0',
                         borderRadius: '6px',
-                        fontSize: '11px',
+                        fontSize: '12px',
                         cursor: 'pointer',
                         background: isSelected ? '#f0fdf4' : '#fff',
                       }}
@@ -714,7 +714,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '7px',
                           flex: 1,
                           minWidth: 0,
                         }}
@@ -722,6 +722,12 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                         <input
                           type="checkbox"
                           checked={isSelected}
+                          style={{
+                            width: '15px',
+                            height: '15px',
+                            accentColor: '#16a34a',
+                            cursor: 'pointer',
+                          }}
                           onChange={(e) => {
                             if (e.target.checked) {
                               setSelectedServices([...selectedServices, srv.code])
@@ -737,6 +743,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            fontSize: '12px',
+                            color: isSelected ? '#166534' : '#1e293b',
+                            fontWeight: isSelected ? 600 : 400,
                           }}
                           title={srv.label}
                         >
@@ -744,7 +753,14 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                         </span>
                       </span>
                       {srv.price ? (
-                        <b style={{ whiteSpace: 'nowrap', marginLeft: '6px' }}>
+                        <b
+                          style={{
+                            whiteSpace: 'nowrap',
+                            marginLeft: '8px',
+                            fontSize: '12px',
+                            color: '#0f172a',
+                          }}
+                        >
                           {formatVND(srv.price)}
                         </b>
                       ) : (
@@ -752,7 +768,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                           style={{
                             color: '#16a34a',
                             whiteSpace: 'nowrap',
-                            marginLeft: '6px',
+                            marginLeft: '8px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
                           }}
                         >
                           Miễn phí
@@ -768,11 +786,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
-                  marginBottom: '4px',
+                  marginBottom: '5px',
                 }}
               >
                 Đồ / Thiết bị KTV cần mang ({selectedDoCanMang.length}):
@@ -781,8 +799,8 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '4px',
-                  maxHeight: '130px',
+                  gap: '5px',
+                  maxHeight: '150px',
                   overflowY: 'auto',
                 }}
               >
@@ -794,12 +812,12 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '5px',
-                        padding: '4px 6px',
-                        borderRadius: '4px',
+                        gap: '6px',
+                        padding: '6px 8px',
+                        borderRadius: '5px',
                         border: '1px solid #e2e8f0',
                         background: isChecked ? '#eff6ff' : '#fff',
-                        fontSize: '10.5px',
+                        fontSize: '11.5px',
                         cursor: 'pointer',
                         color: isChecked ? '#1d4ed8' : '#334155',
                         fontWeight: isChecked ? 600 : 400,
@@ -808,6 +826,12 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                       <input
                         type="checkbox"
                         checked={isChecked}
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          accentColor: '#2563eb',
+                          cursor: 'pointer',
+                        }}
                         onChange={() => handleToggleDoCanMang(item.code)}
                       />
                       <span
@@ -815,6 +839,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          fontSize: '11.5px',
                         }}
                       >
                         {item.label}
@@ -829,11 +854,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
-                  marginBottom: '4px',
+                  marginBottom: '5px',
                 }}
               >
                 Tình trạng lỗi máy (nếu có):
@@ -843,11 +868,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 onChange={(e) => setSelectedMachineProblem(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '34px',
+                  height: '36px',
                   border: '1px solid #dce5f0',
                   borderRadius: '6px',
                   padding: '0 8px',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: '#334155',
                   background: '#fff',
                 }}
@@ -867,14 +892,14 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                   placeholder="Nhập mô tả lỗi máy khác..."
                   style={{
                     width: '100%',
-                    height: '32px',
+                    height: '34px',
                     border: '1px solid #dce5f0',
                     borderRadius: '5px',
                     padding: '0 8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: '#334155',
                     background: '#fff',
-                    marginTop: '4px',
+                    marginTop: '5px',
                   }}
                 />
               )}
@@ -884,11 +909,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             <div>
               <label
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
                   display: 'block',
-                  marginBottom: '4px',
+                  marginBottom: '5px',
                 }}
               >
                 Yêu cầu kỹ thuật viên (more_request):
@@ -898,11 +923,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 onChange={(e) => setSelectedMoreRequest(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '34px',
+                  height: '36px',
                   border: '1px solid #dce5f0',
                   borderRadius: '6px',
                   padding: '0 8px',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: '#334155',
                   background: '#fff',
                 }}
@@ -922,14 +947,14 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                   placeholder="Nhập yêu cầu thêm khác..."
                   style={{
                     width: '100%',
-                    height: '32px',
+                    height: '34px',
                     border: '1px solid #dce5f0',
                     borderRadius: '5px',
                     padding: '0 8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: '#334155',
                     background: '#fff',
-                    marginTop: '4px',
+                    marginTop: '5px',
                   }}
                 />
               )}
