@@ -298,9 +298,23 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     }
   }
 
+  // Kiểm tra xem line của tab này có đang trong cuộc gọi hay không
+  const isCallInProgress =
+    activeTabStatus === 'calling' ||
+    activeTabStatus === 'connected' ||
+    activeTabStatus === 'paused'
+
   // Lưu kết quả cuộc gọi với validation chuẩn API 18
   const handleSaveResult = async () => {
     if (isSubmittingResultRef.current) return
+
+    // Guard: Không cho phép lưu kết quả và đổi khách hàng khi cuộc gọi vẫn đang diễn ra
+    if (isCallInProgress) {
+      notify(
+        'Cuộc gọi đang diễn ra. Vui lòng bấm Gác máy (Kết thúc cuộc gọi) trước khi lưu kết quả!',
+      )
+      return
+    }
 
     if (!currentCustomer) {
       notify('Chưa có khách hàng để lưu kết quả')
@@ -1088,12 +1102,27 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           onClick={handleSaveResult}
           className="save-result"
           type="button"
-          disabled={saveCallResultMutation.isPending || !currentCustomer}
+          disabled={saveCallResultMutation.isPending || !currentCustomer || isCallInProgress}
+          title={
+            isCallInProgress
+              ? 'Vui lòng gác máy trước khi lưu kết quả cuộc gọi'
+              : undefined
+          }
+          style={
+            isCallInProgress
+              ? {
+                  backgroundColor: '#94a3b8',
+                  cursor: 'not-allowed',
+                }
+              : undefined
+          }
         >
           <Save size={18} />
           {saveCallResultMutation.isPending
             ? 'Đang lưu kết quả...'
-            : 'Lưu kết quả cuộc gọi'}
+            : isCallInProgress
+              ? 'Đang đàm thoại (Hãy gác máy trước)'
+              : 'Lưu kết quả cuộc gọi'}
         </button>
       </section>
     </aside>

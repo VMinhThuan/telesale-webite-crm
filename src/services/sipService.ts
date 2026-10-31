@@ -60,6 +60,8 @@ class SipService {
   private activeLineId: number = 1
   // Map quản lý Audio Element riêng cho từng line
   private audioElements: Map<number, HTMLAudioElement> = new Map()
+  // Map quản lý các lượt khởi tạo cuộc gọi đang chuẩn bị (in-flight preparation) theo lineId để hỗ trợ hủy giữa chừng
+  private pendingCallAttempts: Map<number, { attemptId: number; aborted: boolean }> = new Map()
 
   private currentConfig: SipAccountConfig | null = null
   private ringToneAudioContext: AudioContext | null = null
@@ -67,6 +69,12 @@ class SipService {
   private ringGainNode: GainNode | null = null
 
   private registrationStatus: SipRegistrationStatus = 'disconnected'
+
+  // Quản lý tự động thử lại đăng ký khi mạng chập chờn / timeout
+  private registrationRetryTimer: ReturnType<typeof setTimeout> | null = null
+  private registrationRetryAttempts: number = 0
+  // Watchdog phát hiện WebSocket rớt kết nối kéo dài để tái tạo kết nối mới
+  private disconnectWatchdogTimer: ReturnType<typeof setTimeout> | null = null
 
   private registrationListeners: Set<RegistrationListener> = new Set()
   private callStateListeners: Set<CallStateListener> = new Set()
@@ -111,6 +119,11 @@ class SipService {
   private cleanupAudio(lineId: number): void {
     const audio = this.audioElements.get(lineId)
     if (audio) {
+      try {
+        audio.pause()
+      } catch {
+        // ignore
+      }
       audio.srcObject = null
     }
   }
@@ -120,6 +133,11 @@ class SipService {
    */
   private cleanupAllAudio(): void {
     this.audioElements.forEach((audio) => {
+      try {
+        audio.pause()
+      } catch {
+        // ignore
+      }
       audio.srcObject = null
     })
   }
@@ -187,6 +205,73 @@ class SipService {
     }
   }
 
+  private clearRegistrationRetry(): void {
+    if (this.registrationRetryTimer) {
+      clearTimeout(this.registrationRetryTimer)
+      this.registrationRetryTimer = null
+    }
+    this.registrationRetryAttempts = 0
+  }
+
+  private clearDisconnectWatchdog(): void {
+    if (this.disconnectWatchdogTimer) {
+      clearTimeout(this.disconnectWatchdogTimer)
+      this.disconnectWatchdogTimer = null
+    }
+  }
+
+  private startDisconnectWatchdog(): void {
+    if (this.disconnectWatchdogTimer) return
+    this.disconnectWatchdogTimer = setTimeout(() => {
+      this.disconnectWatchdogTimer = null
+      if (this.hasActiveCalls()) return
+      if (this.currentConfig && (!this.ua || !this.ua.isConnected())) {
+        console.warn('[SIP Watchdog] WebSocket mất kết nối kéo dài > 20s. Tự động tái tạo UA mới.')
+        const savedConfig = this.currentConfig
+        this.destroy()
+        this.init(savedConfig)
+      }
+    }, 20000)
+  }
+
+  private scheduleRegistrationRetry(cause?: string): void {
+    if (this.registrationRetryTimer) return
+    if (this.hasActiveCalls()) return
+    if (!this.currentConfig) return
+
+    // Không thử lại nếu lỗi xác thực sai mật khẩu hoặc tài khoản không tồn tại
+    if (cause === 'Invalid Credentials' || cause === 'User Not Found') {
+      console.warn('[SIP] Sai thông tin tài khoản máy nhánh. Dừng thử lại tự động.')
+      return
+    }
+
+    const delay = Math.min(3000 * Math.pow(2, this.registrationRetryAttempts), 30000)
+    this.registrationRetryAttempts++
+
+    console.log(
+      `[SIP] Lập lịch thử đăng ký lại lần ${this.registrationRetryAttempts} sau ${delay / 1000}s (nguyên nhân: ${cause || 'Lỗi mạng'})...`,
+    )
+
+    this.registrationRetryTimer = setTimeout(() => {
+      this.registrationRetryTimer = null
+      if (!this.currentConfig) return
+      if (this.hasActiveCalls()) return
+
+      if (this.ua && this.ua.isConnected()) {
+        try {
+          this.updateRegistrationStatus('connecting')
+          this.ua.register()
+        } catch (err) {
+          console.warn('[SIP] Lỗi khi thử lại ua.register():', err)
+          this.scheduleRegistrationRetry('Retry Exception')
+        }
+      } else {
+        // Tái tạo lại UA để mở kết nối WebSocket mới
+        this.init(this.currentConfig)
+      }
+    }, delay)
+  }
+
   /**
    * Khởi tạo và đăng ký kết nối SIP UA tới tổng đài qua WebSocket WSS
    */
@@ -201,7 +286,7 @@ class SipService {
     if (this.ua && isSameConfig) {
       // Bảo vệ: Nếu đang có cuộc gọi hoạt động trên bất kỳ line nào -> TUYỆT ĐỐI KHÔNG destroy!
       if (this.hasActiveCalls()) {
-        if (!this.ua.isRegistered()) {
+        if (!this.ua.isRegistered() && this.ua.isConnected()) {
           try {
             this.ua.register()
           } catch (e) {
@@ -219,17 +304,21 @@ class SipService {
         return
       }
 
-      // Nếu mất kết nối nhưng không có cuộc gọi -> Thử re-register lại trước khi tạo mới
-      try {
-        this.updateRegistrationStatus('connecting')
-        this.ua.register()
-        return
-      } catch {
-        // Nếu không gửi lại được, tiếp tục bên dưới để tạo lại UA mới
+      // Nếu socket transport vẫn đang mở (connected) -> Thử gọi ua.register()
+      if (this.ua.isConnected()) {
+        try {
+          this.updateRegistrationStatus('connecting')
+          this.ua.register()
+          return
+        } catch (e) {
+          console.warn('[SIP] Lỗi re-register khi socket đang mở:', e)
+        }
       }
+
+      // Nếu socket transport bị ngắt hoặc register thất bại, tiếp tục xuống dưới để tái tạo UA mới
     }
 
-    // 2. Chỉ destroy khi tài khoản thực sự thay đổi (đổi user khác) hoặc chưa từng có UA
+    // 2. Chỉ destroy khi tài khoản thực sự thay đổi (đổi user khác) hoặc chưa từng có UA / socket đã hỏng
     if (this.ua) {
       this.destroy()
     }
@@ -259,14 +348,20 @@ class SipService {
 
       // 3. Lắng nghe sự kiện vòng đời UA
       this.ua.on('connected', () => {
+        this.clearDisconnectWatchdog()
         this.updateRegistrationStatus('connected')
       })
 
       this.ua.on('disconnected', (e: any) => {
-        this.updateRegistrationStatus('disconnected', { cause: e?.error ? 'Lỗi mạng WebSocket' : undefined })
+        this.updateRegistrationStatus('disconnected', {
+          cause: e?.error ? 'Lỗi mạng WebSocket' : undefined,
+        })
+        this.startDisconnectWatchdog()
       })
 
       this.ua.on('registered', () => {
+        this.clearRegistrationRetry()
+        this.clearDisconnectWatchdog()
         this.updateRegistrationStatus('registered')
       })
 
@@ -279,6 +374,7 @@ class SipService {
           cause: e?.cause || 'Sai tài khoản hoặc máy chủ từ chối',
           response: e?.response,
         })
+        this.scheduleRegistrationRetry(e?.cause)
       })
 
       // 4. Lắng nghe cuộc gọi đến (nếu có) -> Gán vào line rảnh đầu tiên hoặc từ chối 486 Busy Here khi cả 3 line bận
@@ -358,6 +454,28 @@ class SipService {
   }
 
   /**
+   * Thiết lập và lắng nghe luồng âm thanh (Remote Audio Track) từ WebRTC RTCPeerConnection
+   */
+  private attachPeerConnection(pc: RTCPeerConnection, lineId: number): void {
+    // Tránh đăng ký trùng lặp nhiều lần trên cùng một RTCPeerConnection instance
+    const pcKey = `__attached_line_${lineId}`
+    if ((pc as any)[pcKey]) return
+      ; (pc as any)[pcKey] = true
+
+    pc.addEventListener('track', (e: RTCTrackEvent) => {
+      const audio = this.getOrCreateAudioElement(lineId)
+      if (e.streams && e.streams[0]) {
+        audio.srcObject = e.streams[0]
+      } else if (e.track) {
+        audio.srcObject = new MediaStream([e.track])
+      }
+      audio.play().catch((err) => {
+        console.warn(`[SIP Line ${lineId}] Lỗi tự động phát âm thanh cuộc gọi:`, err)
+      })
+    })
+  }
+
+  /**
    * Gắn các sự kiện WebRTC của một phiên đàm thoại RTCSession theo lineId
    */
   private bindSessionEvents(
@@ -367,22 +485,28 @@ class SipService {
   ) {
     this.sessions.set(lineId, session)
 
-    // Gắn luồng âm thanh từ khách hàng khi kết nối WebRTC PeerConnection được thiết lập
+    // Helper kiểm tra xem session hiện tại trên lineId có đúng là session này không
+    // (Bảo vệ chống race condition: event cũ kích hoạt sau khi line đã được tái sử dụng cho session mới)
+    const isCurrentSession = () => this.sessions.get(lineId) === session
+
+    // 1. Gắn luồng âm thanh ngay lập tức nếu RTCPeerConnection đã được khởi tạo sẵn
+    // (Đặc biệt quan trọng với cuộc gọi đi outgoing vì ua.call() tạo PeerConnection trước khi trả về session)
+    if (session.connection) {
+      this.attachPeerConnection(session.connection, lineId)
+    }
+
+    // 2. Lắng nghe sự kiện 'peerconnection' (cuộc gọi đến incoming sau khi answer, hoặc khi tái thương lượng SDP)
     session.on('peerconnection', (data: any) => {
-      const pc: RTCPeerConnection = data.peerconnection
-      pc.addEventListener('track', (e: RTCTrackEvent) => {
-        if (e.streams && e.streams[0]) {
-          const audio = this.getOrCreateAudioElement(lineId)
-          audio.srcObject = e.streams[0]
-          audio.play().catch((err) => {
-            console.warn(`[SIP Line ${lineId}] Lỗi tự động phát âm thanh cuộc gọi:`, err)
-          })
-        }
-      })
+      if (!isCurrentSession()) return
+      const pc: RTCPeerConnection = data?.peerconnection || session.connection
+      if (pc) {
+        this.attachPeerConnection(pc, lineId)
+      }
     })
 
     // Khi cuộc gọi bắt đầu kết nối
     session.on('connecting', () => {
+      if (!isCurrentSession()) return
       this.updateCallStatus({
         lineId,
         status: 'calling',
@@ -394,6 +518,7 @@ class SipService {
 
     // Đang đổ chuông (180 Ringing)
     session.on('progress', () => {
+      if (!isCurrentSession()) return
       this.startRingbackTone()
       this.updateCallStatus({
         lineId,
@@ -406,6 +531,7 @@ class SipService {
 
     // Khách hàng nhấc máy (200 OK Confirmed)
     session.on('confirmed', () => {
+      if (!isCurrentSession()) return
       this.stopRingbackTone()
       this.updateCallStatus({
         lineId,
@@ -418,6 +544,7 @@ class SipService {
 
     // Đang giữ máy
     session.on('hold', () => {
+      if (!isCurrentSession()) return
       this.updateCallStatus({
         lineId,
         status: 'paused',
@@ -428,6 +555,7 @@ class SipService {
 
     // Tiếp tục đàm thoại sau khi giữ máy
     session.on('unhold', () => {
+      if (!isCurrentSession()) return
       this.updateCallStatus({
         lineId,
         status: 'connected',
@@ -438,6 +566,10 @@ class SipService {
 
     // Kết thúc cuộc gọi bình thường
     session.on('ended', (e: any) => {
+      if (!isCurrentSession()) {
+        console.warn(`[SIP] Bỏ qua event 'ended' của session cũ trên Line ${lineId}`)
+        return
+      }
       this.stopRingbackTone()
       this.cleanupAudio(lineId)
       this.sessions.delete(lineId)
@@ -452,6 +584,10 @@ class SipService {
 
     // Cuộc gọi thất bại (bận, từ chối, sai số)
     session.on('failed', (e: any) => {
+      if (!isCurrentSession()) {
+        console.warn(`[SIP] Bỏ qua event 'failed' của session cũ trên Line ${lineId}`)
+        return
+      }
       this.stopRingbackTone()
       this.cleanupAudio(lineId)
       this.sessions.delete(lineId)
@@ -474,14 +610,31 @@ class SipService {
     const targetLineId = typeof arg1 === 'number' ? arg1 : this.activeLineId
     const dialNumber = typeof arg1 === 'number' ? (arg2 || '') : arg1
 
+    // 0. Tạo và đánh dấu attemptId mới cho line này nhằm hỗ trợ hủy giữa chừng
+    const attemptId = Date.now() + Math.random()
+    this.pendingCallAttempts.set(targetLineId, { attemptId, aborted: false })
+
+    const isAttemptAborted = () => {
+      const current = this.pendingCallAttempts.get(targetLineId)
+      return !current || current.attemptId !== attemptId || current.aborted
+    }
+
     if (!this.ua) {
+      this.pendingCallAttempts.delete(targetLineId)
       throw new Error('Softphone SIP chưa được khởi tạo. Vui lòng kiểm tra lại cấu hình.')
     }
 
     if (!this.ua.isRegistered()) {
+      this.pendingCallAttempts.delete(targetLineId)
       notify('Máy nhánh SIP đang kết nối lại tới tổng đài. Vui lòng đợi trong giây lát...')
       this.ua.register()
       throw new Error('Máy nhánh SIP chưa hoàn tất đăng ký với tổng đài. Vui lòng thử lại sau giây lát.')
+    }
+
+    // Kiểm tra hủy trước khi xin quyền mic
+    if (isAttemptAborted()) {
+      this.pendingCallAttempts.delete(targetLineId)
+      throw new Error(`Cuộc gọi Line ${targetLineId} đã bị hủy trước khi bắt đầu.`)
     }
 
     // 1. Yêu cầu cấp quyền Microphone từ trình duyệt
@@ -490,10 +643,17 @@ class SipService {
       // Dừng stream xin quyền tạm thời vì JsSIP sẽ tự mở stream thật khi gọi
       stream.getTracks().forEach((t) => t.stop())
     } catch (micErr: any) {
+      this.pendingCallAttempts.delete(targetLineId)
       notify('Trình duyệt chưa được cấp quyền Microphone để thực hiện cuộc gọi.')
       const err = new Error('Chưa cấp quyền Microphone: ' + (micErr?.message || micErr))
         ; (err as any).cause = micErr
       throw err
+    }
+
+    // Kiểm tra hủy ngay sau khi getUserMedia hoàn tất (nhân viên có thể bấm gác máy trong lúc chờ mic)
+    if (isAttemptAborted()) {
+      this.pendingCallAttempts.delete(targetLineId)
+      throw new Error(`Cuộc gọi Line ${targetLineId} đã bị hủy trong quá trình xin quyền microphone.`)
     }
 
     // 2. Cấu hình WebRTC Call Options
@@ -508,6 +668,14 @@ class SipService {
         offerToReceiveAudio: true,
         offerToReceiveVideo: false,
       },
+      eventHandlers: {
+        peerconnection: (data: any) => {
+          const pc: RTCPeerConnection = data?.peerconnection
+          if (pc) {
+            this.attachPeerConnection(pc, targetLineId)
+          }
+        },
+      },
     }
 
     // 3. Trích xuất SIP Domain chuẩn từ impu nếu có (e.g. sip:1126@tongdai.zozin.vn -> tongdai.zozin.vn)
@@ -519,9 +687,33 @@ class SipService {
       }
     }
 
+    // Kiểm tra hủy lần cuối trước khi gọi SIP INVITE
+    if (isAttemptAborted()) {
+      this.pendingCallAttempts.delete(targetLineId)
+      throw new Error(`Cuộc gọi Line ${targetLineId} đã bị hủy trước khi gửi INVITE.`)
+    }
+
     // 4. Thực hiện quay số qua SIP INVITE
     const targetUri = `sip:${dialNumber}@${sipDomain}`
     const session = this.ua.call(targetUri, callOptions)
+
+    // Nếu xảy ra race condition bị hủy ngay khoảnh khắc tạo session, terminate lập tức
+    if (isAttemptAborted()) {
+      try {
+        session.terminate()
+      } catch {
+        // ignore
+      }
+      this.pendingCallAttempts.delete(targetLineId)
+      throw new Error(`Cuộc gọi Line ${targetLineId} đã bị hủy ngay khi tạo session.`)
+    }
+
+    this.pendingCallAttempts.delete(targetLineId)
+
+    // Đảm bảo gắn kết nối audio ngay khi session được trả về
+    if (session.connection) {
+      this.attachPeerConnection(session.connection, targetLineId)
+    }
 
     this.bindSessionEvents(session, targetLineId, 'outgoing')
     this.startRingbackTone()
@@ -570,41 +762,64 @@ class SipService {
 
   /**
    * Bật/Tắt Giữ máy (Hold / Unhold) theo lineId
+   * @returns boolean (true: đang hold, false: đang unhold/connected) nếu thao tác thành công, hoặc null nếu thao tác thất bại / session chưa sẵn sàng
    */
-  public toggleHold(lineId?: number): boolean {
+  public toggleHold(lineId?: number): boolean | null {
     const targetLineId = lineId ?? this.activeLineId
     const session = this.sessions.get(targetLineId)
-    if (!session) return false
+    if (!session) return null
     const isOnHold = session.isOnHold().local
     if (isOnHold) {
-      session.unhold()
+      const ok = session.unhold()
+      if (!ok) {
+        console.warn(`[SIP] session.unhold() thất bại trên line ${targetLineId} (session chưa sẵn sàng re-offer)`)
+        return null
+      }
       return false
     } else {
-      session.hold()
+      const ok = session.hold()
+      if (!ok) {
+        console.warn(`[SIP] session.hold() thất bại trên line ${targetLineId} (session chưa sẵn sàng re-offer hoặc chưa confirmed)`)
+        return null
+      }
       return true
     }
   }
 
   /**
    * Giữ máy (Hold) theo lineId
+   * @returns boolean - true nếu gửi yêu cầu hold thành công, false nếu thất bại hoặc không có session
    */
-  public hold(lineId?: number): void {
+  public hold(lineId?: number): boolean {
     const targetLineId = lineId ?? this.activeLineId
     const session = this.sessions.get(targetLineId)
     if (session && !session.isOnHold().local) {
-      session.hold()
+      const ok = session.hold()
+      if (!ok) {
+        console.warn(`[SIP] session.hold() thất bại trên line ${targetLineId}`)
+        return false
+      }
+      return true
     }
+    return false
   }
 
   /**
    * Tiếp tục cuộc gọi sau khi giữ máy (Unhold) theo lineId
+   * @returns boolean - true nếu gửi yêu cầu unhold thành công, false nếu thất bại hoặc không có session
    */
-  public unhold(lineId?: number): void {
+  public unhold(lineId?: number): boolean {
     const targetLineId = lineId ?? this.activeLineId
     const session = this.sessions.get(targetLineId)
     if (session && session.isOnHold().local) {
-      session.unhold()
+      const ok = session.unhold()
+      if (!ok) {
+        console.warn(`[SIP] session.unhold() thất bại trên line ${targetLineId}`)
+        return false
+      }
+      return true
     }
+    return false
   }
 
   /**
@@ -624,6 +839,9 @@ class SipService {
         mediaConstraints: { audio: true, video: false },
         pcConfig: { iceServers },
       })
+      if (session.connection) {
+        this.attachPeerConnection(session.connection, targetLineId)
+      }
     } catch (err) {
       console.warn(`[SIP Line ${targetLineId}] Lỗi khi trả lời cuộc gọi:`, err)
     }
@@ -634,6 +852,14 @@ class SipService {
    */
   public hangup(lineId?: number): void {
     const targetLineId = lineId ?? this.activeLineId
+
+    // Đánh dấu hủy bất kỳ attempt in-flight nào đang trong quá trình chuẩn bị / getUserMedia
+    const pending = this.pendingCallAttempts.get(targetLineId)
+    if (pending) {
+      pending.aborted = true
+      this.pendingCallAttempts.delete(targetLineId)
+    }
+
     const session = this.sessions.get(targetLineId)
     this.stopRingbackTone()
     if (session) {
@@ -653,6 +879,11 @@ class SipService {
    */
   public hangupAll(): void {
     this.stopRingbackTone()
+    this.pendingCallAttempts.forEach((pending) => {
+      pending.aborted = true
+    })
+    this.pendingCallAttempts.clear()
+
     this.sessions.forEach((session, lineId) => {
       try {
         session.terminate()
@@ -714,6 +945,8 @@ class SipService {
    * Hủy kết nối và dọn dẹp toàn bộ tài nguyên
    */
   public destroy(): void {
+    this.clearRegistrationRetry()
+    this.clearDisconnectWatchdog()
     this.hangupAll()
     if (this.ua) {
       try {

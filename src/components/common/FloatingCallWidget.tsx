@@ -92,13 +92,23 @@ export const FloatingCallWidget: React.FC = () => {
 
   const handleToggleHold = () => {
     if (currentTab) {
-      const isNowHeld = sipService.toggleHold(currentTab.id)
+      const result = sipService.toggleHold(currentTab.id)
+      if (result === null) {
+        notify('Chưa thể giữ máy/tiếp tục vào lúc này. Vui lòng thử lại sau giây lát.')
+        return
+      }
+      const isNowHeld = result
       const newStatus = isNowHeld ? 'paused' : 'connected'
       updateTab(currentTab.id, { isHeld: isNowHeld, status: newStatus })
       useCallStore.setState({ isHeld: isNowHeld, status: newStatus })
       notify(isNowHeld ? `Đang giữ máy (${currentTab.label})` : `Tiếp tục cuộc gọi (${currentTab.label})`)
     } else {
-      const isNowHeld = sipService.toggleHold()
+      const result = sipService.toggleHold()
+      if (result === null) {
+        notify('Chưa thể giữ máy/tiếp tục vào lúc này. Vui lòng thử lại sau giây lát.')
+        return
+      }
+      const isNowHeld = result
       useCallStore.getState().toggleHold()
       notify(isNowHeld ? 'Đang giữ máy' : 'Tiếp tục cuộc gọi')
     }
