@@ -435,21 +435,27 @@ export const Training: React.FC<TrainingProps> = ({ setPage }) => {
                 Xem tất cả <ArrowRight size={13} />
               </button>
             </div>
-            {visibleMaterials.slice(0, 3).map((item) => {
-              const Icon = getMaterialIcon(item.type, item.tone)
-              return (
-                <div
-                  className="updated-row"
-                  key={item.id || item.title}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => handleOpenMaterial(item)}
-                >
-                  <Icon size={16} />
-                  <span>{item.title}</span>
-                  <time>{formatDate(item.publishedAt || item.updatedAt)}</time>
-                </div>
-              )
-            })}
+            {visibleMaterials.length > 0 ? (
+              visibleMaterials.slice(0, 3).map((item) => {
+                const Icon = getMaterialIcon(item.type, item.tone)
+                return (
+                  <div
+                    className="updated-row"
+                    key={item.id || item.title}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleOpenMaterial(item)}
+                  >
+                    <Icon size={16} />
+                    <span>{item.title}</span>
+                    <time>{formatDate(item.publishedAt || item.updatedAt)}</time>
+                  </div>
+                )
+              })
+            ) : (
+              <div style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '13px' }}>
+                Chưa có tài liệu nào
+              </div>
+            )}
           </section>
 
 

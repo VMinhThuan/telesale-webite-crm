@@ -16,74 +16,18 @@ export const R2_CONFIG = {
   secretAccessKey: (import.meta as any).env?.VITE_R2_SECRET_ACCESS_KEY || '',
 }
 
-// Dữ liệu mẫu khởi tạo ban đầu khi R2 chưa có file manifest.json
+// Dữ liệu khung ban đầu khi chưa tải được hoặc khi R2 mới khởi tạo
 export const defaultManifest: TrainingManifest = {
   version: '1.0',
   updatedAt: new Date().toISOString(),
   categories: [
     'Tất cả',
-    'Nghi vụ telesale',
+    'Nghiệp vụ telesale',
     'Kịch bản tư vấn',
     'Kiến thức sản phẩm',
     'Video hướng dẫn',
   ],
-  materials: [
-    {
-      id: 'mat-001',
-      title: 'Quy trình telesale chuẩn',
-      desc: 'Các bước gọi, tư vấn và ghi nhận kết quả.',
-      category: 'Nghiệp vụ telesale',
-      type: 'pdf',
-      fileUrl: `${R2_CONFIG.publicUrl}/docs/quy-trinh-telesale.pdf`,
-      meta: 'PDF · 12 trang',
-      tone: 'blue',
-      updatedAt: '2026-10-28',
-    },
-    {
-      id: 'mat-002',
-      title: 'Kịch bản tư vấn bảo dưỡng & thay lõi',
-      desc: 'Bảo dưỡng, thay lõi lọc nước và kỹ năng xử lý từ chối.',
-      category: 'Kịch bản tư vấn',
-      type: 'pdf',
-      fileUrl: `${R2_CONFIG.publicUrl}/docs/kich-ban-tu-van.pdf`,
-      meta: 'PDF · 8 trang',
-      tone: 'amber',
-      updatedAt: '2026-10-29',
-    },
-    {
-      id: 'mat-003',
-      title: 'Kiến thức sản phẩm & chức năng lõi lọc',
-      desc: 'Cấu tạo máy lọc nước và chức năng từng lõi chuyên sâu.',
-      category: 'Kiến thức sản phẩm',
-      type: 'pdf',
-      fileUrl: `${R2_CONFIG.publicUrl}/docs/kien-thuc-may-loc-nuoc.pdf`,
-      meta: 'PDF · 15 trang',
-      tone: 'green',
-      updatedAt: '2026-10-27',
-    },
-    {
-      id: 'mat-004',
-      title: 'Video hướng dẫn sử dụng phần mềm CRM',
-      desc: 'Làm quen giao diện Dashboard, Telesale và Quản lý đơn.',
-      category: 'Video hướng dẫn',
-      type: 'video',
-      fileUrl: `${R2_CONFIG.publicUrl}/videos/huong-dan-he-thong.mp4`,
-      meta: 'Video · 06:45',
-      tone: 'video',
-      updatedAt: '2026-10-30',
-    },
-    {
-      id: 'mat-005',
-      title: 'Video thực hành kỹ năng xử lý từ chối',
-      desc: 'Thực hành các tình huống từ chối thường gặp khi gọi cho khách.',
-      category: 'Video hướng dẫn',
-      type: 'video',
-      fileUrl: `${R2_CONFIG.publicUrl}/videos/thuc-hanh-xu-ly-tu-choi.mp4`,
-      meta: 'Video · 12:10',
-      tone: 'video',
-      updatedAt: '2026-10-31',
-    },
-  ],
+  materials: [],
   journeys: {
     'Nghiệp vụ telesale': [
       {
@@ -151,7 +95,7 @@ class TrainingStorageService {
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
       throw new Error(
-        'Chưa cấu hình R2 credentials trong .env (VITE_R2_ACCOUNT_ID, VITE_R2_ACCESS_KEY_ID, VITE_R2_SECRET_ACCESS_KEY). Vui lòng cập nhật để thực hiện upload.',
+        'Chưa cấu hình R2 credentials trong .env. Vui lòng cập nhật để thực hiện upload.',
       )
     }
 
