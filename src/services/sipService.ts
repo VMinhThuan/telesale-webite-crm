@@ -80,14 +80,59 @@ class SipService {
   private callStateListeners: Set<CallStateListener> = new Set()
 
   /**
-   * Đặt line đang active
+   * Đặt line đang active và kích hoạt điều phối Audio Focus
    */
   public setActiveLineId(lineId: number): void {
     this.activeLineId = lineId
+    this.applyAudioFocus(lineId)
   }
 
   public getActiveLineId(): number {
     return this.activeLineId
+  }
+
+  /**
+   * Bộ điều phối Audio Focus tập trung (Audio Focus Manager):
+   * Đảm bảo bất biến (Invariant): Tại một thời điểm, chỉ một line duy nhất được mở mic và phát âm thanh ra loa.
+   * Tất cả các line còn lại bị ngắt tiếng cục bộ lập tức (0ms) và được chuyển sang trạng thái giữ máy (Hold).
+   */
+  public applyAudioFocus(targetLineId: number): void {
+    this.activeLineId = targetLineId
+
+    // 1. Điều phối thẻ <audio> phát âm thanh ra loa/tai nghe (0ms delay)
+    this.audioElements.forEach((audio, lineId) => {
+      const isTarget = lineId === targetLineId
+      audio.muted = !isTarget
+      audio.volume = isTarget ? 1.0 : 0.0
+      if (isTarget && audio.paused && audio.srcObject) {
+        audio.play().catch(() => { })
+      }
+    })
+
+    // 2. Điều phối Microphone và lệnh Giữ máy (SIP Hold/Unhold) giữa các phiên đàm thoại
+    this.sessions.forEach((session, lineId) => {
+      if (session.isEnded()) return
+
+      if (lineId === targetLineId) {
+        // Line được focus: Mở microphone
+        if (session.isMuted().audio) {
+          session.unmute({ audio: true })
+        }
+        // Nếu line này đang bị hold, gửi lệnh unhold để tiếp tục đàm thoại
+        if (session.isOnHold().local) {
+          session.unhold()
+        }
+      } else {
+        // Line không được focus: Ngắt microphone lập tức để không lọt tiếng sang khách hàng
+        if (!session.isMuted().audio) {
+          session.mute({ audio: true })
+        }
+        // Nếu line này đang đàm thoại (connected) và chưa hold, tự động gửi lệnh giữ máy
+        if (!session.isOnHold().local) {
+          session.hold()
+        }
+      }
+    })
   }
 
   /**
@@ -469,6 +514,13 @@ class SipService {
       } else if (e.track) {
         audio.srcObject = new MediaStream([e.track])
       }
+
+      // Áp dụng Audio Focus Invariant:
+      // Chỉ mở tiếng nếu lineId này đúng là activeLineId, ngược lại mute ngay lập tức (0ms delay)
+      const isTarget = lineId === this.activeLineId
+      audio.muted = !isTarget
+      audio.volume = isTarget ? 1.0 : 0.0
+
       audio.play().catch((err) => {
         console.warn(`[SIP Line ${lineId}] Lỗi tự động phát âm thanh cuộc gọi:`, err)
       })
@@ -533,18 +585,61 @@ class SipService {
     session.on('confirmed', () => {
       if (!isCurrentSession()) return
       this.stopRingbackTone()
-      this.updateCallStatus({
-        lineId,
-        status: 'connected',
-        session,
-        direction,
-        remoteNumber: session.remote_identity?.uri?.user,
-      })
+
+      // Kiểm tra Audio Focus khi có khách hàng nhấc máy:
+      // Nếu line active hiện tại khác lineId và đang đàm thoại (connected và không hold)
+      const currentActiveId = this.activeLineId
+      const currentActiveSession = this.sessions.get(currentActiveId)
+      const isAnotherLineTalking =
+        currentActiveId !== lineId &&
+        currentActiveSession &&
+        !currentActiveSession.isEnded() &&
+        !currentActiveSession.isOnHold().local &&
+        this.lineStatuses.get(currentActiveId) === 'connected'
+
+      if (isAnotherLineTalking) {
+        // Line khác đang đàm thoại: Line này nghe máy sau -> Tự động giữ máy và mute loa/mic line này (0ms)
+        console.log(
+          `[SIP Audio Manager] Line ${lineId} nhấc máy khi Line ${currentActiveId} đang đàm thoại. Tự động giữ máy Line ${lineId}.`,
+        )
+        const audio = this.getOrCreateAudioElement(lineId)
+        audio.muted = true
+        audio.volume = 0.0
+        session.mute({ audio: true })
+
+        setTimeout(() => {
+          if (isCurrentSession()) {
+            session.hold()
+          }
+        }, 50)
+
+        this.updateCallStatus({
+          lineId,
+          status: 'paused',
+          session,
+          direction,
+          remoteNumber: session.remote_identity?.uri?.user,
+        })
+      } else {
+        // Chưa có line nào đang đàm thoại: Trao Audio Focus cho line vừa nhấc máy này!
+        this.setActiveLineId(lineId)
+        this.updateCallStatus({
+          lineId,
+          status: 'connected',
+          session,
+          direction,
+          remoteNumber: session.remote_identity?.uri?.user,
+        })
+      }
     })
 
     // Đang giữ máy
     session.on('hold', () => {
       if (!isCurrentSession()) return
+      const audio = this.getOrCreateAudioElement(lineId)
+      audio.muted = true
+      audio.volume = 0.0
+
       this.updateCallStatus({
         lineId,
         status: 'paused',
@@ -556,6 +651,11 @@ class SipService {
     // Tiếp tục đàm thoại sau khi giữ máy
     session.on('unhold', () => {
       if (!isCurrentSession()) return
+      const audio = this.getOrCreateAudioElement(lineId)
+      const isTarget = lineId === this.activeLineId
+      audio.muted = !isTarget
+      audio.volume = isTarget ? 1.0 : 0.0
+
       this.updateCallStatus({
         lineId,
         status: 'connected',
@@ -580,6 +680,23 @@ class SipService {
         direction,
         cause: e?.cause,
       })
+
+      // Tự động phục hồi Audio Focus sang line còn lại (nếu có)
+      if (lineId === this.activeLineId) {
+        let nextFocusLine: number | null = null
+        for (const [otherLineId, otherSession] of this.sessions.entries()) {
+          if (otherLineId !== lineId && otherSession && !otherSession.isEnded()) {
+            nextFocusLine = otherLineId
+            break
+          }
+        }
+        if (nextFocusLine !== null) {
+          console.log(
+            `[SIP Audio Manager] Line ${lineId} kết thúc. Tự động chuyển Audio Focus sang Line ${nextFocusLine}.`,
+          )
+          this.setActiveLineId(nextFocusLine)
+        }
+      }
     })
 
     // Cuộc gọi thất bại (bận, từ chối, sai số)
@@ -598,6 +715,23 @@ class SipService {
         direction,
         cause: e?.cause || 'Cuộc gọi không thành công',
       })
+
+      // Tự động phục hồi Audio Focus sang line còn lại (nếu có)
+      if (lineId === this.activeLineId) {
+        let nextFocusLine: number | null = null
+        for (const [otherLineId, otherSession] of this.sessions.entries()) {
+          if (otherLineId !== lineId && otherSession && !otherSession.isEnded()) {
+            nextFocusLine = otherLineId
+            break
+          }
+        }
+        if (nextFocusLine !== null) {
+          console.log(
+            `[SIP Audio Manager] Line ${lineId} thất bại. Tự động chuyển Audio Focus sang Line ${nextFocusLine}.`,
+          )
+          this.setActiveLineId(nextFocusLine)
+        }
+      }
     })
   }
 

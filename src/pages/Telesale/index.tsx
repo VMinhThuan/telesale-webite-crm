@@ -292,23 +292,18 @@ export const Telesale: React.FC = () => {
   const handleSelectTab = (newTabId: number) => {
     if (newTabId === activeTabId) return
 
-    // Cập nhật line active cho sipService
+    // Cập nhật line active cho sipService (tự động kích hoạt Audio Focus Manager: ngắt loa/mic tab cũ và mở tab mới)
     sipService.setActiveLineId(newTabId)
-
-    // Nếu tab cũ đang đàm thoại, tự động gửi lệnh SIP hold giữ máy khách đúng line đó
-    let didHold = false
-    if (activeTab.status === 'connected') {
-      didHold = sipService.hold(activeTabId)
-      if (!didHold) {
-        console.warn(`[Telesale] Tự động hold tab ${activeTabId} khi chuyển tab chưa sẵn sàng`)
-      }
-    }
 
     setTabs((prev) =>
       prev.map((t) => {
-        // Chỉ chuyển sang trạng thái Giữ máy (Hold) nếu lệnh hold thực sự thành công
-        if (t.id === activeTabId && t.status === 'connected' && didHold) {
+        // Tab cũ đang đàm thoại thì chuyển sang Giữ máy (Hold)
+        if (t.id === activeTabId && t.status === 'connected') {
           return { ...t, status: 'paused', isHeld: true }
+        }
+        // Tab mới đang bị Giữ máy thì chuyển sang Đàm thoại (Connected)
+        if (t.id === newTabId && t.status === 'paused') {
+          return { ...t, status: 'connected', isHeld: false }
         }
         return t
       }),
@@ -357,8 +352,8 @@ export const Telesale: React.FC = () => {
     )
   }
 
-  // Khóa chống Race Condition và Double-Click khi quay số
-  const isDialingRef = useRef(false)
+  // Khóa chống Race Condition và Double-Click khi quay số theo từng tab
+  const dialingTabsRef = useRef<Record<number, boolean>>({})
   // Quản lý attemptId theo từng tab để hỗ trợ hủy cuộc gọi đang chuẩn bị (in-flight preparation)
   const callAttemptsRef = useRef<Record<number, number>>({})
 
@@ -371,9 +366,6 @@ export const Telesale: React.FC = () => {
       )
       return
     }
-
-    // 1. Kiểm tra khóa chống double-click tức thời
-    if (isDialingRef.current) return
 
     if (!currentCustomer) {
       notify('Chưa có thông tin khách hàng để gọi')
@@ -402,12 +394,13 @@ export const Telesale: React.FC = () => {
     const targetMemberId =
       memberId || activeTab.selectedMemberId || currentCustomer.members?.[0]?.member_id
 
+    // 1. Kiểm tra khóa chống double-click tức thời cho tab mục tiêu
+    if (dialingTabsRef.current[targetTabId]) return
+    dialingTabsRef.current[targetTabId] = true
+
     // Sinh mã attemptId mới cho targetTabId để kiểm soát hủy cuộc gọi
     const currentAttemptId = Date.now() + Math.floor(Math.random() * 1000)
     callAttemptsRef.current[targetTabId] = currentAttemptId
-
-    // Khóa cờ đang quay số
-    isDialingRef.current = true
 
     // Khóa trạng thái line đang quay số (chuyển sang 'calling')
     setTabs((prev) =>
@@ -591,7 +584,7 @@ export const Telesale: React.FC = () => {
       if (callAttemptsRef.current[targetTabId] === currentAttemptId) {
         delete callAttemptsRef.current[targetTabId]
       }
-      isDialingRef.current = false
+      dialingTabsRef.current[targetTabId] = false
     }
   }
 
@@ -639,7 +632,7 @@ export const Telesale: React.FC = () => {
   const handleEndCall = () => {
     // Hủy bỏ bất kỳ lượt quay số in-flight nào đang chuẩn bị trên tab này và mở khóa cờ quay số
     delete callAttemptsRef.current[activeTabId]
-    isDialingRef.current = false
+    dialingTabsRef.current[activeTabId] = false
 
     sipService.hangup(activeTabId)
     setTabs((prev) =>
