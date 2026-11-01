@@ -17,6 +17,7 @@ import { Topbar } from '@/components/common/Topbar'
 import { TableSkeleton } from '@/components/ui/TableSkeleton'
 import { useEnums } from '@/hooks/useEnums'
 import sipService from '@/services/sipService'
+import tabLeaderService from '@/services/tabLeaderService'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
@@ -64,6 +65,24 @@ const AppShell: React.FC = () => {
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
   useEnums()
+
+  // Khởi tạo và quản lý quyền sở hữu SIP giữa các Browser Tab toàn cục
+  useEffect(() => {
+    tabLeaderService.init()
+    tabLeaderService.setActiveCallsChecker(() => sipService.hasActiveCalls())
+
+    const unsubscribeLeader = tabLeaderService.onLeaderChange((isMaster) => {
+      if (!isMaster) {
+        // Khi tab này mất quyền Master (bị chuyển quyền sang tab khác hoặc master nhường quyền),
+        // giải phóng ngay User Agent SIP trên tab này để không có 2 tab cùng duy trì SIP UA.
+        sipService.destroy()
+      }
+    })
+
+    return () => {
+      unsubscribeLeader()
+    }
+  }, [])
 
   // Theo dõi bộ đếm thời lượng đàm thoại 3 line trên toàn ứng dụng (kể cả khi chuyển trang)
   useEffect(() => {

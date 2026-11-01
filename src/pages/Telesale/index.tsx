@@ -354,8 +354,6 @@ export const Telesale: React.FC = () => {
 
   // Khóa chống Race Condition và Double-Click khi quay số theo từng tab
   const dialingTabsRef = useRef<Record<number, boolean>>({})
-  // Quản lý attemptId theo từng tab để hỗ trợ hủy cuộc gọi đang chuẩn bị (in-flight preparation)
-  const callAttemptsRef = useRef<Record<number, number>>({})
 
   // Quay số cho thành viên của Tab đang active
   const handleDial = async (memberId?: number) => {
@@ -398,9 +396,8 @@ export const Telesale: React.FC = () => {
     if (dialingTabsRef.current[targetTabId]) return
     dialingTabsRef.current[targetTabId] = true
 
-    // Sinh mã attemptId mới cho targetTabId để kiểm soát hủy cuộc gọi
-    const currentAttemptId = Date.now() + Math.floor(Math.random() * 1000)
-    callAttemptsRef.current[targetTabId] = currentAttemptId
+    // Sinh mã attemptId mới cho targetTabId thông qua sipService để hỗ trợ hủy toàn cục (kể cả từ Floating Widget)
+    const currentAttemptId = sipService.startCallAttempt(targetTabId)
 
     // Khóa trạng thái line đang quay số (chuyển sang 'calling')
     setTabs((prev) =>
@@ -442,8 +439,8 @@ export const Telesale: React.FC = () => {
         member_id: targetMemberId,
       })
 
-      // KIỂM TRA HỦY: Sau khi gọi API 16 xong, kiểm tra xem nhân viên có bấm gác máy trong lúc chờ API không
-      if (callAttemptsRef.current[targetTabId] !== currentAttemptId) {
+      // KIỂM TRA HỦY: Sau khi gọi API 16 xong, kiểm tra xem nhân viên có bấm gác máy (ở Telesale hoặc Floating Widget) không
+      if (!sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {
         console.warn(`[Telesale] Cuộc gọi Line ${targetTabId} đã bị hủy trong lúc chờ API quay số.`)
         rollbackAutoHeld()
         return
@@ -474,7 +471,7 @@ export const Telesale: React.FC = () => {
         )
 
         // KIỂM TRA HỦY: Kiểm tra lần nữa trước khi gọi SIP
-        if (callAttemptsRef.current[targetTabId] !== currentAttemptId) {
+        if (!sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {
           console.warn(`[Telesale] Cuộc gọi Line ${targetTabId} đã bị hủy trước khi gọi SIP.`)
           rollbackAutoHeld()
           return
@@ -503,7 +500,7 @@ export const Telesale: React.FC = () => {
         await sipService.call(targetTabId, dialInfo.dial_number)
 
         // KIỂM TRA HỦY: Kiểm tra sau khi sipService.call hoàn tất
-        if (callAttemptsRef.current[targetTabId] !== currentAttemptId) {
+        if (!sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {
           console.warn(`[Telesale] Cuộc gọi Line ${targetTabId} đã bị hủy trong lúc mở mic.`)
           sipService.hangup(targetTabId)
           rollbackAutoHeld()
@@ -548,7 +545,7 @@ export const Telesale: React.FC = () => {
     } catch (err: any) {
       rollbackAutoHeld()
       const isAborted =
-        callAttemptsRef.current[targetTabId] !== currentAttemptId ||
+        !sipService.isCallAttemptValid(targetTabId, currentAttemptId) ||
         err?.message?.includes('đã bị hủy')
 
       if (!isAborted) {
@@ -581,8 +578,8 @@ export const Telesale: React.FC = () => {
         )
       }
     } finally {
-      if (callAttemptsRef.current[targetTabId] === currentAttemptId) {
-        delete callAttemptsRef.current[targetTabId]
+      if (sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {
+        sipService.cancelCallAttempt(targetTabId)
       }
       dialingTabsRef.current[targetTabId] = false
     }
@@ -631,7 +628,7 @@ export const Telesale: React.FC = () => {
   // Kết thúc cuộc gọi của tab đang active
   const handleEndCall = () => {
     // Hủy bỏ bất kỳ lượt quay số in-flight nào đang chuẩn bị trên tab này và mở khóa cờ quay số
-    delete callAttemptsRef.current[activeTabId]
+    sipService.cancelCallAttempt(activeTabId)
     dialingTabsRef.current[activeTabId] = false
 
     sipService.hangup(activeTabId)
@@ -697,6 +694,20 @@ export const Telesale: React.FC = () => {
     }, 400)
   }
 
+  // Chuyển quyền tổng đài SIP sang tab hiện tại thông qua cơ chế Two-Phase Safe Handoff
+  const handleClaimMaster = async () => {
+    try {
+      const result = await tabLeaderService.claimMaster()
+      if (!result.success) {
+        notify(result.reason || 'Không thể chuyển quyền lúc này. Vui lòng thử lại sau.')
+      } else {
+        notify('Đã chuyển quyền tổng đài sang tab này.')
+      }
+    } catch {
+      notify('Lỗi khi gửi yêu cầu chuyển quyền tổng đài.')
+    }
+  }
+
   return (
     <div className="content telesale-content">
       {/* Banner cảnh báo khi mở nhiều tab và tab này không giữ quyền SIP Master */}
@@ -722,7 +733,7 @@ export const Telesale: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => tabLeaderService.claimMaster()}
+            onClick={handleClaimMaster}
             style={{
               backgroundColor: '#ea580c',
               color: '#ffffff',

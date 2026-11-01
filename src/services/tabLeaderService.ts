@@ -8,6 +8,9 @@ export type LeaderMessage =
   | { type: 'I_AM_MASTER'; masterTabId: string }
   | { type: 'HEARTBEAT'; masterTabId: string }
   | { type: 'CLAIM_MASTER'; newMasterTabId: string }
+  | { type: 'REQUEST_TAKEOVER'; requesterTabId: string; requestId: string; force?: boolean }
+  | { type: 'TAKEOVER_ACCEPTED'; requesterTabId: string; requestId: string }
+  | { type: 'TAKEOVER_REJECTED'; requesterTabId: string; requestId: string; reason: string }
   | { type: 'RELEASE_MASTER'; oldMasterTabId: string }
 
 type LeaderChangeListener = (isMaster: boolean) => void
@@ -16,6 +19,7 @@ const CHANNEL_NAME = 'salesflow_telesale_sip_leader_v1'
 const HEARTBEAT_INTERVAL_MS = 1000
 const HEARTBEAT_TIMEOUT_MS = 3000
 const DISCOVERY_TIMEOUT_MS = 300
+const TAKEOVER_TIMEOUT_MS = 1200
 
 class TabLeaderService {
   private tabId: string
@@ -28,6 +32,15 @@ class TabLeaderService {
   private discoveryTimer: ReturnType<typeof setTimeout> | null = null
   private listeners: Set<LeaderChangeListener> = new Set()
   private initialized: boolean = false
+
+  // Kiểm tra cuộc gọi đang diễn ra trước khi bàn giao quyền Master
+  private activeCallsCheckFn: (() => boolean) | null = null
+
+  // Hàng đợi các yêu cầu takeover đang chờ phản hồi
+  private pendingTakeoverRequests: Map<
+    string,
+    { resolve: (res: { success: boolean; reason?: string }) => void; timer: ReturnType<typeof setTimeout> }
+  > = new Map()
 
   constructor() {
     this.tabId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -43,6 +56,13 @@ class TabLeaderService {
 
   public getMasterTabId(): string | null {
     return this.masterTabId
+  }
+
+  /**
+   * Đăng ký hàm kiểm tra cuộc gọi đang diễn ra trên tab này
+   */
+  public setActiveCallsChecker(fn: () => boolean): void {
+    this.activeCallsCheckFn = fn
   }
 
   /**
@@ -88,13 +108,39 @@ class TabLeaderService {
 
   /**
    * Yêu cầu giành quyền Master cho tab hiện tại (khi người dùng bấm nút "Chuyển quyền sang tab này")
+   * Thực hiện giao thức Two-Phase Handoff để bảo vệ các cuộc gọi đang diễn ra ở tab cũ không bị gián đoạn đột ngột.
    */
-  public claimMaster(): void {
-    if (this.isMaster) return
+  public claimMaster(force: boolean = false): Promise<{ success: boolean; reason?: string }> {
+    if (this.isMaster) {
+      return Promise.resolve({ success: true })
+    }
 
-    console.log(`[TabLeader] Tab ${this.tabId} chủ động nhận quyền Master.`)
-    this.postMessage({ type: 'CLAIM_MASTER', newMasterTabId: this.tabId })
-    this.becomeMaster()
+    if (!this.channel || !this.masterTabId) {
+      console.log(`[TabLeader] Tab ${this.tabId} chủ động nhận quyền Master (chưa có master trước đó).`)
+      this.becomeMaster()
+      return Promise.resolve({ success: true })
+    }
+
+    console.log(`[TabLeader] Tab ${this.tabId} gửi yêu cầu nhận quyền Master từ tab ${this.masterTabId}.`)
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingTakeoverRequests.delete(requestId)
+        console.warn(`[TabLeader] Hết thời gian chờ phản hồi chuyển quyền (${TAKEOVER_TIMEOUT_MS}ms). Tự động giành quyền Master.`)
+        this.becomeMaster()
+        resolve({ success: true })
+      }, TAKEOVER_TIMEOUT_MS)
+
+      this.pendingTakeoverRequests.set(requestId, { resolve, timer })
+
+      this.postMessage({
+        type: 'REQUEST_TAKEOVER',
+        requesterTabId: this.tabId,
+        requestId,
+        force,
+      })
+    })
   }
 
   /**
@@ -123,6 +169,13 @@ class TabLeaderService {
       clearTimeout(this.discoveryTimer)
       this.discoveryTimer = null
     }
+
+    this.pendingTakeoverRequests.forEach(({ timer, resolve }) => {
+      clearTimeout(timer)
+      resolve({ success: false, reason: 'Tab closed' })
+    })
+    this.pendingTakeoverRequests.clear()
+    this.activeCallsCheckFn = null
 
     if (typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', this.handleBeforeUnload)
@@ -159,19 +212,15 @@ class TabLeaderService {
         // Tab khác xác nhận đang là Master
         if (msg.masterTabId !== this.tabId) {
           this.lastHeartbeatAt = Date.now()
-          this.setMasterState(false, msg.masterTabId)
-        }
-        break
-      }
-
-      case 'HEARTBEAT': {
-        if (msg.masterTabId !== this.tabId) {
-          this.lastHeartbeatAt = Date.now()
           if (this.isMaster) {
-            // Trường hợp hy hữu 2 tab cùng nhận là master -> Tab có id lớn hơn nhường
+            // Cả 2 tab đều nhận là Master -> Phân xử theo tabId duy nhất: tab có tabId nhỏ hơn sẽ nhường
+            // Tránh tình trạng cả 2 cùng nhường quyền (mutual concession)
             if (this.tabId < msg.masterTabId) {
-              console.warn(`[TabLeader] Xung đột Master: nhường quyền cho tab ${msg.masterTabId}`)
+              console.warn(`[TabLeader] Xung đột I_AM_MASTER: nhường quyền cho tab ${msg.masterTabId}`)
               this.stepDown(msg.masterTabId)
+            } else {
+              console.warn(`[TabLeader] Xung đột I_AM_MASTER: giữ quyền Master trước tab ${msg.masterTabId}`)
+              this.postMessage({ type: 'I_AM_MASTER', masterTabId: this.tabId })
             }
           } else {
             this.setMasterState(false, msg.masterTabId)
@@ -180,11 +229,85 @@ class TabLeaderService {
         break
       }
 
+      case 'HEARTBEAT': {
+        if (msg.masterTabId !== this.tabId) {
+          this.lastHeartbeatAt = Date.now()
+          if (this.isMaster) {
+            // Cả 2 tab cùng nhận là master -> Tab có id nhỏ hơn nhường
+            if (this.tabId < msg.masterTabId) {
+              console.warn(`[TabLeader] Xung đột HEARTBEAT: nhường quyền cho tab ${msg.masterTabId}`)
+              this.stepDown(msg.masterTabId)
+            } else {
+              this.postMessage({ type: 'HEARTBEAT', masterTabId: this.tabId })
+            }
+          } else {
+            this.setMasterState(false, msg.masterTabId)
+          }
+        }
+        break
+      }
+
+      case 'REQUEST_TAKEOVER': {
+        // Tab khác yêu cầu chuyển quyền Master
+        if (this.isMaster) {
+          const hasActive = this.activeCallsCheckFn ? this.activeCallsCheckFn() : false
+          if (hasActive && !msg.force) {
+            console.warn(`[TabLeader] Từ chối yêu cầu chuyển quyền từ tab ${msg.requesterTabId} do đang có cuộc gọi hoạt động.`)
+            this.postMessage({
+              type: 'TAKEOVER_REJECTED',
+              requesterTabId: msg.requesterTabId,
+              requestId: msg.requestId,
+              reason: 'Tab hiện tại đang có cuộc gọi đang diễn ra. Vui lòng kết thúc cuộc gọi trước khi chuyển quyền tổng đài.',
+            })
+          } else {
+            console.log(`[TabLeader] Chấp thuận chuyển quyền sang tab ${msg.requesterTabId}.`)
+            this.stepDown(msg.requesterTabId)
+            this.postMessage({
+              type: 'TAKEOVER_ACCEPTED',
+              requesterTabId: msg.requesterTabId,
+              requestId: msg.requestId,
+            })
+          }
+        }
+        break
+      }
+
+      case 'TAKEOVER_ACCEPTED': {
+        if (msg.requesterTabId === this.tabId) {
+          const pending = this.pendingTakeoverRequests.get(msg.requestId)
+          if (pending) {
+            clearTimeout(pending.timer)
+            this.pendingTakeoverRequests.delete(msg.requestId)
+            this.becomeMaster()
+            pending.resolve({ success: true })
+          }
+        }
+        break
+      }
+
+      case 'TAKEOVER_REJECTED': {
+        if (msg.requesterTabId === this.tabId) {
+          const pending = this.pendingTakeoverRequests.get(msg.requestId)
+          if (pending) {
+            clearTimeout(pending.timer)
+            this.pendingTakeoverRequests.delete(msg.requestId)
+            pending.resolve({ success: false, reason: msg.reason })
+          }
+        }
+        break
+      }
+
       case 'CLAIM_MASTER': {
-        // Tab khác chủ động nhận quyền Master
+        // Tab khác chủ động nhận quyền Master (tương thích ngược)
         if (msg.newMasterTabId !== this.tabId) {
-          console.log(`[TabLeader] Tab ${msg.newMasterTabId} đã nhận quyền Master. Nhường quyền.`)
-          this.stepDown(msg.newMasterTabId)
+          const hasActive = this.activeCallsCheckFn ? this.activeCallsCheckFn() : false
+          if (hasActive && this.isMaster) {
+            console.warn(`[TabLeader] Tab ${msg.newMasterTabId} gửi CLAIM_MASTER nhưng tab hiện tại đang có cuộc gọi. Giữ quyền.`)
+            this.postMessage({ type: 'I_AM_MASTER', masterTabId: this.tabId })
+          } else {
+            console.log(`[TabLeader] Tab ${msg.newMasterTabId} đã nhận quyền Master. Nhường quyền.`)
+            this.stepDown(msg.newMasterTabId)
+          }
         }
         break
       }

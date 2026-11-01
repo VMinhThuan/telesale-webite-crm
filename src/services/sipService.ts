@@ -70,6 +70,17 @@ class SipService {
 
   private registrationStatus: SipRegistrationStatus = 'disconnected'
 
+  // Trạng thái người dùng chủ động tắt mic (User-initiated mute)
+  private userMutedLines: Set<number> = new Set()
+  // Trạng thái người dùng chủ động giữ máy (User-initiated hold)
+  private userHeldLines: Set<number> = new Set()
+  // Trạng thái hệ thống tự động giữ máy do chuyển Audio Focus (System-initiated auto hold)
+  private autoHeldLines: Set<number> = new Set()
+
+  // Quản lý các lượt quay số đang trong quá trình chuẩn bị (in-flight preparation: API 16, getUserMedia, v.v.)
+  // Sử dụng toàn cục để gác máy từ bất kỳ đâu (Telesale, Floating Widget, App unmount) đều hủy được cuộc gọi
+  private inFlightAttempts: Map<number, { attemptId: number; aborted: boolean }> = new Map()
+
   // Quản lý tự động thử lại đăng ký khi mạng chập chờn / timeout
   private registrationRetryTimer: ReturnType<typeof setTimeout> | null = null
   private registrationRetryAttempts: number = 0
@@ -78,6 +89,35 @@ class SipService {
 
   private registrationListeners: Set<RegistrationListener> = new Set()
   private callStateListeners: Set<CallStateListener> = new Set()
+
+  /**
+   * Bắt đầu một lượt quay số mới trên line chỉ định
+   * @returns attemptId duy nhất của lượt gọi này
+   */
+  public startCallAttempt(lineId: number): number {
+    const attemptId = Date.now() + Math.floor(Math.random() * 10000)
+    this.inFlightAttempts.set(lineId, { attemptId, aborted: false })
+    return attemptId
+  }
+
+  /**
+   * Hủy lượt quay số đang chuẩn bị trên line chỉ định
+   */
+  public cancelCallAttempt(lineId: number): void {
+    const attempt = this.inFlightAttempts.get(lineId)
+    if (attempt) {
+      attempt.aborted = true
+      this.inFlightAttempts.delete(lineId)
+    }
+  }
+
+  /**
+   * Kiểm tra xem lượt quay số hiện tại có còn hợp lệ hay đã bị hủy
+   */
+  public isCallAttemptValid(lineId: number, attemptId: number): boolean {
+    const attempt = this.inFlightAttempts.get(lineId)
+    return Boolean(attempt && attempt.attemptId === attemptId && !attempt.aborted)
+  }
 
   /**
    * Đặt line đang active và kích hoạt điều phối Audio Focus
@@ -94,7 +134,7 @@ class SipService {
   /**
    * Bộ điều phối Audio Focus tập trung (Audio Focus Manager):
    * Đảm bảo bất biến (Invariant): Tại một thời điểm, chỉ một line duy nhất được mở mic và phát âm thanh ra loa.
-   * Tất cả các line còn lại bị ngắt tiếng cục bộ lập tức (0ms) và được chuyển sang trạng thái giữ máy (Hold).
+   * Phân biệt rõ giữa hành vi người dùng chủ động tắt mic/giữ máy với việc hệ thống tự động điều phối.
    */
   public applyAudioFocus(targetLineId: number): void {
     this.activeLineId = targetLineId
@@ -114,22 +154,36 @@ class SipService {
       if (session.isEnded()) return
 
       if (lineId === targetLineId) {
-        // Line được focus: Mở microphone
-        if (session.isMuted().audio) {
-          session.unmute({ audio: true })
+        // Line được focus:
+        // CHỈ unmute microphone nếu người dùng KHÔNG chủ động tắt mic trước đó
+        if (!this.userMutedLines.has(targetLineId)) {
+          if (session.isMuted().audio) {
+            session.unmute({ audio: true })
+          }
         }
-        // Nếu line này đang bị hold, gửi lệnh unhold để tiếp tục đàm thoại
-        if (session.isOnHold().local) {
-          session.unhold()
+        // CHỈ tự động unhold nếu lần hold trước là do hệ thống tự động giữ (autoHeld)
+        // TUYỆT ĐỐI KHÔNG tự unhold nếu người dùng đã chủ động bấm giữ máy (userHeld)
+        if (!this.userHeldLines.has(targetLineId) && this.autoHeldLines.has(targetLineId)) {
+          if (session.isOnHold().local) {
+            const ok = session.unhold()
+            if (ok) {
+              this.autoHeldLines.delete(targetLineId)
+            }
+          } else {
+            this.autoHeldLines.delete(targetLineId)
+          }
         }
       } else {
         // Line không được focus: Ngắt microphone lập tức để không lọt tiếng sang khách hàng
         if (!session.isMuted().audio) {
           session.mute({ audio: true })
         }
-        // Nếu line này đang đàm thoại (connected) và chưa hold, tự động gửi lệnh giữ máy
-        if (!session.isOnHold().local) {
-          session.hold()
+        // Nếu line này đang đàm thoại (connected) và chưa hold, hệ thống tự động giữ máy (autoHeld)
+        if (!session.isOnHold().local && !this.userHeldLines.has(lineId)) {
+          const ok = session.hold()
+          if (ok) {
+            this.autoHeldLines.add(lineId)
+          }
         }
       }
     })
@@ -673,6 +727,10 @@ class SipService {
       this.stopRingbackTone()
       this.cleanupAudio(lineId)
       this.sessions.delete(lineId)
+      this.userMutedLines.delete(lineId)
+      this.userHeldLines.delete(lineId)
+      this.autoHeldLines.delete(lineId)
+      this.cancelCallAttempt(lineId)
       this.updateCallStatus({
         lineId,
         status: 'ended',
@@ -708,6 +766,10 @@ class SipService {
       this.stopRingbackTone()
       this.cleanupAudio(lineId)
       this.sessions.delete(lineId)
+      this.userMutedLines.delete(lineId)
+      this.userHeldLines.delete(lineId)
+      this.autoHeldLines.delete(lineId)
+      this.cancelCallAttempt(lineId)
       this.updateCallStatus({
         lineId,
         status: 'failed',
@@ -749,6 +811,8 @@ class SipService {
     this.pendingCallAttempts.set(targetLineId, { attemptId, aborted: false })
 
     const isAttemptAborted = () => {
+      const inFlight = this.inFlightAttempts.get(targetLineId)
+      if (inFlight && inFlight.aborted) return true
       const current = this.pendingCallAttempts.get(targetLineId)
       return !current || current.attemptId !== attemptId || current.aborted
     }
@@ -865,9 +929,11 @@ class SipService {
     const isMuted = session.isMuted().audio
     if (isMuted) {
       session.unmute({ audio: true })
+      this.userMutedLines.delete(targetLineId)
       return false
     } else {
       session.mute({ audio: true })
+      this.userMutedLines.add(targetLineId)
       return true
     }
   }
@@ -877,6 +943,7 @@ class SipService {
    */
   public mute(lineId?: number): void {
     const targetLineId = lineId ?? this.activeLineId
+    this.userMutedLines.add(targetLineId)
     const session = this.sessions.get(targetLineId)
     if (session && !session.isMuted().audio) {
       session.mute({ audio: true })
@@ -888,6 +955,7 @@ class SipService {
    */
   public unmute(lineId?: number): void {
     const targetLineId = lineId ?? this.activeLineId
+    this.userMutedLines.delete(targetLineId)
     const session = this.sessions.get(targetLineId)
     if (session && session.isMuted().audio) {
       session.unmute({ audio: true })
@@ -909,6 +977,8 @@ class SipService {
         console.warn(`[SIP] session.unhold() thất bại trên line ${targetLineId} (session chưa sẵn sàng re-offer)`)
         return null
       }
+      this.userHeldLines.delete(targetLineId)
+      this.autoHeldLines.delete(targetLineId)
       return false
     } else {
       const ok = session.hold()
@@ -916,6 +986,8 @@ class SipService {
         console.warn(`[SIP] session.hold() thất bại trên line ${targetLineId} (session chưa sẵn sàng re-offer hoặc chưa confirmed)`)
         return null
       }
+      this.userHeldLines.add(targetLineId)
+      this.autoHeldLines.delete(targetLineId)
       return true
     }
   }
@@ -933,6 +1005,8 @@ class SipService {
         console.warn(`[SIP] session.hold() thất bại trên line ${targetLineId}`)
         return false
       }
+      this.userHeldLines.add(targetLineId)
+      this.autoHeldLines.delete(targetLineId)
       return true
     }
     return false
@@ -951,6 +1025,8 @@ class SipService {
         console.warn(`[SIP] session.unhold() thất bại trên line ${targetLineId}`)
         return false
       }
+      this.userHeldLines.delete(targetLineId)
+      this.autoHeldLines.delete(targetLineId)
       return true
     }
     return false
@@ -987,12 +1063,18 @@ class SipService {
   public hangup(lineId?: number): void {
     const targetLineId = lineId ?? this.activeLineId
 
-    // Đánh dấu hủy bất kỳ attempt in-flight nào đang trong quá trình chuẩn bị / getUserMedia
+    // 1. Hủy bất kỳ lượt quay số in-flight nào đang trong quá trình chuẩn bị / getUserMedia / API 16
+    this.cancelCallAttempt(targetLineId)
     const pending = this.pendingCallAttempts.get(targetLineId)
     if (pending) {
       pending.aborted = true
       this.pendingCallAttempts.delete(targetLineId)
     }
+
+    // 2. Dọn dẹp trạng thái mute / hold của line
+    this.userMutedLines.delete(targetLineId)
+    this.userHeldLines.delete(targetLineId)
+    this.autoHeldLines.delete(targetLineId)
 
     const session = this.sessions.get(targetLineId)
     this.stopRingbackTone()
@@ -1013,10 +1095,19 @@ class SipService {
    */
   public hangupAll(): void {
     this.stopRingbackTone()
+    this.inFlightAttempts.forEach((attempt) => {
+      attempt.aborted = true
+    })
+    this.inFlightAttempts.clear()
+
     this.pendingCallAttempts.forEach((pending) => {
       pending.aborted = true
     })
     this.pendingCallAttempts.clear()
+
+    this.userMutedLines.clear()
+    this.userHeldLines.clear()
+    this.autoHeldLines.clear()
 
     this.sessions.forEach((session, lineId) => {
       try {
@@ -1057,11 +1148,21 @@ class SipService {
   }
 
   /**
-   * Kiểm tra xem hiện tại có cuộc gọi nào đang hoạt động trên bất kỳ line nào không
+   * Kiểm tra xem hiện tại có cuộc gọi nào đang hoạt động hoặc đang chuẩn bị trên bất kỳ line nào không
    */
   public hasActiveCalls(): boolean {
     for (const session of this.sessions.values()) {
       if (session && !session.isEnded()) {
+        return true
+      }
+    }
+    for (const attempt of this.inFlightAttempts.values()) {
+      if (!attempt.aborted) {
+        return true
+      }
+    }
+    for (const pending of this.pendingCallAttempts.values()) {
+      if (!pending.aborted) {
         return true
       }
     }
