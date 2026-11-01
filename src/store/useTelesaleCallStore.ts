@@ -20,6 +20,7 @@ export interface TelesaleDraftResult {
   orderDate: string
   orderTime: string
   orderSlotId?: number
+  branchId?: number
 }
 
 export const createDefaultDraftResult = (defaultOrderDate = ''): TelesaleDraftResult => ({
@@ -41,6 +42,7 @@ export const createDefaultDraftResult = (defaultOrderDate = ''): TelesaleDraftRe
   orderDate: defaultOrderDate,
   orderTime: '08:30',
   orderSlotId: undefined,
+  branchId: undefined,
 })
 
 export interface TelesaleCallTab {

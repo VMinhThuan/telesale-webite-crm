@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Building2,
   CalendarCheck,
   CheckCircle2,
   CircleX,
@@ -47,6 +48,9 @@ export interface TelesaleCustomerPanelProps {
   currentCustomer: NextCustomerDto | null
   selectedCampaignName?: string
   branchId: number
+  branchName?: string
+  availableBranches?: { id: number; name: string }[]
+  onBranchChange?: (branchId: number) => void
   orderDate: string
   onOrderDateChange: (date: string) => void
   orderTime: string
@@ -64,6 +68,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   currentCustomer,
   selectedCampaignName,
   branchId,
+  branchName,
+  availableBranches,
+  onBranchChange,
   orderDate,
   onOrderDateChange,
   orderTime,
@@ -142,7 +149,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     setOtherMoreRequest(draft.otherMoreRequest)
     setServiceSearch('')
 
-    // Đồng bộ ngày hẹn/giờ hẹn/slot sang parent nếu tab có lưu sẵn
+    // Đồng bộ ngày hẹn/giờ hẹn/slot/chi nhánh sang parent nếu tab có lưu sẵn
     if (draft.orderDate) {
       onOrderDateChange(draft.orderDate)
     }
@@ -151,6 +158,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     }
     if (onOrderSlotIdChange && draft.orderSlotId !== undefined) {
       onOrderSlotIdChange(draft.orderSlotId)
+    }
+    if (onBranchChange && draft.branchId) {
+      onBranchChange(draft.branchId)
     }
 
     currentOrderKeyRef.current = generateIdempotencyKey()
@@ -166,6 +176,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     onOrderDateChange,
     onOrderTimeChange,
     onOrderSlotIdChange,
+    onBranchChange,
   ])
 
   // 2. Tự động lưu mọi thay đổi form vào bản nháp của activeTabId trong Store
@@ -191,6 +202,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       orderDate,
       orderTime,
       orderSlotId,
+      branchId,
     })
   }, [
     activeTabId,
@@ -212,6 +224,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     orderDate,
     orderTime,
     orderSlotId,
+    branchId,
     updateTabDraft,
   ])
 
@@ -456,8 +469,8 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             }}
             title={
               activeTabStatus === 'calling' ||
-              activeTabStatus === 'connected' ||
-              activeTabStatus === 'paused'
+                activeTabStatus === 'connected' ||
+                activeTabStatus === 'paused'
                 ? `Đang có cuộc gọi tại ${activeTabLabel || 'tab này'} — Chuyển sang Tab khác để nạp khách mới`
                 : 'Đổi sang khách khác'
             }
@@ -754,6 +767,122 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 Thiết lập đơn hàng hẹn khách
               </p>
             </div>
+
+            {/* Chọn Chi nhánh thực hiện đơn hàng (đồng bộ với Cột 1 và Backend) */}
+            <div>
+              <label
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  marginBottom: '5px',
+                }}
+              >
+                <Building2 size={14} style={{ color: '#2563eb' }} />
+                Chi nhánh thực hiện đơn hàng <b style={{ color: '#e11d48' }}>*</b>:
+              </label>
+              {availableBranches && availableBranches.length > 1 ? (
+                <select
+                  value={branchId}
+                  onChange={(e) => {
+                    const newId = Number(e.target.value)
+                    onBranchChange?.(newId)
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '35px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '0 10px',
+                    fontSize: '13px',
+                    color: '#0f172a',
+                    background: '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {availableBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#1e293b',
+                    background: '#f8fafc',
+                    padding: '7px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  🏢 {branchName}
+                </div>
+              )}
+            </div>
+
+            {/* Thông báo kết nối ca hẹn với Cột 1 */}
+            {orderSlotId ? (
+              <div
+                style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  color: '#1e40af',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <span style={{ fontWeight: 600 }}>🎯 Ca hẹn từ Lịch Cột 1:</span>
+                  <div style={{ marginTop: '2px', color: '#1d4ed8' }}>
+                    Ngày {dayjs(orderDate).format('DD/MM/YYYY')} • Ca <strong>{orderTime}</strong> (Slot #{orderSlotId})
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    background: '#dbeafe',
+                    color: '#1e40af',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  ĐÃ KHỚP SLOT
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '6px',
+                  padding: '7px 11px',
+                  fontSize: '11px',
+                  color: '#92400e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>💡</span>
+                <span>
+                  <strong>Mẹo:</strong> Bấm trực tiếp vào ô ca hẹn trống ở <strong>Cột (Lịch hẹn)</strong> để tự động điền ngày giờ và khóa mã slot chuẩn xác.
+                </span>
+              </div>
+            )}
 
             <div className="appointment-fields" style={{ padding: 0 }}>
               <label>
@@ -1111,9 +1240,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           style={
             isCallInProgress
               ? {
-                  backgroundColor: '#94a3b8',
-                  cursor: 'not-allowed',
-                }
+                backgroundColor: '#94a3b8',
+                cursor: 'not-allowed',
+              }
               : undefined
           }
         >

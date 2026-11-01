@@ -78,7 +78,19 @@ export const Telesale: React.FC = () => {
     return campaignsList.find((c) => c.campaign_id === selectedCampaignId) || campaignsList[0]
   }, [campaignsList, selectedCampaignId])
 
-  const branchId = selectedCampaign?.branch_id || 3
+  // Trích xuất danh sách tất cả các chi nhánh khả dụng từ danh sách chiến dịch mà nhân viên có quyền
+  const availableBranches = useMemo(() => {
+    const map = new Map<number, string>()
+    campaignsList.forEach((c) => {
+      if (c.branch_id && c.branch_name) {
+        map.set(c.branch_id, c.branch_name)
+      }
+    })
+    if (map.size === 0) {
+      map.set(3, 'Trụ sở Hà Nội')
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [campaignsList])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()
@@ -88,6 +100,39 @@ export const Telesale: React.FC = () => {
   const setTabs = useTelesaleCallStore((s) => s.setTabs)
   const activeTabId = useTelesaleCallStore((s) => s.activeTabId)
   const setActiveTabId = useTelesaleCallStore((s) => s.setActiveTabId)
+
+  // Chi nhánh hiệu lực của tab hiện tại (mặc định lấy theo campaign, có thể chọn chi nhánh khác theo tab draft)
+  const activeTab = useMemo(() => {
+    return tabs.find((t) => t.id === activeTabId) || tabs[0]
+  }, [tabs, activeTabId])
+
+  // Tab đang hoạt động
+  const currentCustomer = activeTab?.customer
+
+  // Ngày và ca hẹn đồng bộ giữa Cột 1 (SchedulePanel) và Cột 3 (CustomerPanel)
+  const [orderDate, setOrderDate] = useState(() => dayjs().format('YYYY-MM-DD'))
+  const [orderTime, setOrderTime] = useState('08:30')
+  const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
+
+  const currentDraftBranchId = activeTab?.draftResult?.branchId
+  const branchId = currentDraftBranchId || selectedCampaign?.branch_id || 3
+  const branchName =
+    availableBranches.find((b) => b.id === branchId)?.name ||
+    selectedCampaign?.branch_name ||
+    'Trụ sở Hà Nội'
+
+  const handleBranchChange = React.useCallback(
+    (newBranchId: number) => {
+      useTelesaleCallStore.getState().updateTabDraft(activeTabId, {
+        branchId: newBranchId,
+        orderSlotId: undefined, // Reset slot cũ vì slot không còn hiệu lực trên chi nhánh mới
+      })
+      setOrderSlotId(undefined)
+      const name = availableBranches.find((b) => b.id === newBranchId)?.name || `Chi nhánh #${newBranchId}`
+      notify(`Đã chuyển sang ${name}. Lịch slot hẹn đã được cập nhật.`)
+    },
+    [activeTabId, availableBranches],
+  )
 
   // Kiểm tra xem hiện tại có cuộc gọi nào đang hoạt động trên bất kỳ line nào không
   const hasActiveCalls = useMemo(() => {
@@ -100,18 +145,6 @@ export const Telesale: React.FC = () => {
       ) || sipService.hasActiveCalls()
     )
   }, [tabs])
-
-  // Tab đang hoạt động
-  const activeTab = useMemo(() => {
-    return tabs.find((t) => t.id === activeTabId) || tabs[0]
-  }, [tabs, activeTabId])
-
-  const currentCustomer = activeTab?.customer
-
-  // Ngày và ca hẹn đồng bộ giữa Cột 1 (SchedulePanel) và Cột 3 (CustomerPanel)
-  const [orderDate, setOrderDate] = useState(() => dayjs().format('YYYY-MM-DD'))
-  const [orderTime, setOrderTime] = useState('08:30')
-  const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
 
   const handleOrderDateChange = React.useCallback(
     (newDate: string) => {
@@ -404,12 +437,12 @@ export const Telesale: React.FC = () => {
       prev.map((t) =>
         t.id === targetTabId
           ? {
-              ...t,
-              status: 'calling',
-              durationSec: 0,
-              isMuted: false,
-              isHeld: false,
-            }
+            ...t,
+            status: 'calling',
+            durationSec: 0,
+            isMuted: false,
+            isHeld: false,
+          }
           : t,
       ),
     )
@@ -461,11 +494,11 @@ export const Telesale: React.FC = () => {
           prev.map((t) =>
             t.id === targetTabId
               ? {
-                  ...t,
-                  status: 'calling',
-                  callerNumber: dialInfo.phone_masked,
-                  selectedMemberId: dialInfo.member_id,
-                }
+                ...t,
+                status: 'calling',
+                callerNumber: dialInfo.phone_masked,
+                selectedMemberId: dialInfo.member_id,
+              }
               : t,
           ),
         )
@@ -871,8 +904,10 @@ export const Telesale: React.FC = () => {
       <div className="telesale-grid">
         {/* CỘT 1: Lịch Slot hẹn chi nhánh theo ma trận 3 ngày */}
         <TelesaleSchedulePanel
-          branchName={selectedCampaign?.branch_name}
+          branchName={branchName}
           branchId={branchId}
+          availableBranches={availableBranches}
+          onBranchChange={handleBranchChange}
           orderDate={orderDate}
           onDateChange={handleOrderDateChange}
           selectedSlotId={orderSlotId}
@@ -887,6 +922,7 @@ export const Telesale: React.FC = () => {
               orderSlotId: slotId,
               orderTime: slotTime,
               orderDate: d,
+              branchId,
             })
           }}
         />
@@ -926,6 +962,9 @@ export const Telesale: React.FC = () => {
           currentCustomer={currentCustomer}
           selectedCampaignName={selectedCampaign?.name}
           branchId={branchId}
+          branchName={branchName}
+          availableBranches={availableBranches}
+          onBranchChange={handleBranchChange}
           orderDate={orderDate}
           onOrderDateChange={handleOrderDateChange}
           orderTime={orderTime}

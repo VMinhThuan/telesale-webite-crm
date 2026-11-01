@@ -8,6 +8,8 @@ import { BranchSlotDto } from '../../../types/api'
 export interface TelesaleSchedulePanelProps {
   branchName?: string
   branchId: number
+  availableBranches?: { id: number; name: string }[]
+  onBranchChange?: (branchId: number) => void
   orderDate: string
   onDateChange: (date: string) => void
   selectedSlotId?: number
@@ -17,6 +19,8 @@ export interface TelesaleSchedulePanelProps {
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   branchName,
   branchId,
+  availableBranches,
+  onBranchChange,
   orderDate,
   onDateChange,
   selectedSlotId,
@@ -200,9 +204,35 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
     <section className="call-panel schedule-panel">
       {/* Tiêu đề Lịch hẹn chi nhánh */}
       <div className="call-panel-heading">
-        <div>
+        <div style={{ width: '100%' }}>
           <p className="eyebrow">LỊCH HẸN CHI NHÁNH</p>
-          <h2>{branchName || 'Trụ sở Hà Nội'}</h2>
+          {availableBranches && availableBranches.length > 1 ? (
+            <select
+              value={branchId}
+              onChange={(e) => onBranchChange?.(Number(e.target.value))}
+              style={{
+                fontSize: '14px',
+                fontWeight: 700,
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                marginTop: '3px',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                width: '100%',
+              }}
+              title="Chọn chi nhánh để xem lịch slot"
+            >
+              {availableBranches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <h2>{branchName}</h2>
+          )}
         </div>
       </div>
 
