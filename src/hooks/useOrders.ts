@@ -51,11 +51,17 @@ export function useOrdersTotalRevenue(params?: OrderQueryParams) {
 /**
  * Hook truy vấn danh sách slot hẹn theo chi nhánh
  */
-export function useBranchSlots(branchId = 3, fromDate?: string, toDate?: string) {
+export function useBranchSlots(
+  branchId = 3,
+  fromDate?: string,
+  toDate?: string,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: queryKeys.orders.slots(branchId, fromDate, toDate),
     queryFn: () => orderService.getBranchSlots(branchId, fromDate, toDate),
     staleTime: 1000 * 60 * 5, // 5 phút
+    enabled: options?.enabled ?? true,
   })
 }
 

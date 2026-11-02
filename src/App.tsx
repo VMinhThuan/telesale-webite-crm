@@ -23,6 +23,7 @@ import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType, PeriodType } from '@/types'
 import { notify } from '@/utils/notify'
+import { getEffectiveSipConfig } from '@/utils/sip'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
 const LoginPage = lazy(() =>
@@ -76,13 +77,39 @@ const AppShell: React.FC = () => {
         // Khi tab này mất quyền Master (bị chuyển quyền sang tab khác hoặc master nhường quyền),
         // giải phóng ngay User Agent SIP trên tab này để không có 2 tab cùng duy trì SIP UA.
         sipService.destroy()
+      } else {
+        const currentUser = useAuthStore.getState().user
+        const config = getEffectiveSipConfig(currentUser)
+        if (config) {
+          sipService.init(config)
+        }
       }
     })
+
+    // Khi app vừa mount, nếu là Master tab và đã có user sipConfig thì tự động init
+    if (tabLeaderService.isLeader()) {
+      const currentUser = useAuthStore.getState().user
+      const config = getEffectiveSipConfig(currentUser)
+      if (config) {
+        sipService.init(config)
+      }
+    }
 
     return () => {
       unsubscribeLeader()
     }
   }, [])
+
+  // Tự động kết nối máy nhánh SIP khi thông tin đăng nhập user sẵn sàng
+  const currentUser = useAuthStore((s) => s.user)
+  useEffect(() => {
+    if (currentUser && tabLeaderService.isLeader()) {
+      const config = getEffectiveSipConfig(currentUser)
+      if (config) {
+        sipService.init(config)
+      }
+    }
+  }, [currentUser])
 
   // Theo dõi bộ đếm thời lượng đàm thoại 3 line trên toàn ứng dụng (kể cả khi chuyển trang)
   useEffect(() => {
