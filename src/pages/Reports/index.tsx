@@ -48,73 +48,6 @@ const PERIOD_OPTIONS: PeriodOption[] = [
   },
 ]
 
-interface ChartPointData {
-  day: string
-  calls: number
-  orders: number
-}
-
-function ReportChart({ values }: { values: ChartPointData[] }) {
-  const maxCalls = Math.max(10, Math.ceil(Math.max(1, ...values.map((item) => item.calls)) / 10) * 10)
-  const maxOrders = Math.max(1, Math.max(1, ...values.map((item) => item.orders)))
-  const scaleLabels = Array.from({ length: 6 }, (_, index) =>
-    Math.round(maxCalls - (maxCalls / 5) * index),
-  )
-
-  return (
-    <section className="call-panel report-chart">
-      <div className="call-panel-heading">
-        <div>
-          <p className="eyebrow">PHÂN TÍCH</p>
-          <h2>Xu hướng cuộc gọi & đơn chốt</h2>
-        </div>
-        <div className="chart-legend">
-          <span>
-            <i className="blue" /> Cuộc gọi
-          </span>
-          <span>
-            <i className="green" /> Đơn chốt
-          </span>
-        </div>
-      </div>
-      <div className="modern-chart">
-        <div className="chart-scale">
-          {scaleLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div
-          className="bar-groups"
-          style={{ gridTemplateColumns: `repeat(${Math.max(1, values.length)}, 1fr)` }}
-        >
-          {values.map((item) => (
-            <div className="bar-group" key={item.day}>
-              <div className="bar-zone">
-                <span
-                  className="call-bar"
-                  title={`${item.calls} cuộc gọi`}
-                  style={{ height: `${Math.min(100, (item.calls / maxCalls) * 100)}%` }}
-                >
-                  <b>{item.calls}</b>
-                </span>
-                <span
-                  className="order-bar"
-                  title={`${item.orders} đơn chốt`}
-                  style={{ height: `${Math.min(100, (item.orders / maxOrders) * 100)}%` }}
-                >
-                  <b>{item.orders}</b>
-                </span>
-              </div>
-              <small>{item.day}</small>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className="chart-footnote">Dữ liệu thời gian thực theo khoảng thời gian đang chọn.</p>
-    </section>
-  )
-}
-
 export const Reports: React.FC = () => {
   const [selectedPeriodIndex, setSelectedPeriodIndex] = useState(1) // 7 ngày gần nhất
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
@@ -191,29 +124,6 @@ export const Reports: React.FC = () => {
       { hours: 0, calls: 0, connected: 0, leads: 0, closed: 0, returned: 0, commission: 0 },
     )
   }, [filteredResults])
-
-  // Biểu đồ xu hướng cuộc gọi & đơn chốt theo từng ngày trong kỳ
-  const chartData: ChartPointData[] = useMemo(() => {
-    const daysCount = currentPeriod.days
-    const start = dayjs(fromDate)
-    const points: ChartPointData[] = []
-
-    for (let i = 0; i < Math.min(daysCount, 7); i++) {
-      const dayStr = start.add(i, 'day').format('DD/MM')
-      const targetDate = start.add(i, 'day').format('YYYY-MM-DD')
-
-      const dayMatches = filteredResults.filter(
-        (r) => (r as any).date === targetDate || (r as any).ngay === targetDate,
-      )
-
-      const calls = dayMatches.reduce((sum, r) => sum + (r.tong_total_call || 0), 0)
-      const orders = dayMatches.reduce((sum, r) => sum + (r.tong_da_chot || 0), 0)
-
-      points.push({ day: dayStr, calls, orders })
-    }
-
-    return points
-  }, [currentPeriod, fromDate, filteredResults])
 
   // Thống kê lịch hẹn 3 ngày tới từ danh sách đơn hàng thật (Lọc theo nhân viên nếu đang chọn nhân viên cụ thể)
   const upcomingAppointments = useMemo(() => {
@@ -349,46 +259,42 @@ export const Reports: React.FC = () => {
         ))}
       </section>
 
-      <div className="report-main-grid">
-        <ReportChart values={chartData} />
-
-        <section className="call-panel upcoming">
-          <div className="call-panel-heading">
-            <div>
-              <p className="eyebrow">LỊCH HẸN</p>
-              <h2>Lịch hẹn 3 ngày tới</h2>
+      <section className="call-panel upcoming">
+        <div className="call-panel-heading">
+          <div>
+            <p className="eyebrow">LỊCH HẸN</p>
+            <h2>Lịch hẹn 3 ngày tới</h2>
+          </div>
+        </div>
+        <div className="upcoming-days">
+          {upcomingAppointments.map((item, index) => (
+            <div className={['blue', 'green', 'amber'][index % 3]} key={item.label}>
+              <CalendarDays size={17} />
+              <span>{item.label}</span>
+              <b>{item.count} đơn</b>
             </div>
+          ))}
+        </div>
+        <div className="total-booked">
+          <CalendarDays size={21} />
+          <span>Tổng đơn đã hẹn:</span>
+          <strong>{upcomingAppointments.reduce((sum, val) => sum + val.count, 0)}</strong>
+        </div>
+        <div className="upcoming-bottom">
+          <div>
+            <UserCheck size={21} />
+            <span>
+              Khách tiềm năng: <b>{totals.leads} khách</b>
+            </span>
           </div>
-          <div className="upcoming-days">
-            {upcomingAppointments.map((item, index) => (
-              <div className={['blue', 'green', 'amber'][index % 3]} key={item.label}>
-                <CalendarDays size={17} />
-                <span>{item.label}</span>
-                <b>{item.count} đơn</b>
-              </div>
-            ))}
+          <div>
+            <MessageCircle size={21} />
+            <span>
+              Đơn đã chốt: <b>{totals.closed} đơn</b>
+            </span>
           </div>
-          <div className="total-booked">
-            <CalendarDays size={21} />
-            <span>Tổng đơn đã hẹn:</span>
-            <strong>{upcomingAppointments.reduce((sum, val) => sum + val.count, 0)}</strong>
-          </div>
-          <div className="upcoming-bottom">
-            <div>
-              <UserCheck size={21} />
-              <span>
-                Khách tiềm năng: <b>{totals.leads} khách</b>
-              </span>
-            </div>
-            <div>
-              <MessageCircle size={21} />
-              <span>
-                Đơn đã chốt: <b>{totals.closed} đơn</b>
-              </span>
-            </div>
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <section className="call-panel staff-report">
         <div className="call-panel-heading">
