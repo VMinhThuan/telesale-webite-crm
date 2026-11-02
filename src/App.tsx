@@ -21,7 +21,7 @@ import tabLeaderService from '@/services/tabLeaderService'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
-import { DialogState, PageType, PeriodType } from '@/types'
+import { DialogState, PageType } from '@/types'
 import { notify } from '@/utils/notify'
 import { getEffectiveSipConfig } from '@/utils/sip'
 
@@ -62,7 +62,6 @@ const AppShell: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   const [toast, setToast] = useState('')
   const [dialog, setDialog] = useState<DialogState | null>(null)
-  const [period, setPeriod] = useState<PeriodType>('Tháng 09/2025')
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
   useEnums()
@@ -280,8 +279,6 @@ const AppShell: React.FC = () => {
       <main>
         <Topbar
           pageTitle={getPageTitle(location.pathname)}
-          period={period}
-          setPeriod={setPeriod}
           setPage={handleNavigatePage}
           openSidebar={() => setOpen(true)}
           onOpenLogin={() => navigate('/login')}
@@ -297,7 +294,7 @@ const AppShell: React.FC = () => {
             }
           >
             <Routes>
-              <Route path="/" element={<Dashboard period={period} />} />
+              <Route path="/" element={<Dashboard />} />
               <Route path="/telesale" element={<Telesale />} />
               <Route path="/leads" element={<Leads onOpenDialog={setDialog} />} />
               <Route path="/orders" element={<Orders onOpenDialog={setDialog} />} />

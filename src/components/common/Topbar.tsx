@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Bell,
   CalendarCheck,
-  CalendarDays,
   CheckCheck,
   ChevronDown,
   Menu,
@@ -20,8 +19,8 @@ import { notify } from '../../utils/notify'
 
 interface TopbarProps {
   pageTitle: string
-  period: PeriodType
-  setPeriod: (p: PeriodType) => void
+  period?: PeriodType
+  setPeriod?: (p: PeriodType) => void
   notifications?: NotificationItem[]
   setNotifications?: React.Dispatch<React.SetStateAction<NotificationItem[]>>
   setPage?: (page: PageType) => void
@@ -29,17 +28,8 @@ interface TopbarProps {
   onOpenLogin?: () => void
 }
 
-const periods: PeriodType[] = [
-  'Hôm nay',
-  '7 ngày gần nhất',
-  'Tháng 09/2025',
-  'Tháng 10/2025',
-]
-
 export const Topbar: React.FC<TopbarProps> = ({
   pageTitle,
-  period,
-  setPeriod,
   setPage,
   openSidebar,
   onOpenLogin: _onOpenLogin,
@@ -56,14 +46,12 @@ export const Topbar: React.FC<TopbarProps> = ({
     markAllAsRead,
   } = useNotifications()
 
-  const [dateOpen, setDateOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notificationTab, setNotificationTab] = useState<'all' | 'unread'>('all')
 
   const notificationMenuRef = useRef<HTMLDivElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
-  const dateMenuRef = useRef<HTMLDivElement>(null)
 
   // 2. Tự động đóng dropdown khi click chuột ra ngoài
   useEffect(() => {
@@ -75,20 +63,11 @@ export const Topbar: React.FC<TopbarProps> = ({
       if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setProfileOpen(false)
       }
-      if (dateMenuRef.current && !dateMenuRef.current.contains(target)) {
-        setDateOpen(false)
-      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const handleSelectPeriod = (item: PeriodType) => {
-    setPeriod(item)
-    setDateOpen(false)
-    notify(`Đã chuyển sang ${item}`)
-  }
 
   // 3. Xử lý click từng thông báo: đánh dấu đã đọc và điều hướng
   const handleItemClick = (item: AppNotification) => {
@@ -180,39 +159,6 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="top-actions">
-        {/* Chọn kỳ hiển thị */}
-        <div className="header-popover-wrap" ref={dateMenuRef}>
-          <button
-            data-silent
-            type="button"
-            onClick={() => {
-              setDateOpen(!dateOpen)
-              setNotificationOpen(false)
-              setProfileOpen(false)
-            }}
-            className="date-picker"
-          >
-            <CalendarDays size={18} />
-            <span>{period}</span>
-            <ChevronDown size={16} />
-          </button>
-
-          {dateOpen && (
-            <div className="header-popover period-menu">
-              <b>Chọn kỳ hiển thị</b>
-              {periods.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => handleSelectPeriod(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Thông báo hệ thống với Dropdown List chuyên nghiệp */}
         <div className="header-popover-wrap" ref={notificationMenuRef}>
           <button
@@ -220,7 +166,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => {
               setNotificationOpen(!notificationOpen)
-              setDateOpen(false)
               setProfileOpen(false)
             }}
             className="bell"
@@ -450,7 +395,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => {
               setProfileOpen(!profileOpen)
-              setDateOpen(false)
               setNotificationOpen(false)
             }}
             className="profile"

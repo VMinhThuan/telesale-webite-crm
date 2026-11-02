@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Download, FileText, Image as ImageIcon, Users } from 'lucide-react'
 import { ContactItem, LightboxImage } from './types'
-import { getInitials, isImageFile } from './chatUtils'
+import { getInitials, getUserColor, isImageFile } from './chatUtils'
 import { notify } from '../../utils/notify'
 
 interface ChatInfoProps {
@@ -140,13 +140,24 @@ export const ChatInfo: React.FC<ChatInfoProps> = ({
 
                   const initials = getInitials(pName)
                   const isMe = p.isMe || (user?.name && pName === user.name)
-                  const tones = ['blue', 'green', 'amber', 'purple', 'rose']
-                  const tone = isMe ? 'manager' : tones[idx % tones.length]
+                  const memberColor = getUserColor(pName)
                   const isAdmin = Boolean(p.admin)
 
                   return (
                     <div className="member" key={p.id || p.owner_id || idx}>
-                      <div className={`message-avatar ${tone}`}>
+                      <div
+                        className="message-avatar"
+                        style={
+                          isMe
+                            ? { backgroundColor: '#2776de', color: '#fff', fontWeight: 700 }
+                            : {
+                                backgroundColor: memberColor.bg,
+                                color: memberColor.text,
+                                border: `1px solid ${memberColor.border}`,
+                                fontWeight: 700,
+                              }
+                        }
+                      >
                         {avatarSrc ? (
                           <img
                             src={avatarSrc}
@@ -165,8 +176,9 @@ export const ChatInfo: React.FC<ChatInfoProps> = ({
                         )}
                         <i />
                       </div>
-                      <span>
-                        {pName} {isMe && ' (Tôi)'}
+                      <span style={{ fontWeight: 500 }}>
+                        <span style={{ color: isMe ? '#2563eb' : memberColor.text }}>{pName}</span>
+                        {isMe && ' (Tôi)'}
                       </span>
                       <b
                         style={{

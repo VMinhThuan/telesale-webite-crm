@@ -14,12 +14,13 @@ export const CHAT_THREAD_DETAIL_QUERY_KEY = queryKeys.chat.all
 /**
  * Hook tải danh sách các cuộc hội thoại (API 35: GET /api/chats)
  */
-export function useChatThreads(page = 1, perPage = 20) {
+export function useChatThreads(page = 1, perPage = 20, enabled = true) {
   return useQuery({
     queryKey: queryKeys.chat.threadList(page, perPage),
     queryFn: () => chatService.getThreads(page, perPage),
     staleTime: 1000 * 30, // 30s
     refetchInterval: 1000 * 45, // Tự động kéo tin mới mỗi 45s
+    enabled,
   })
 }
 

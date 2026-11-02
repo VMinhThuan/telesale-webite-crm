@@ -8,6 +8,7 @@ import {
 import { useAuth, useUserLists } from '../../hooks/useAuth'
 import { notify } from '../../utils/notify'
 import { ContactItem, LightboxImage } from './types'
+import { formatConversationTime } from './chatUtils'
 import { ChatSidebar } from './ChatSidebar'
 import { ChatRoom } from './ChatRoom'
 import { ChatInfo } from './ChatInfo'
@@ -70,7 +71,7 @@ export const Chat: React.FC = () => {
       const preview = rawMsg ? String(rawMsg) : 'Chưa có tin nhắn gần đây'
 
       const timeStr = latestMsg?.created_at || t.updated_at || t.created_at || ''
-      const time = timeStr.length >= 16 ? timeStr.slice(11, 16) : ''
+      const time = formatConversationTime(timeStr)
 
       // Chuẩn hóa đường dẫn avatar từ ERP (/messenger/assets/...)
       const avatarUrl = t.avatar

@@ -26,7 +26,7 @@ import {
 import dayjs from '../../lib/dayjs'
 
 interface DashboardProps {
-  period: PeriodType
+  period?: PeriodType
 }
 
 type DatePreset = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom'

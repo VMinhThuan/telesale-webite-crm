@@ -21,6 +21,7 @@ import {
   formatFileSize,
   formatMessageTime,
   getInitials,
+  getUserColor,
   renderHighlightedContent,
 } from './chatUtils'
 import { useSendMessageMutation, useUploadAttachmentMutation } from '../../hooks/useChat'
@@ -593,6 +594,41 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                     activeContact.name &&
                     item.sender_name !== activeContact.name)
 
+                const prevIsOutgoing = prevItem
+                  ? Boolean(
+                      prevItem.is_outgoing ||
+                        (user?.name && prevItem.sender_name === user.name) ||
+                        (!activeContact.isGroup &&
+                          activeContact.name &&
+                          prevItem.sender_name !== activeContact.name),
+                    )
+                  : null
+
+                // Kiểm tra khoảng cách thời gian giữa 2 tin nhắn liên tiếp (dưới 10 phút để gom cụm)
+                let isWithinTimeCluster = true
+                if (item.created_at && prevItem?.created_at) {
+                  const diffMs = Math.abs(
+                    new Date(item.created_at).getTime() - new Date(prevItem.created_at).getTime(),
+                  )
+                  isWithinTimeCluster = diffMs <= 10 * 60 * 1000
+                }
+
+                // Gom nhóm tin nhắn cùng tác giả gửi liên tiếp
+                const isSameSenderAsPrev = Boolean(
+                  !showDateDivider &&
+                    prevItem &&
+                    prevIsOutgoing === isOutgoing &&
+                    (isOutgoing || prevItem.sender_name === item.sender_name) &&
+                    isWithinTimeCluster,
+                )
+
+                // Kiểm tra xem phút gửi có thay đổi so với tin trước không
+                const isTimeChanged =
+                  prevItem &&
+                  formatMessageTime(item.created_at) !== formatMessageTime(prevItem.created_at)
+
+                // Lấy màu đại diện cố định theo tên người gửi (Giải pháp 1)
+                const userColor = !isOutgoing ? getUserColor(item.sender_name) : null
                 const isHighlighted = highlightedMessageId === item.id
 
                 return (
@@ -606,6 +642,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       id={`msg-${item.id}`}
                       className={`message ${isOutgoing ? 'outgoing' : ''}`}
                       style={{
+                        marginTop: isSameSenderAsPrev ? '3px' : '12px',
+                        marginBottom: '3px',
                         backgroundColor: isHighlighted ? '#fef9c3' : undefined,
                         boxShadow: isHighlighted ? '0 0 0 2px #facc15' : undefined,
                         borderRadius: '10px',
@@ -614,16 +652,44 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                       }}
                     >
                       {!isOutgoing && (
-                        <div className="message-avatar blue">
-                          {getInitials(item.sender_name)}
-                        </div>
+                        !isSameSenderAsPrev ? (
+                          <div
+                            className="message-avatar"
+                            style={{
+                              backgroundColor: userColor?.bg,
+                              color: userColor?.text,
+                              border: `1px solid ${userColor?.border}`,
+                              fontWeight: 700,
+                            }}
+                            title={item.sender_name}
+                          >
+                            {getInitials(item.sender_name)}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '38px',
+                              flexShrink: 0,
+                              height: '1px',
+                            }}
+                            aria-hidden="true"
+                          />
+                        )
                       )}
 
                       <div>
-                        <p>
-                          <b>{isOutgoing ? 'Tôi' : item.sender_name}</b>
-                          <time>{formatMessageTime(item.created_at)}</time>
-                        </p>
+                        {!isSameSenderAsPrev ? (
+                          <p style={{ margin: '0 0 5px' }}>
+                            <b style={{ color: isOutgoing ? undefined : userColor?.text }}>
+                              {isOutgoing ? 'Tôi' : item.sender_name}
+                            </b>
+                            <time>{formatMessageTime(item.created_at)}</time>
+                          </p>
+                        ) : isTimeChanged ? (
+                          <p style={{ margin: '0 0 3px', fontSize: '9px', textAlign: isOutgoing ? 'right' : 'left' }}>
+                            <time>{formatMessageTime(item.created_at)}</time>
+                          </p>
+                        ) : null}
 
                         {/* Tin nhắn ảnh */}
                         {item.type === 'image' && (
@@ -725,7 +791,20 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                         {isOutgoing && <small className="seen">✓✓ Đã gửi</small>}
                       </div>
 
-                      {isOutgoing && <div className="message-avatar manager">Tôi</div>}
+                      {isOutgoing && (
+                        !isSameSenderAsPrev ? (
+                          <div className="message-avatar manager">Tôi</div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '38px',
+                              flexShrink: 0,
+                              height: '1px',
+                            }}
+                            aria-hidden="true"
+                          />
+                        )
+                      )}
                     </div>
                   </React.Fragment>
                 )

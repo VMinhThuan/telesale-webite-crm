@@ -1,10 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
   BookOpen,
-  ChevronDown,
-  Headphones,
   LayoutDashboard,
   MessageCircle,
   PanelLeftClose,
@@ -17,6 +15,8 @@ import {
   LucideIcon,
 } from 'lucide-react'
 import { PageType } from '../../types'
+import { useAuthStore } from '../../store/useAuthStore'
+import { useChatThreads } from '../../hooks/useChat'
 
 interface NavItemDef {
   label: string
@@ -63,6 +63,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const activePage = getCurrentPage()
+
+  // Theo dõi số tin nhắn chưa đọc thực tế từ API chats khi đã đăng nhập
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const { data: threadsData } = useChatThreads(1, 20, Boolean(isAuthenticated))
+
+  const unreadCount = useMemo(() => {
+    if (!isAuthenticated || !threadsData?.threads) return 0
+    return threadsData.threads.reduce(
+      (sum: number, t: any) => sum + (Number(t.unread_count) || 0),
+      0,
+    )
+  }, [isAuthenticated, threadsData])
 
   const handleNavClick = (targetPage: PageType, path: string) => {
     if (setPage) setPage(targetPage)
@@ -118,7 +130,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <MessageCircle size={19} />
           <span>Trò chuyện</span>
-          <i className="notify-dot" />
+          {unreadCount > 0 && (
+            <span
+              className="unread-badge"
+              title={`${unreadCount} tin nhắn chưa đọc`}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -130,17 +149,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Settings size={19} />
           <span>Cài đặt</span>
         </button>
-
-        <div className="support-card">
-          <div className="support-icon">
-            <Headphones size={20} />
-          </div>
-          <div>
-            <strong>Cần hỗ trợ?</strong>
-            <span>Liên hệ quản trị viên</span>
-          </div>
-          <ChevronDown size={15} />
-        </div>
       </div>
     </aside>
   )
