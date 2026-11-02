@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  CircleX,
   ClipboardCheck,
   Clock3,
   DollarSign,
@@ -40,10 +41,17 @@ import {
   useRescheduleOrderMutation,
 } from '../../hooks/useOrders'
 import { DialogState } from '../../types'
+import { CallActionControl } from '../../components/common/CallActionControl'
 import dayjs from '../../lib/dayjs'
 import { BranchSlotDto, OrderDto } from '../../types/api'
 import { useEnums } from '../../hooks/useEnums'
-import { formatDate, formatVND, getStatusBadgeTone } from '../../utils/formatters'
+import {
+  formatDate,
+  formatVND,
+  getStatusBadgeTone,
+  isConfirmedOrderStatus,
+  isTerminatedOrderStatus,
+} from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 
 interface OrdersProps {
@@ -86,7 +94,7 @@ interface ReasonOption {
   label: string
 }
 
-export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
+export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) => {
   const { traVeNote, huyNote } = useEnums()
 
   const returnReasonOptions = useMemo<ReasonOption[]>(() => {
@@ -271,11 +279,13 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
   // Thống kê nhanh tổng quan các đơn
   const statsOverview = useMemo(() => {
     const total = ordersResponse?.total || ordersList.length
-    const confirmedCount = ordersList.filter((o) => o.sale_checked || o.trang_thai === 'Đã xác nhận').length
-    const pendingCount = ordersList.filter((o) => !o.sale_checked && o.trang_thai !== 'Đã xác nhận').length
+    const confirmedCount = ordersList.filter((o) => isConfirmedOrderStatus(o)).length
+    const pendingCount = ordersList.filter(
+      (o) => !isConfirmedOrderStatus(o) && !isTerminatedOrderStatus(o.status, o.trang_thai),
+    ).length
     const estimatedRevenue = ordersList.reduce((acc, cur) => {
       // Loại trừ đơn bị hủy hoặc trả về khỏi doanh số thực tế
-      if (['huy', 'tra_ve', 'sai_may'].includes(cur.status)) return acc
+      if (isTerminatedOrderStatus(cur.status, cur.trang_thai)) return acc
       return acc + (cur.doanh_so || 0)
     }, 0)
 
@@ -286,21 +296,6 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
       estimatedRevenue,
     }
   }, [ordersResponse, ordersList])
-
-  // Xử lý gọi điện thoại xác nhận lịch hẹn
-  const handleConfirmCall = () => {
-    if (!activeOrder) return
-
-    // Kích hoạt mutation cập nhật trạng thái sale_checked
-    confirmOrderMutation.mutate(activeOrder.order_id)
-
-    if (onOpenDialog) {
-      onOpenDialog({
-        title: `Xác nhận lịch hẹn đơn ${activeOrder.ord_code} - ${activeOrder.ten_khach_hang}`,
-        type: 'call',
-      })
-    }
-  }
 
   // Xử lý lưu điều chỉnh lịch hẹn & ghi chú
   const handleSaveAdjustment = () => {
@@ -567,7 +562,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                             </td>
                             <td>
                               <span className={clsx('lead-status', tone)}>
-                                {order.sale_checked ? (
+                                {isConfirmedOrderStatus(order) ? (
                                   <CheckCircle2 size={13} style={{ color: '#16956c' }} />
                                 ) : tone === 'green' ? (
                                   <CalendarCheck size={13} />
@@ -698,33 +693,45 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog }) => {
                   </span>
                   <span>
                     Xác nhận với khách{' '}
-                    <b className={activeOrder.sale_checked ? 'green-text' : 'amber-text'}>
-                      {activeOrder.sale_checked ? (
-                        <>
-                          <CheckCircle2 size={13} /> Đã gọi xác nhận
-                        </>
-                      ) : (
-                        <>
-                          <Clock3 size={13} /> Chờ gọi xác nhận
-                        </>
-                      )}
-                    </b>
+                    {isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai) ? (
+                      <b className="rose-text">
+                        <CircleX size={13} /> {activeOrder.trang_thai || 'Đã hủy'}
+                      </b>
+                    ) : isConfirmedOrderStatus(activeOrder) ? (
+                      <b className="green-text">
+                        <CheckCircle2 size={13} />{' '}
+                        {activeOrder.trang_thai?.toLowerCase().includes('chờ tag')
+                          ? 'Đã xác nhận (Chờ tag KTV)'
+                          : 'Đã xác nhận'}
+                      </b>
+                    ) : (
+                      <b className="amber-text">
+                        <Clock3 size={13} /> Chờ gọi xác nhận
+                      </b>
+                    )}
                   </span>
                 </div>
 
-                <button
-                  className="contact-button"
-                  onClick={handleConfirmCall}
-                  type="button"
+                <CallActionControl
+                  customerId={activeOrder.customer_id}
+                  customerName={activeOrder.ten_khach_hang}
+                  buttonText={
+                    isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
+                      ? 'Gọi cho khách'
+                      : isConfirmedOrderStatus(activeOrder)
+                        ? 'Gọi lại cho khách'
+                        : 'Gọi xác nhận'
+                  }
+                  onCallStarted={() => {
+                    if (
+                      !isConfirmedOrderStatus(activeOrder) &&
+                      !isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
+                    ) {
+                      confirmOrderMutation.mutate(activeOrder.order_id)
+                    }
+                  }}
                   disabled={confirmOrderMutation.isPending}
-                >
-                  <Phone size={18} />
-                  {confirmOrderMutation.isPending
-                    ? 'Đang cập nhật...'
-                    : activeOrder.sale_checked
-                      ? 'Gọi lại cho khách'
-                      : 'Gọi xác nhận'}
-                </button>
+                />
               </section>
 
               {/* Panel Điều chỉnh lịch hẹn */}

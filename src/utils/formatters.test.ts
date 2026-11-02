@@ -5,6 +5,8 @@ import {
   formatDuration,
   formatVND,
   getStatusBadgeTone,
+  isConfirmedOrderStatus,
+  isTerminatedOrderStatus,
 } from './formatters'
 
 describe('Formatters Unit Tests', () => {
@@ -72,6 +74,67 @@ describe('Formatters Unit Tests', () => {
       expect(getStatusBadgeTone('Đã hủy')).toBe('rose')
       expect(getStatusBadgeTone('Trả về')).toBe('rose')
       expect(getStatusBadgeTone(null)).toBe('gray')
+    })
+  })
+
+  describe('isTerminatedOrderStatus()', () => {
+    it('nhận diện chính xác các đơn hàng đã bị hủy, trả về hoặc sai máy', () => {
+      expect(isTerminatedOrderStatus('huy', 'Hủy')).toBe(true)
+      expect(isTerminatedOrderStatus('tra_ve', 'Trả về')).toBe(true)
+      expect(isTerminatedOrderStatus('sai_may', 'Sai máy')).toBe(true)
+      expect(isTerminatedOrderStatus(undefined, 'Đã hủy')).toBe(true)
+      expect(isTerminatedOrderStatus('HUY', '')).toBe(true)
+    })
+
+    it('trả về false đối với các đơn hàng hoạt động bình thường', () => {
+      expect(isTerminatedOrderStatus('da_hen', 'Đã hẹn')).toBe(false)
+      expect(isTerminatedOrderStatus('da_xac_nhan', 'Đã xác nhận')).toBe(false)
+      expect(isTerminatedOrderStatus('cho_xac_nhan', 'Chờ xác nhận')).toBe(false)
+      expect(isTerminatedOrderStatus(null, null)).toBe(false)
+    })
+  })
+
+  describe('isConfirmedOrderStatus()', () => {
+    it('nhận diện đơn đã xác nhận từ trường status da_xac_nhan hoặc trang_thai chứa Đã xác nhận, chờ tag', () => {
+      expect(
+        isConfirmedOrderStatus({
+          status: 'da_xac_nhan',
+          trang_thai: 'Đã xác nhận, chờ tag',
+          sale_checked: false,
+        }),
+      ).toBe(true)
+      expect(
+        isConfirmedOrderStatus({
+          status: 'da_xac_nhan',
+          trang_thai: 'Đã xác nhận',
+          sale_checked: false,
+        }),
+      ).toBe(true)
+      expect(
+        isConfirmedOrderStatus({
+          sale_checked: true,
+          status: 'da_hen',
+          trang_thai: 'Đã hẹn',
+        }),
+      ).toBe(true)
+    })
+
+    it('trả về false với đơn chưa xác nhận (Đã hẹn) hoặc đơn bị hủy', () => {
+      expect(
+        isConfirmedOrderStatus({
+          status: 'da_hen',
+          trang_thai: 'Đã hẹn',
+          sale_checked: false,
+        }),
+      ).toBe(false)
+      expect(
+        isConfirmedOrderStatus({
+          status: 'huy',
+          trang_thai: 'Hủy',
+          sale_checked: true,
+        }),
+      ).toBe(false)
+      expect(isConfirmedOrderStatus(null)).toBe(false)
     })
   })
 })

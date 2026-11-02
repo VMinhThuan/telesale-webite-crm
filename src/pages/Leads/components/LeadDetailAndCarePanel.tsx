@@ -7,13 +7,8 @@ import {
   CircleX,
   Clock3,
   MapPin,
-  Mic,
-  MicOff,
   MoreHorizontal,
-  Pause,
   Phone,
-  PhoneOff,
-  Play,
   Save,
   ShieldCheck,
   ShoppingCart,
@@ -27,7 +22,7 @@ import { useCampaigns } from '../../../hooks/useTelesale'
 import { useBranchSlots } from '../../../hooks/useOrders'
 import { useMakeCall } from '../../../hooks/useMakeCall'
 import { useAuthStore } from '../../../store/useAuthStore'
-import { CallDurationText } from '../../../store/useCallStore'
+import { CallActionControl } from '../../../components/common/CallActionControl'
 import { useEnums } from '../../../hooks/useEnums'
 import { BranchSlotDto } from '../../../types/api'
 import { DialogState } from '../../../types'
@@ -64,24 +59,8 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
   const { data: campaignsData } = useCampaigns()
   const userBranchId = useAuthStore((s) => s.user?.branchId)
   const { services: serviceOptions = [] } = useEnums()
-  const {
-    makeCall,
-    endCall,
-    toggleMute,
-    toggleHold,
-    isDialing,
-    callStatus,
-    isCallActive,
-    isMuted,
-    isHeld,
-    activeCaller,
-  } = useMakeCall()
+  const { makeCall, isDialing } = useMakeCall()
   const [selectedMemberId, setSelectedMemberId] = useState<number | undefined>(undefined)
-
-  // Kiểm tra xem khách hàng này có đang trong cuộc gọi hay không
-  const isCurrentLeadInCall =
-    isCallActive &&
-    (activeCaller?.customerId === customerDetail?.customer_id || !activeCaller?.customerId)
 
   // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
   const availableBranches = useMemo(() => {
@@ -478,154 +457,15 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
           </div>
         )}
 
-        {isCurrentLeadInCall || isDialing ? (
-          <div
-            style={{
-              margin: '15px 16px 16px',
-              padding: '12px 14px',
-              borderRadius: '10px',
-              background: '#0f172a',
-              color: '#ffffff',
-              boxShadow: '0 8px 22px -4px rgba(15, 23, 42, 0.35)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-            }}
-          >
-            {/* Header: Trạng thái cuộc gọi & Đồng hồ đếm giây */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    width: '9px',
-                    height: '9px',
-                    borderRadius: '50%',
-                    backgroundColor:
-                      callStatus === 'connected'
-                        ? '#22c55e'
-                        : callStatus === 'paused'
-                          ? '#f59e0b'
-                          : '#38bdf8',
-                    boxShadow:
-                      callStatus === 'connected'
-                        ? '0 0 8px #22c55e'
-                        : callStatus === 'paused'
-                          ? '0 0 8px #f59e0b'
-                          : '0 0 8px #38bdf8',
-                  }}
-                />
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc' }}>
-                  {callStatus === 'calling' || isDialing
-                    ? 'Đang quay số...'
-                    : callStatus === 'paused'
-                      ? 'Đang giữ máy'
-                      : 'Đang đàm thoại'}
-                </span>
-                {activeCaller?.memberName && (
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                    ({activeCaller.memberName})
-                  </span>
-                )}
-              </div>
-
-              {/* Đồng hồ thời lượng */}
-              <div
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  color: '#38bdf8',
-                  background: 'rgba(56, 189, 248, 0.12)',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                }}
-              >
-                <CallDurationText />
-              </div>
-            </div>
-
-            {/* Cụm nút thao tác nhanh: Tắt mic | Giữ máy | Gác máy */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.15fr', gap: '7px' }}>
-              <button
-                type="button"
-                onClick={() => toggleMute()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                  padding: '8px 6px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: isMuted ? '#ef4444' : '#334155',
-                  color: '#ffffff',
-                  transition: 'background 0.15s ease',
-                }}
-              >
-                {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-                {isMuted ? 'Bật mic' : 'Tắt mic'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => toggleHold()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                  padding: '8px 6px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: isHeld ? '#d97706' : '#334155',
-                  color: '#ffffff',
-                  transition: 'background 0.15s ease',
-                }}
-              >
-                {isHeld ? <Play size={14} /> : <Pause size={14} />}
-                {isHeld ? 'Tiếp tục' : 'Giữ máy'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => endCall()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                  padding: '8px 6px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.4)',
-                  transition: 'background 0.15s ease',
-                }}
-              >
-                <PhoneOff size={14} />
-                Gác máy
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            className="contact-button"
-            onClick={() => handleCallLead()}
-            type="button"
-          >
-            <Phone size={18} /> Gọi khách hàng
-          </button>
-        )}
+        <CallActionControl
+          customerId={customerDetail?.customer_id || 0}
+          customerName={customerDetail?.customer_name}
+          memberId={selectedMemberId}
+          memberName={customerDetail?.members?.find((m) => m.member_id === selectedMemberId)?.name}
+          customerData={customerDetail}
+          buttonText="Gọi khách hàng"
+          disabled={!customerDetail}
+        />
       </section>
 
       {/* 2. CẬP NHẬT CHĂM SÓC KHÁCH HÀNG */}

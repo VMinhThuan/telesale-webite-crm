@@ -69,3 +69,45 @@ export const getStatusBadgeTone = (
   }
   return 'gray'
 }
+
+/**
+ * Kiểm tra xem đơn hàng có thuộc nhóm trạng thái kết thúc/tiêu cực (Hủy, Trả về, Sai máy) hay không
+ */
+export const isTerminatedOrderStatus = (
+  status?: string | null,
+  trangThai?: string | null,
+): boolean => {
+  const s = (status || '').toLowerCase()
+  const t = (trangThai || '').toLowerCase()
+  return (
+    ['huy', 'tra_ve', 'sai_may'].includes(s) ||
+    t.includes('hủy') ||
+    t.includes('trả về') ||
+    t.includes('sai máy')
+  )
+}
+
+export interface OrderStatusCheckable {
+  status?: string | null
+  trang_thai?: string | null
+  sale_checked?: boolean | null
+}
+
+/**
+ * Kiểm tra xem đơn hàng đã được xác nhận lịch hẹn hay chưa
+ * (Dựa trên cờ sale_checked, status da_xac_nhan hoặc chuỗi trạng thái chứa 'đã xác nhận')
+ */
+export const isConfirmedOrderStatus = (
+  order?: OrderStatusCheckable | null,
+): boolean => {
+  if (!order) return false
+  if (isTerminatedOrderStatus(order.status, order.trang_thai)) return false
+  if (order.sale_checked) return true
+  const s = (order.status || '').toLowerCase()
+  const t = (order.trang_thai || '').toLowerCase()
+  return (
+    s === 'da_xac_nhan' ||
+    t.includes('đã xác nhận') ||
+    t.includes('da_xac_nhan')
+  )
+}

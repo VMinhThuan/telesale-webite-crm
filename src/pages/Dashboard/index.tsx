@@ -18,7 +18,11 @@ import { notify } from '../../utils/notify'
 import { useDailyResults } from '../../hooks/useTelesale'
 import { useOrdersList } from '../../hooks/useOrders'
 import { useCustomersList } from '../../hooks/useCustomers'
-import { formatVND } from '../../utils/formatters'
+import {
+  formatVND,
+  isConfirmedOrderStatus,
+  isTerminatedOrderStatus,
+} from '../../utils/formatters'
 import dayjs from '../../lib/dayjs'
 
 interface DashboardProps {
@@ -472,10 +476,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
       .reduce((sum, o) => sum + (Number(o.doanh_so) || 0), 0)
   }, [ordersList])
 
-  // Đơn hàng cần gọi xác nhận của HÔM NAY
+  // Đơn hàng cần gọi xác nhận của HÔM NAY (loại trừ các đơn đã xác nhận và đơn hủy / trả về / sai máy)
   const pendingConfirmOrders = useMemo(() => {
     const list = todayOrdersData?.items || []
-    return list.filter((o) => !o.sale_checked && o.trang_thai !== 'Đã xác nhận')
+    return list.filter(
+      (o) =>
+        !isConfirmedOrderStatus(o) &&
+        !isTerminatedOrderStatus(o.status, o.trang_thai),
+    )
   }, [todayOrdersData])
 
   // Khách hàng hẹn gọi lại của HÔM NAY

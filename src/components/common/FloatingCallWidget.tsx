@@ -51,7 +51,10 @@ export const FloatingCallWidget: React.FC = () => {
     legacyStatus === 'calling' || legacyStatus === 'connected' || legacyStatus === 'paused'
 
   const isCallActive = activeCallTabs.length > 0 || isLegacyCallActive
-  const hasInPlaceCallControls = location.pathname === '/telesale' || location.pathname === '/leads'
+  const hasInPlaceCallControls =
+    location.pathname.startsWith('/telesale') ||
+    location.pathname.startsWith('/leads') ||
+    location.pathname.startsWith('/orders')
 
   if (!isCallActive || hasInPlaceCallControls) {
     return null

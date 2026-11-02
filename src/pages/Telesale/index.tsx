@@ -354,6 +354,7 @@ export const Telesale: React.FC = () => {
       memberId: targetMemberId,
       lineId: activeTabId,
       customer: currentCustomer,
+      isTelesale: true,
     })
   }
 

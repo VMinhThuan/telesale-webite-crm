@@ -16,6 +16,8 @@ export interface MakeCallParams {
   memberName?: string
   lineId?: number
   customer?: Partial<NextCustomerDto> | null
+  /** Đặt true CHỈ KHI cuộc gọi xuất phát từ màn hình Telesale để đồng bộ hiển thị vào tab Telesale */
+  isTelesale?: boolean
   onSuccess?: () => void
 }
 
@@ -88,6 +90,7 @@ export function useMakeCall() {
       memberId,
       lineId,
       customer,
+      isTelesale = false,
       onSuccess,
     }: MakeCallParams) => {
       // 0. Kiểm tra quyền Master Tab
@@ -158,25 +161,36 @@ export function useMakeCall() {
       const currentAttemptId = sipService.startCallAttempt(targetTabId)
 
       // Cập nhật tab sang trạng thái 'calling'
-      const existingTab = currentTabs.find((t) => t.id === targetTabId)
-      const tabCustomer: NextCustomerDto = {
-        customer_id: customerId,
-        customer_code: customer?.customer_code || '',
-        customer_name: customerName || customer?.customer_name || 'Khách hàng',
-        masked_address: (customer as any)?.masked_address || (customer as any)?.dia_chi || '',
-        lock_info: false,
-        cus_campaign_id: (customer as any)?.cus_campaign_id || 0,
-        members: customer?.members || [],
-      }
+      if (isTelesale) {
+        const existingTab = currentTabs.find((t) => t.id === targetTabId)
+        const tabCustomer: NextCustomerDto = {
+          customer_id: customerId,
+          customer_code: customer?.customer_code || '',
+          customer_name: customerName || customer?.customer_name || 'Khách hàng',
+          masked_address: (customer as any)?.masked_address || (customer as any)?.dia_chi || '',
+          lock_info: false,
+          cus_campaign_id: (customer as any)?.cus_campaign_id || 0,
+          members: customer?.members || [],
+        }
 
-      useTelesaleCallStore.getState().updateTab(targetTabId, {
-        status: 'calling',
-        durationSec: 0,
-        isMuted: false,
-        isHeld: false,
-        customer: existingTab?.customer?.customer_id === customerId ? existingTab.customer : tabCustomer,
-        selectedMemberId: memberId,
-      })
+        useTelesaleCallStore.getState().updateTab(targetTabId, {
+          status: 'calling',
+          durationSec: 0,
+          isMuted: false,
+          isHeld: false,
+          customer: existingTab?.customer?.customer_id === customerId ? existingTab.customer : tabCustomer,
+          selectedMemberId: memberId,
+        })
+      } else {
+        // Cuộc gọi từ màn hình khác (Khách tiềm năng / Đơn hàng):
+        // KHÔNG cập nhật hay ghi đè customer/selectedMemberId vào tabs của Telesale
+        useTelesaleCallStore.getState().updateTab(targetTabId, {
+          status: 'calling',
+          durationSec: 0,
+          isMuted: false,
+          isHeld: false,
+        })
+      }
 
       // Danh sách các line đang đàm thoại được tạm giữ máy tự động khi chuyển audio focus
       const autoHeldLineIds: number[] = []
@@ -221,11 +235,13 @@ export function useMakeCall() {
             memberName: dialInfo.member_name,
           })
 
-          useTelesaleCallStore.getState().updateTab(targetTabId, {
-            status: 'calling',
-            callerNumber: dialInfo.phone_masked,
-            selectedMemberId: dialInfo.member_id,
-          })
+          if (isTelesale) {
+            useTelesaleCallStore.getState().updateTab(targetTabId, {
+              status: 'calling',
+              callerNumber: dialInfo.phone_masked,
+              selectedMemberId: dialInfo.member_id,
+            })
+          }
 
           // KIỂM TRA HỦY: Kiểm tra lần nữa trước khi gọi SIP
           if (!sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {
