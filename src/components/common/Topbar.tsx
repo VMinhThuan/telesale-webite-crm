@@ -180,7 +180,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             <div
               className="header-popover notification-menu"
               style={{
-                width: '360px',
+                width: 'min(360px, calc(100vw - 24px))',
                 padding: '0',
                 overflow: 'hidden',
                 borderRadius: '12px',

@@ -99,8 +99,8 @@ export const CallActionControl: React.FC<CallActionControlProps> = ({
     return (
       <div
         style={{
-          margin: '15px 16px 16px',
-          padding: '13px 16px',
+          margin: '14px 0 16px',
+          padding: '12px 14px',
           borderRadius: '10px',
           background: '#f8fbff',
           border: '1px solid #e2eaf4',
@@ -108,6 +108,8 @@ export const CallActionControl: React.FC<CallActionControlProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
+          boxSizing: 'border-box',
+          width: '100%',
           ...style,
         }}
         className={className}
@@ -163,7 +165,7 @@ export const CallActionControl: React.FC<CallActionControlProps> = ({
         </div>
 
         {/* Cụm nút điều khiển đàm thoại chuẩn Telesale */}
-        <div className="call-controls" style={{ padding: '6px 0 2px', gap: '24px' }}>
+        <div className="call-controls" style={{ padding: '6px 0 2px', gap: 'clamp(10px, 4vw, 24px)' }}>
           <button
             type="button"
             onClick={() => toggleMute()}

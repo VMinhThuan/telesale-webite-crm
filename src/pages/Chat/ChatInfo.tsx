@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Download, FileText, Image as ImageIcon, Users } from 'lucide-react'
+import { ArrowRight, Download, FileText, Image as ImageIcon, Users, X } from 'lucide-react'
 import { ContactItem, LightboxImage } from './types'
 import { getInitials, getUserColor, isImageFile } from './chatUtils'
 import { notify } from '../../utils/notify'
@@ -9,6 +9,8 @@ interface ChatInfoProps {
   threadDetail: any
   user: any
   onPreviewImage?: (image: LightboxImage) => void
+  onClose?: () => void
+  isDrawer?: boolean
 }
 
 export const ChatInfo: React.FC<ChatInfoProps> = ({
@@ -16,6 +18,8 @@ export const ChatInfo: React.FC<ChatInfoProps> = ({
   threadDetail,
   user,
   onPreviewImage,
+  onClose,
+  isDrawer,
 }) => {
   const [showAllParticipants, setShowAllParticipants] = useState(false)
 
@@ -50,8 +54,20 @@ export const ChatInfo: React.FC<ChatInfoProps> = ({
   }, [threadDetail?.messages])
 
   return (
-    <aside className="chat-info">
-      <h2>Thông tin hội thoại</h2>
+    <aside className={`chat-info ${isDrawer ? 'chat-info-drawer' : ''}`}>
+      <div className="chat-info-head">
+        <h2>Thông tin hội thoại</h2>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="chat-info-close-btn"
+            title="Đóng thông tin hội thoại"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
       {activeContact ? (
         <>
           <div className="chat-group-info">

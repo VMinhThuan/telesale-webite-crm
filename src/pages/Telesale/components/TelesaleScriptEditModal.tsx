@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import {
-  FileText,
   Loader2,
   Plus,
   Trash2,

@@ -99,7 +99,31 @@ export const Chat: React.FC = () => {
 
   const [activeContact, setActiveContact] = useState<ContactItem | null>(null)
 
-  // Tự động mở cuộc hội thoại mới nhất (đầu tiên trong danh sách threads) khi có dữ liệu từ ERP
+  // 2. Quản lý Responsive Master-Detail cho Tablet & Mobile
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  })
+  const [isTablet, setIsTablet] = useState<boolean>(() => {
+    return typeof window !== 'undefined'
+      ? window.innerWidth > 768 && window.innerWidth <= 1200
+      : false
+  })
+  const [mobileView, setMobileView] = useState<'sidebar' | 'room' | 'info'>('sidebar')
+  const [showInfoPanel, setShowInfoPanel] = useState<boolean>(true)
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth
+      const mobile = width <= 768
+      const tablet = width > 768 && width <= 1200
+      setIsMobile(mobile)
+      setIsTablet(tablet)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Tự động mở cuộc hội thoại mới nhất khi có dữ liệu từ ERP
   useEffect(() => {
     if (contactList.length > 0) {
       const isCurrentValid = activeContact && contactList.some((c) => c.id === activeContact.id)
@@ -117,51 +141,108 @@ export const Chat: React.FC = () => {
     }
 
     setActiveContact(c)
+    if (isMobile) {
+      setMobileView('room')
+    }
     // Nếu hội thoại có tin nhắn chưa đọc, kích hoạt đánh dấu đã đọc trên ERP (API 43)
     if (c.unread) {
       markReadMutation.mutate(c.id)
     }
   }
 
-  // 2. Tải tin nhắn & danh sách thành viên của hội thoại đang chọn (API 37: GET /api/chats/{thread_id})
+  const handleBackToSidebar = () => {
+    setMobileView('sidebar')
+  }
+
+  const handleToggleInfo = () => {
+    if (isMobile) {
+      setMobileView((prev) => (prev === 'info' ? 'room' : 'info'))
+    } else {
+      setShowInfoPanel((prev) => !prev)
+    }
+  }
+
+  const handleCloseInfo = () => {
+    if (isMobile) {
+      setMobileView('room')
+    } else {
+      setShowInfoPanel(false)
+    }
+  }
+
+  // 3. Tải tin nhắn & danh sách thành viên của hội thoại đang chọn (API 37: GET /api/chats/{thread_id})
   const {
     data: threadDetail,
     isLoading: isLoadingMessages,
   } = useChatThreadDetail(activeContact?.id)
 
   return (
-    <div className="chat-page">
-      <div className="chat-layout">
+    <div className={`chat-page ${isMobile ? 'is-mobile' : ''}`}>
+      <div
+        className={`chat-layout ${!showInfoPanel ? 'info-hidden' : ''} ${
+          isMobile ? `mobile-view-${mobileView}` : ''
+        }`}
+      >
         {/* Cột 1: Danh sách hội thoại & tìm kiếm đồng nghiệp */}
-        <ChatSidebar
-          contactList={contactList}
-          activeContact={activeContact}
-          onSelectContact={handleSelectContact}
-          totalThreads={totalThreads}
-          totalUnreadCount={totalUnreadCount}
-          isLoadingThreads={isLoadingThreads}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onFetchNextPage={fetchNextPage}
-          contactsData={contactsData}
-        />
+        {(!isMobile || mobileView === 'sidebar') && (
+          <ChatSidebar
+            contactList={contactList}
+            activeContact={activeContact}
+            onSelectContact={handleSelectContact}
+            totalThreads={totalThreads}
+            totalUnreadCount={totalUnreadCount}
+            isLoadingThreads={isLoadingThreads}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onFetchNextPage={fetchNextPage}
+            contactsData={contactsData}
+          />
+        )}
 
         {/* Cột 2: Khung trò chuyện chính, tìm kiếm tin nhắn & gửi tệp */}
-        <ChatRoom
-          activeContact={activeContact}
-          threadDetail={threadDetail}
-          isLoadingMessages={isLoadingMessages}
-          user={user}
-          onPreviewImage={setPreviewImage}
-        />
+        {(!isMobile || mobileView === 'room') && (
+          <ChatRoom
+            activeContact={activeContact}
+            threadDetail={threadDetail}
+            isLoadingMessages={isLoadingMessages}
+            user={user}
+            onPreviewImage={setPreviewImage}
+            onBack={isMobile ? handleBackToSidebar : undefined}
+            onToggleInfo={handleToggleInfo}
+            isInfoOpen={isMobile ? mobileView === 'info' : showInfoPanel}
+          />
+        )}
 
         {/* Cột 3: Thông tin hội thoại, thành viên tham gia & tệp đã chia sẻ */}
-        <ChatInfo
-          activeContact={activeContact}
-          threadDetail={threadDetail}
-          user={user}
-          onPreviewImage={setPreviewImage}
-        />
+        {isMobile && mobileView === 'info' && (
+          <ChatInfo
+            activeContact={activeContact}
+            threadDetail={threadDetail}
+            user={user}
+            onPreviewImage={setPreviewImage}
+            onClose={handleCloseInfo}
+          />
+        )}
+
+        {!isMobile && showInfoPanel && (
+          <>
+            {isTablet && (
+              <div
+                className="chat-info-backdrop"
+                onClick={handleCloseInfo}
+                title="Đóng thông tin hội thoại"
+              />
+            )}
+            <ChatInfo
+              activeContact={activeContact}
+              threadDetail={threadDetail}
+              user={user}
+              onPreviewImage={setPreviewImage}
+              onClose={isTablet ? handleCloseInfo : undefined}
+              isDrawer={isTablet}
+            />
+          </>
+        )}
       </div>
 
       {/* Modal phóng to xem ảnh trực tiếp trên website (Lightbox) */}

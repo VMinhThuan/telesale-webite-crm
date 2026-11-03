@@ -14,7 +14,7 @@ interface SidebarBannerProps {
 }
 
 export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
-  const { data: config, isLoading } = useTelesaleConfig()
+  const { data: config } = useTelesaleConfig()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)

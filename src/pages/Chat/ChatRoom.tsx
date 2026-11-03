@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   Download,
   FileText,
   Film,
   Image as ImageIcon,
+  Info,
   Loader2,
   Mic,
   MoreHorizontal,
@@ -37,6 +39,9 @@ interface ChatRoomProps {
   isLoadingMessages: boolean
   user: any
   onPreviewImage?: (image: LightboxImage) => void
+  onBack?: () => void
+  onToggleInfo?: () => void
+  isInfoOpen?: boolean
 }
 
 export const ChatRoom: React.FC<ChatRoomProps> = ({
@@ -45,6 +50,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
   isLoadingMessages,
   user,
   onPreviewImage,
+  onBack,
+  onToggleInfo,
+  isInfoOpen,
 }) => {
   const sendMessageMutation = useSendMessageMutation()
   const uploadAttachmentMutation = useUploadAttachmentMutation()
@@ -408,6 +416,16 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
               </div>
             ) : (
               <>
+                {onBack && (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="chat-back-btn"
+                    title="Quay lại danh sách hội thoại"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                )}
                 <div className={`contact-avatar ${activeContact.tone}`}>
                   {activeContact.avatarUrl ? (
                     <img
@@ -427,7 +445,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                   )}
                   <i />
                 </div>
-                <div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h2>{activeContact.name}</h2>
                   <p>
                     <i /> {activeContact.isGroup ? 'Nhóm trao đổi nội bộ' : 'Đang trực tuyến'}
@@ -453,6 +471,16 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
                 >
                   <MoreHorizontal size={16} />
                 </button>
+                {onToggleInfo && (
+                  <button
+                    type="button"
+                    onClick={onToggleInfo}
+                    className={`chat-header-btn ${isInfoOpen ? 'active' : ''}`}
+                    title={isInfoOpen ? 'Đóng thông tin hội thoại' : 'Xem thông tin hội thoại & tệp đã chia sẻ'}
+                  >
+                    <Info size={16} />
+                  </button>
+                )}
               </>
             )}
           </div>

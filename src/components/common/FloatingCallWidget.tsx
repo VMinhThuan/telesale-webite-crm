@@ -169,8 +169,8 @@ export const FloatingCallWidget: React.FC = () => {
     <div
       style={{
         position: 'fixed',
-        bottom: '24px',
-        right: '24px',
+        bottom: 'clamp(12px, 3vw, 24px)',
+        right: 'clamp(12px, 3vw, 24px)',
         zIndex: 9990,
         backgroundColor: '#1e293b',
         color: '#ffffff',
@@ -180,7 +180,9 @@ export const FloatingCallWidget: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        maxWidth: '440px',
+        width: 'min(440px, calc(100vw - 24px))',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
         animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >

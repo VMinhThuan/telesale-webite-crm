@@ -479,9 +479,9 @@ export const Telesale: React.FC = () => {
         </div>
 
         {/* Dropdown chọn chiến dịch đàm thoại */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '12px', color: '#6d7f9c', fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '100%' }}>
+            <span style={{ fontSize: '12px', color: '#6d7f9c', fontWeight: 600, whiteSpace: 'nowrap' }}>
               Chiến dịch:
             </span>
             <select
@@ -504,6 +504,7 @@ export const Telesale: React.FC = () => {
                 fontWeight: 600,
                 outline: 'none',
                 cursor: hasActiveCalls ? 'not-allowed' : 'pointer',
+                maxWidth: 'min(240px, calc(100vw - 120px))',
               }}
             >
               {campaignsList.map((c) => (

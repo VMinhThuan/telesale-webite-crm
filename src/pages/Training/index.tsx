@@ -177,7 +177,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         <div>
           <h2>Kiến thức và hướng dẫn dành cho nhân viên telesale</h2>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <label className="training-search" style={{ margin: 0 }}>
             <Search size={18} />
             <input
@@ -204,6 +204,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
               gap: '8px',
               cursor: 'pointer',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              whiteSpace: 'nowrap',
             }}
           >
             <UploadCloud size={16} /> Tải tài liệu lên

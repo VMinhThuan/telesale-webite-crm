@@ -182,9 +182,10 @@ function CallConversionFunnel({
 
       {/* Bố cục 2 cột (Phương án A): Cột trái (Phễu 5 tầng Compact) + Cột phải (4 KPI Tỷ lệ Vàng 2x2) */}
       <div
+        className="funnel-container"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
           gap: '16px',
           alignItems: 'stretch',
         }}
@@ -273,9 +274,10 @@ function CallConversionFunnel({
 
         {/* Cột phải: 4 Chỉ số KPI Tỷ lệ vàng dạng lưới 2x2 */}
         <div
+          className="funnel-kpi-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
             gap: '12px',
           }}
         >
@@ -761,7 +763,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
           {/* Cột 1: Đơn hàng cần gọi xác nhận hôm nay */}
           <div
             style={{
@@ -817,6 +819,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
                     }}
                   >
                     <div>
@@ -903,6 +907,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
                     }}
                   >
                     <div>
