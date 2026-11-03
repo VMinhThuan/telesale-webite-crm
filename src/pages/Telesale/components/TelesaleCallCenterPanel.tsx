@@ -1,12 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   ChevronDown,
-  Lightbulb,
   Loader2,
   MapPin,
   Mic,
   MicOff,
   Pause,
+  Pencil,
   Phone,
   PhoneCall,
   PhoneOff,
@@ -19,6 +19,9 @@ import clsx from 'clsx'
 import { NextCustomerDto } from '../../../types/api'
 import { formatDuration } from '../../../utils/formatters'
 import { notify } from '../../../utils/notify'
+import { useTelesaleConfig } from '../../../hooks/useTelesaleConfig'
+import { defaultTelesaleConfig } from '../../../services/telesaleConfig.service'
+import { TelesaleScriptEditModal } from './TelesaleScriptEditModal'
 
 export interface TelesaleCallTab {
   id: number
@@ -78,6 +81,21 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   // Lấy tab đang active
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
   const currentCustomer = activeTab?.customer
+
+  // Hook nạp kịch bản từ Cloudflare R2
+  const { data: config } = useTelesaleConfig()
+  const scripts =
+    config?.scripts && config.scripts.length > 0
+      ? config.scripts
+      : defaultTelesaleConfig.scripts
+
+  const [activeScriptId, setActiveScriptId] = useState<string>('')
+  const [isScriptDropdownOpen, setIsScriptDropdownOpen] = useState(false)
+  const [isEditScriptModalOpen, setIsEditScriptModalOpen] = useState(false)
+
+  // Script đang hiển thị
+  const currentScript =
+    scripts.find((s) => s.id === activeScriptId) || scripts[0]
 
   return (
     <div className="center-call-column">
@@ -726,44 +744,107 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
       <section className="call-panel script-panel">
         <div className="call-panel-heading">
           <div>
-            <p className="eyebrow">KỊCH BẢN TƯ VẤN</p>
-            <h2>Tư vấn máy lọc nước</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <p className="eyebrow" style={{ margin: 0 }}>KỊCH BẢN TƯ VẤN</p>
+              {/* Nút Chỉnh sửa Kịch bản */}
+              <button
+                type="button"
+                title="Chỉnh sửa kịch bản tư vấn"
+                onClick={() => setIsEditScriptModalOpen(true)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
+            <h2>{currentScript?.title || 'Tư vấn máy lọc nước'}</h2>
           </div>
-          <button className="subtle-select" type="button">
-            Bảo dưỡng / Thay lõi <ChevronDown size={15} />
-          </button>
+
+          {/* Dropdown chọn tình huống kịch bản */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className="subtle-select"
+              type="button"
+              onClick={() => setIsScriptDropdownOpen(!isScriptDropdownOpen)}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {currentScript?.name || 'Bảo dưỡng / Thay lõi'} <ChevronDown size={15} />
+            </button>
+
+            {isScriptDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '4px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  zIndex: 20,
+                  minWidth: '190px',
+                  overflow: 'hidden',
+                }}
+              >
+                {scripts.map((sc) => (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveScriptId(sc.id)
+                      setIsScriptDropdownOpen(false)
+                      notify(`Đã chuyển kịch bản: ${sc.name}`)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: 'none',
+                      background: sc.id === currentScript?.id ? '#eff6ff' : 'transparent',
+                      color: sc.id === currentScript?.id ? '#2563eb' : '#334155',
+                      fontWeight: sc.id === currentScript?.id ? 600 : 400,
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'block',
+                    }}
+                  >
+                    {sc.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
         <ol>
-          <li>
-            Em chào anh/chị, em là tư vấn viên từ Lọc Nước 365. Em liên hệ để hỗ
-            trợ kiểm tra định kỳ chất lượng nguồn nước nhà mình ạ.
-          </li>
-          <li>
-            Dạ không biết lần gần nhất gia đình mình thay bộ lõi thô 1, 2, 3 là
-            khi nào rồi ạ?
-          </li>
-          <li>
-            Hiện tại vòi nước nhà mình chảy có mạnh không, nước có mùi vị lạ hay
-            máy có phát ra tiếng ồn không ạ?
-          </li>
-          <li>
-            Bên em đang có chương trình kỹ thuật viên qua kiểm tra máy, đo nồng
-            độ TDS miễn phí tại nhà. Em hẹn lịch vào ca sáng hay chiều tiện cho
-            gia đình mình ạ?
-          </li>
+          {currentScript?.steps && currentScript.steps.length > 0 ? (
+            currentScript.steps.map((step, idx) => <li key={idx}>{step}</li>)
+          ) : (
+            <li>Chưa có nội dung câu thoại cho kịch bản này.</li>
+          )}
         </ol>
-        <button
-          className="next-tip"
-          type="button"
-          onClick={() =>
-            notify(
-              'Gợi ý: Nhấn mạnh dịch vụ kiểm tra miễn phí áp lực nước và nồng độ TDS',
-            )
-          }
-        >
-          <Lightbulb size={17} /> Gợi ý tiếp theo
-        </button>
       </section>
+
+      {/* Modal Chỉnh sửa Kịch bản tư vấn */}
+      {isEditScriptModalOpen && (
+        <TelesaleScriptEditModal
+          scripts={scripts}
+          activeScriptId={currentScript?.id || ''}
+          onSelectScript={(id) => setActiveScriptId(id)}
+          onClose={() => setIsEditScriptModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

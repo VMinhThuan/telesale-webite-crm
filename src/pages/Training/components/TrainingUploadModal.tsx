@@ -114,7 +114,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
           background: '#ffffff',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '560px',
+          maxWidth: '680px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           display: 'flex',
@@ -207,10 +207,7 @@ export const TrainingUploadModal: React.FC<TrainingUploadModalProps> = ({
           >
             <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <strong>Lưu ý:</strong> Bạn cần điền đầy đủ các thông số trong file{' '}
-              <code>.env</code> (<code>VITE_R2_ACCOUNT_ID</code>,{' '}
-              <code>VITE_R2_ACCESS_KEY_ID</code>,{' '}
-              <code>VITE_R2_SECRET_ACCESS_KEY</code>) để thực hiện tải tệp lên hệ thống.
+              <strong>Lưu ý:</strong> Dịch vụ lưu trữ tệp chưa được kết nối đầy đủ. Vui lòng liên hệ quản trị viên để được hỗ trợ tải tài liệu.
             </div>
           </div>
         )}

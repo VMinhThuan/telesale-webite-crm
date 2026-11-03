@@ -17,6 +17,7 @@ import {
 import { PageType } from '../../types'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useChatThreads } from '../../hooks/useChat'
+import { SidebarBanner } from './SidebarBanner'
 
 interface NavItemDef {
   label: string
@@ -120,6 +121,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         ))}
       </nav>
+
+      {/* Widget Banner nội bộ (trình chiếu ảnh) */}
+      <SidebarBanner collapsed={collapsed} />
 
       <div className="sidebar-bottom">
         <button

@@ -80,7 +80,7 @@ export const TrainingEditModal: React.FC<TrainingEditModalProps> = ({
           background: '#ffffff',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '520px',
+          maxWidth: '680px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           display: 'flex',

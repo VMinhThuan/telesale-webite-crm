@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import {
+  BadgeCheck,
   BarChart3,
   CalendarDays,
   ChevronDown,
   Clock3,
-  Coins,
   Info,
   MessageCircle,
   Phone,
@@ -18,7 +18,6 @@ import { useUserLists } from '../../hooks/useAuth'
 import { useDailyResultsList } from '../../hooks/useTelesale'
 import { useOrdersList } from '../../hooks/useOrders'
 import { notify } from '../../utils/notify'
-import { formatVND } from '../../utils/formatters'
 
 interface PeriodOption {
   label: string
@@ -118,10 +117,10 @@ export const Reports: React.FC = () => {
         connected: acc.connected + (cur.tong_call_answer || 0),
         leads: acc.leads + (cur.tong_giu_lai_cs || 0) + (cur.tong_hen_goi_lai || 0),
         closed: acc.closed + (cur.tong_da_chot || 0),
+        confirmed: acc.confirmed + (cur.tong_don_da_xac_nhan || 0),
         returned: acc.returned + (cur.tong_don_tra_ve || 0),
-        commission: acc.commission + (cur.tong_da_chot || 0) * 150000,
       }),
-      { hours: 0, calls: 0, connected: 0, leads: 0, closed: 0, returned: 0, commission: 0 },
+      { hours: 0, calls: 0, connected: 0, leads: 0, closed: 0, confirmed: 0, returned: 0 },
     )
   }, [filteredResults])
 
@@ -151,6 +150,7 @@ export const Reports: React.FC = () => {
     { label: 'Kết nối', value: String(totals.connected), icon: Users, tone: 'blue' },
     { label: 'Khách tiềm năng', value: String(totals.leads), icon: UserCheck, tone: 'amber' },
     { label: 'Đơn đã chốt', value: String(totals.closed), icon: ShoppingCart, tone: 'green' },
+    { label: 'Đơn đã xác nhận', value: String(totals.confirmed), icon: BadgeCheck, tone: 'green' },
     { label: 'Đơn trả về', value: String(totals.returned), icon: Undo2, tone: 'rose' },
     {
       label: 'Số đơn trung bình/ngày',
@@ -158,18 +158,22 @@ export const Reports: React.FC = () => {
       icon: BarChart3,
       tone: 'blue',
     },
-    { label: 'Tổng hoa hồng', value: formatVND(totals.commission), icon: Coins, tone: 'amber' },
   ]
 
   const handleExportCSV = () => {
     const csvContent =
-      'Nhân viên,Cuộc gọi,Kết nối,Đã chốt,Hoa hồng\n' +
+      'Nhân viên,Cuộc gọi,Kết nối,Tiềm năng,Đã chốt,Đã xác nhận,Trả về,Tỷ lệ chốt\n' +
       filteredResults
-        .map(
-          (p) =>
-            `${p.user_name || 'Nhân viên'},${p.tong_total_call || 0},${p.tong_call_answer || 0},${p.tong_da_chot || 0
-            },${(p.tong_da_chot || 0) * 150000}`,
-        )
+        .map((p) => {
+          const calls = p.tong_total_call || 0
+          const connected = p.tong_call_answer || 0
+          const leads = (p.tong_giu_lai_cs || 0) + (p.tong_hen_goi_lai || 0)
+          const closed = p.tong_da_chot || 0
+          const confirmed = p.tong_don_da_xac_nhan || 0
+          const returned = p.tong_don_tra_ve || 0
+          const rate = connected > 0 ? `${((closed / connected) * 100).toFixed(1)}%` : '0%'
+          return `"${p.user_name || 'Nhân viên'}",${calls},${connected},${leads},${closed},${confirmed},${returned},${rate}`
+        })
         .join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -326,9 +330,9 @@ export const Reports: React.FC = () => {
                     'Kết nối',
                     'Tiềm năng',
                     'Đã chốt',
+                    'Đã xác nhận',
                     'Trả về',
                     'Tỷ lệ chốt',
-                    'Hoa hồng',
                   ].map((x) => (
                     <th key={x}>{x}</th>
                   ))}
@@ -341,9 +345,9 @@ export const Reports: React.FC = () => {
                   const connected = person.tong_call_answer || 0
                   const leads = (person.tong_giu_lai_cs || 0) + (person.tong_hen_goi_lai || 0)
                   const closed = person.tong_da_chot || 0
+                  const confirmed = person.tong_don_da_xac_nhan || 0
                   const returned = person.tong_don_tra_ve || 0
                   const rate = connected > 0 ? `${((closed / connected) * 100).toFixed(1)}%` : '0%'
-                  const commission = closed * 150000
 
                   return (
                     <tr key={person.user_id || idx}>
@@ -353,9 +357,9 @@ export const Reports: React.FC = () => {
                       <td>{connected}</td>
                       <td>{leads}</td>
                       <td>{closed}</td>
+                      <td>{confirmed}</td>
                       <td>{returned}</td>
                       <td>{rate}</td>
-                      <td>{formatVND(commission)}</td>
                     </tr>
                   )
                 })}
@@ -366,13 +370,13 @@ export const Reports: React.FC = () => {
                   <td>{totals.connected}</td>
                   <td>{totals.leads}</td>
                   <td>{totals.closed}</td>
+                  <td>{totals.confirmed}</td>
                   <td>{totals.returned}</td>
                   <td>
                     {totals.connected > 0
                       ? `${((totals.closed / totals.connected) * 100).toFixed(1)}%`
                       : '0%'}
                   </td>
-                  <td>{formatVND(totals.commission)}</td>
                 </tr>
               </tbody>
             </table>
