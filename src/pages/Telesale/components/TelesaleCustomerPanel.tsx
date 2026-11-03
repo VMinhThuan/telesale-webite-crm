@@ -179,6 +179,21 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     onBranchChange,
   ])
 
+  // Tự động nhận diện gợi ý kết quả khi cuộc gọi của activeTab kết thúc (FreeSWITCH / SIP termination)
+  const activeTabTerminationInfo = useTelesaleCallStore((s) => {
+    const tab = s.tabs.find((t) => t.id === activeTabId)
+    return tab?.terminationInfo
+  })
+
+  useEffect(() => {
+    if (activeTabTerminationInfo?.suggestedOutcome && activeTabStatus === 'ended') {
+      setSelectedOutcome(activeTabTerminationInfo.suggestedOutcome)
+      if (activeTabTerminationInfo.suggestedOutcome === 'callback') {
+        setCallbackDate((prev) => prev || dayjs().format('YYYY-MM-DD'))
+      }
+    }
+  }, [activeTabTerminationInfo, activeTabStatus])
+
   // 2. Tự động lưu mọi thay đổi form vào bản nháp của activeTabId trong Store
   useEffect(() => {
     if (isHydratingRef.current) return

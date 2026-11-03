@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { CallResultOutcome, NextCustomerDto } from '../types/api'
+import { ParsedCallTermination } from '../utils/sipCallParser'
 
 export interface TelesaleDraftResult {
   outcome: CallResultOutcome
@@ -56,6 +57,7 @@ export interface TelesaleCallTab {
   isHeld: boolean
   callerNumber?: string
   draftResult?: TelesaleDraftResult
+  terminationInfo?: ParsedCallTermination | null
 }
 
 const initialTabs: TelesaleCallTab[] = [

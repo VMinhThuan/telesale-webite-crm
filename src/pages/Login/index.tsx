@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Sparkles,
   User,
-  Zap,
 } from 'lucide-react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'

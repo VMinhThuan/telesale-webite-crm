@@ -21,6 +21,7 @@ import { formatDuration } from '../../../utils/formatters'
 import { notify } from '../../../utils/notify'
 import { useTelesaleConfig } from '../../../hooks/useTelesaleConfig'
 import { defaultTelesaleConfig } from '../../../services/telesaleConfig.service'
+import { ParsedCallTermination } from '../../../utils/sipCallParser'
 import { TelesaleScriptEditModal } from './TelesaleScriptEditModal'
 
 export interface TelesaleCallTab {
@@ -33,6 +34,7 @@ export interface TelesaleCallTab {
   isMuted: boolean
   isHeld: boolean
   callerNumber?: string
+  terminationInfo?: ParsedCallTermination | null
 }
 
 export interface TelesaleCallCenterPanelProps {
@@ -236,7 +238,9 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
             if (isConnected) statusText = 'Đang gọi'
             else if (isPaused) statusText = 'Giữ máy'
             else if (isCalling) statusText = 'Đang gọi...'
-            else if (tab.customer) statusText = 'Đã nạp'
+            else if (tab.status === 'ended') {
+              statusText = tab.terminationInfo?.shortLabel || 'Đã kết thúc'
+            } else if (tab.customer) statusText = 'Đã nạp'
 
             return (
               <button
@@ -651,35 +655,109 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                     >
                       <div
                         style={{
-                          padding: '10px 14px',
+                          padding: '12px 14px',
                           borderRadius: '8px',
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          background:
+                            activeTab.terminationInfo?.tone === 'amber'
+                              ? '#fffbeb'
+                              : activeTab.terminationInfo?.tone === 'rose'
+                                ? '#fef2f2'
+                                : activeTab.terminationInfo?.tone === 'blue'
+                                  ? '#eff6ff'
+                                  : '#f8fafc',
+                          border: `1px solid ${
+                            activeTab.terminationInfo?.tone === 'amber'
+                              ? '#fde68a'
+                              : activeTab.terminationInfo?.tone === 'rose'
+                                ? '#fecaca'
+                                : activeTab.terminationInfo?.tone === 'blue'
+                                  ? '#bfdbfe'
+                                  : '#e2e8f0'
+                          }`,
                           marginBottom: '10px',
                           fontSize: '12px',
-                          color: '#475569',
+                          textAlign: 'left',
                         }}
                       >
-                        <span style={{ fontWeight: 600, color: '#dc2626' }}>
-                          ● Cuộc gọi đã kết thúc
-                        </span>
-                        {activeTab.durationSec > 0 && (
-                          <span>
-                            {' '}
-                            (Thời lượng:{' '}
-                            {formatDuration(activeTab.durationSec)})
-                          </span>
-                        )}
-                        <p
+                        <div
                           style={{
-                            margin: '4px 0 0',
-                            color: '#64748b',
-                            fontSize: '11px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            flexWrap: 'wrap',
                           }}
                         >
-                          Vui lòng ghi nhận kết quả ở cột bên phải để hoàn tất
-                          và nhận khách tiếp theo.
-                        </p>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: '12.5px',
+                              color:
+                                activeTab.terminationInfo?.tone === 'amber'
+                                  ? '#b45309'
+                                  : activeTab.terminationInfo?.tone === 'rose'
+                                    ? '#dc2626'
+                                    : activeTab.terminationInfo?.tone === 'blue'
+                                      ? '#1d4ed8'
+                                      : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            ● {activeTab.terminationInfo?.label || 'Cuộc gọi đã kết thúc'}
+                          </span>
+                          {activeTab.durationSec > 0 && (
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+                              Thời lượng: {formatDuration(activeTab.durationSec)}
+                            </span>
+                          )}
+                        </div>
+
+                        {activeTab.terminationInfo?.detail && (
+                          <p
+                            style={{
+                              margin: '5px 0 0',
+                              color: '#64748b',
+                              fontSize: '11px',
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            {activeTab.terminationInfo.detail}
+                          </p>
+                        )}
+
+                        {activeTab.terminationInfo?.suggestedOutcome && (
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              paddingTop: '6px',
+                              borderTop: '1px dashed rgba(0,0,0,0.08)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '11px',
+                              color: '#2563eb',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <span>💡 Đã tự động gợi ý kết quả:</span>
+                            <span
+                              style={{
+                                background: '#dbeafe',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                color: '#1e40af',
+                              }}
+                            >
+                              {activeTab.terminationInfo.suggestedOutcome === 'callback'
+                                ? 'Hẹn gọi lại'
+                                : activeTab.terminationInfo.suggestedOutcome === 'no_answer'
+                                  ? 'Không nghe máy'
+                                  : 'Sai số'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <button
                         type="button"

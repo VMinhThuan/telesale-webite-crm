@@ -37,6 +37,11 @@ export interface SipCallStateEvent {
   direction?: 'incoming' | 'outgoing'
   remoteNumber?: string
   cause?: string
+  originator?: 'local' | 'remote' | 'system'
+  sipStatusCode?: number
+  reasonPhrase?: string
+  reasonHeader?: string
+  wasConfirmed?: boolean
 }
 
 type RegistrationListener = (
@@ -76,6 +81,8 @@ class SipService {
   private userHeldLines: Set<number> = new Set()
   // Trạng thái hệ thống tự động giữ máy do chuyển Audio Focus (System-initiated auto hold)
   private autoHeldLines: Set<number> = new Set()
+  // Ghi nhận các line đã từng xác lập kết nối đàm thoại 2 chiều (confirmed)
+  private confirmedLines: Set<number> = new Set()
 
   // Quản lý các lượt quay số đang trong quá trình chuẩn bị (in-flight preparation: API 16, getUserMedia, v.v.)
   // Sử dụng toàn cục để gác máy từ bất kỳ đâu (Telesale, Floating Widget, App unmount) đều hủy được cuộc gọi
@@ -622,10 +629,16 @@ class SipService {
       })
     })
 
-    // Đang đổ chuông (180 Ringing)
-    session.on('progress', () => {
+    // Đang đổ chuông (180 Ringing hoặc 183 Session Progress)
+    session.on('progress', (e: any) => {
       if (!isCurrentSession()) return
-      this.startRingbackTone()
+      // Nếu là 183 Session Progress có early media SDP từ tổng đài, dừng chuông giả lập để nghe âm báo nhà mạng
+      const hasEarlyMedia = Boolean(e?.response?.body || e?.message?.body)
+      if (hasEarlyMedia) {
+        this.stopRingbackTone()
+      } else {
+        this.startRingbackTone()
+      }
       this.updateCallStatus({
         lineId,
         status: 'progress',
@@ -638,6 +651,7 @@ class SipService {
     // Khách hàng nhấc máy (200 OK Confirmed)
     session.on('confirmed', () => {
       if (!isCurrentSession()) return
+      this.confirmedLines.add(lineId)
       this.stopRingbackTone()
 
       // Kiểm tra Audio Focus khi có khách hàng nhấc máy:
@@ -731,12 +745,25 @@ class SipService {
       this.userHeldLines.delete(lineId)
       this.autoHeldLines.delete(lineId)
       this.cancelCallAttempt(lineId)
+
+      const wasConfirmed = this.confirmedLines.has(lineId)
+      this.confirmedLines.delete(lineId)
+
+      const sipStatusCode = e?.message?.status_code
+      const reasonPhrase = e?.message?.reason_phrase
+      const reasonHeader = typeof e?.message?.getHeader === 'function' ? e.message.getHeader('Reason') : ''
+
       this.updateCallStatus({
         lineId,
         status: 'ended',
         session: null,
         direction,
         cause: e?.cause,
+        originator: e?.originator,
+        sipStatusCode,
+        reasonPhrase,
+        reasonHeader,
+        wasConfirmed,
       })
 
       // Tự động phục hồi Audio Focus sang line còn lại (nếu có)
@@ -770,12 +797,25 @@ class SipService {
       this.userHeldLines.delete(lineId)
       this.autoHeldLines.delete(lineId)
       this.cancelCallAttempt(lineId)
+
+      const wasConfirmed = this.confirmedLines.has(lineId)
+      this.confirmedLines.delete(lineId)
+
+      const sipStatusCode = e?.message?.status_code
+      const reasonPhrase = e?.message?.reason_phrase
+      const reasonHeader = typeof e?.message?.getHeader === 'function' ? e.message.getHeader('Reason') : ''
+
       this.updateCallStatus({
         lineId,
         status: 'failed',
         session: null,
         direction,
         cause: e?.cause || 'Cuộc gọi không thành công',
+        originator: e?.originator,
+        sipStatusCode,
+        reasonPhrase,
+        reasonHeader,
+        wasConfirmed,
       })
 
       // Tự động phục hồi Audio Focus sang line còn lại (nếu có)
@@ -1086,8 +1126,17 @@ class SipService {
       }
       this.sessions.delete(targetLineId)
     }
+    const wasConfirmed = this.confirmedLines.has(targetLineId)
+    this.confirmedLines.delete(targetLineId)
     this.cleanupAudio(targetLineId)
-    this.updateCallStatus({ lineId: targetLineId, status: 'ended', session: null })
+    this.updateCallStatus({
+      lineId: targetLineId,
+      status: 'ended',
+      session: null,
+      originator: 'local',
+      cause: 'Canceled',
+      wasConfirmed,
+    })
   }
 
   /**
@@ -1108,6 +1157,7 @@ class SipService {
     this.userMutedLines.clear()
     this.userHeldLines.clear()
     this.autoHeldLines.clear()
+    this.confirmedLines.clear()
 
     this.sessions.forEach((session, lineId) => {
       try {

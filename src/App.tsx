@@ -24,6 +24,7 @@ import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType } from '@/types'
 import { notify } from '@/utils/notify'
 import { getEffectiveSipConfig } from '@/utils/sip'
+import { parseSipTermination } from '@/utils/sipCallParser'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
 const LoginPage = lazy(() =>
@@ -126,7 +127,7 @@ const AppShell: React.FC = () => {
       const activeTabId = useTelesaleCallStore.getState().activeTabId
 
       if (event.status === 'calling' || event.status === 'progress') {
-        useTelesaleCallStore.getState().updateTab(lineId, { status: 'calling' })
+        useTelesaleCallStore.getState().updateTab(lineId, { status: 'calling', terminationInfo: null })
         if (lineId === activeTabId) {
           useCallStore.setState({ status: 'calling' })
         }
@@ -141,10 +142,37 @@ const AppShell: React.FC = () => {
           useCallStore.setState({ status: 'paused', isHeld: true })
         }
       } else if (event.status === 'ended' || event.status === 'failed') {
-        useTelesaleCallStore.getState().updateTab(lineId, { status: 'ended', isHeld: false })
+        const currentTabs = useTelesaleCallStore.getState().tabs
+        const targetTab = currentTabs.find((t) => t.id === lineId)
+
+        const parsedTermination = parseSipTermination({
+          status: event.status,
+          originator: event.originator,
+          cause: event.cause,
+          sipStatusCode: event.sipStatusCode,
+          reasonPhrase: event.reasonPhrase,
+          reasonHeader: event.reasonHeader,
+          wasConfirmed: event.wasConfirmed,
+          durationSec: targetTab?.durationSec || 0,
+        })
+
+        useTelesaleCallStore.getState().updateTab(lineId, {
+          status: 'ended',
+          isHeld: false,
+          terminationInfo: parsedTermination,
+        })
+
+        // Tự động gợi ý kết quả CRM trên bản nháp của tab nếu chưa chọn kết quả
+        if (parsedTermination.suggestedOutcome) {
+          const currentDraft = useTelesaleCallStore.getState().getTabDraft(lineId)
+          if (!currentDraft.outcome || currentDraft.outcome === 'potential') {
+            useTelesaleCallStore.getState().updateTabDraft(lineId, {
+              outcome: parsedTermination.suggestedOutcome,
+            })
+          }
+        }
 
         // Kiểm tra nếu line kết thúc là line active HOẶC không còn line nào đang gọi/kết nối/giữ máy
-        const currentTabs = useTelesaleCallStore.getState().tabs
         const remainingActiveTab = currentTabs.find(
           (t) => t.id !== lineId && (t.status === 'calling' || t.status === 'connected' || t.status === 'paused'),
         )
@@ -164,8 +192,8 @@ const AppShell: React.FC = () => {
           })
         }
 
-        if (event.status === 'failed' && event.cause) {
-          notify(`Cuộc gọi Line ${lineId} kết thúc: ${event.cause}`)
+        if (parsedTermination.code !== 'local_hangup' && parsedTermination.code !== 'local_canceled') {
+          notify(`Line ${lineId}: ${parsedTermination.label}`)
         }
       }
     })
