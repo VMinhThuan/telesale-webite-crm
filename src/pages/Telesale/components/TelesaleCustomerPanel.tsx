@@ -8,7 +8,6 @@ import {
   FileText,
   MapPin,
   Phone,
-  RotateCw,
   Save,
   ShoppingCart,
   Timer,
@@ -60,7 +59,7 @@ export interface TelesaleCustomerPanelProps {
   activeTabId?: number
   activeTabLabel?: string
   activeTabStatus?: string
-  onFetchNextCustomer: () => void
+  onFetchNextCustomer?: () => void
   onSaveResultSuccess: () => void
 }
 
@@ -69,7 +68,6 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   selectedCampaignName,
   branchId,
   branchName,
-  availableBranches,
   onBranchChange,
   orderDate,
   onOrderDateChange,
@@ -80,7 +78,6 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   activeTabId = 1,
   activeTabLabel,
   activeTabStatus,
-  onFetchNextCustomer,
   onSaveResultSuccess,
 }) => {
   // Đồng bộ bản nháp đa tab với useTelesaleCallStore
@@ -466,32 +463,6 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             </p>
             <h2>Thông tin liên hệ</h2>
           </div>
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => {
-              if (
-                activeTabStatus === 'calling' ||
-                activeTabStatus === 'connected' ||
-                activeTabStatus === 'paused'
-              ) {
-                notify(
-                  `${activeTabLabel || 'Tab này'} đang có cuộc gọi. Vui lòng chuyển sang Tab khác để nạp khách mới!`,
-                )
-                return
-              }
-              onFetchNextCustomer()
-            }}
-            title={
-              activeTabStatus === 'calling' ||
-                activeTabStatus === 'connected' ||
-                activeTabStatus === 'paused'
-                ? `Đang có cuộc gọi tại ${activeTabLabel || 'tab này'} — Chuyển sang Tab khác để nạp khách mới`
-                : 'Đổi sang khách khác'
-            }
-          >
-            <RotateCw size={16} />
-          </button>
         </div>
 
         <div className="customer-brief">
@@ -799,47 +770,22 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 <Building2 size={14} style={{ color: '#2563eb' }} />
                 Chi nhánh thực hiện đơn hàng <b style={{ color: '#e11d48' }}>*</b>:
               </label>
-              {availableBranches && availableBranches.length > 1 ? (
-                <select
-                  value={branchId}
-                  onChange={(e) => {
-                    const newId = Number(e.target.value)
-                    onBranchChange?.(newId)
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '35px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '0 10px',
-                    fontSize: '13px',
-                    color: '#0f172a',
-                    background: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {availableBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#1e293b',
-                    background: '#f8fafc',
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                  }}
-                >
-                  🏢 {branchName}
-                </div>
-              )}
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#1e293b',
+                  background: '#f8fafc',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>🏢 {branchName || 'Chi nhánh theo chiến dịch'}</span>
+              </div>
             </div>
 
             {/* Thông báo kết nối ca hẹn với Cột 1 */}

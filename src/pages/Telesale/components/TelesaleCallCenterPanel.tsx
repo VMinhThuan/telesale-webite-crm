@@ -12,6 +12,7 @@ import {
   PhoneOff,
   Play,
   RotateCw,
+  SkipForward,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -470,132 +471,191 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                   {/* TRẠNG THÁI 1: CHƯA GỌI -> Điều chỉnh UX chống xung đột theo trạng thái SIP */}
                   {isIdle && (
                     <div style={{ padding: '6px 16px 14px' }}>
-                      {sipRegStatus === 'connecting' ? (
-                        <button
-                          type="button"
-                          disabled
-                          title="Hệ thống đang bắt tay kết nối WebSocket WSS với tổng đài, nút gọi sẽ tự động sẵn sàng sau giây lát"
-                          style={{
-                            width: '100%',
-                            padding: '11px 18px',
-                            borderRadius: '8px',
-                            background: '#f1f5f9',
-                            color: '#64748b',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor: 'not-allowed',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          <Loader2
-                            size={18}
-                            style={{
-                              color: '#2563eb',
-                              animation: 'spin 1s linear infinite',
-                            }}
-                          />
-                          <span>
-                            Đang kết nối tổng đài... Vui lòng đợi
-                          </span>
-                        </button>
-                      ) : sipRegStatus === 'registered' ? (
-                        <button
-                          type="button"
-                          disabled={isDialing || activeTab.status === 'calling'}
-                          onClick={() =>
-                            onDial(
-                              activeTab.selectedMemberId ||
-                              selectedMember?.member_id,
-                            )
-                          }
-                          style={{
-                            width: '100%',
-                            padding: '11px 18px',
-                            borderRadius: '8px',
-                            background: isDialing ? '#94a3b8' : '#16a34a', // Màu xám khi đang kết nối, xanh lá cây khi sẵn sàng
-                            color: '#ffffff',
-                            border: 'none',
-                            fontSize: '13.5px',
-                            fontWeight: 700,
-                            cursor: isDialing ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            boxShadow: isDialing
-                              ? 'none'
-                              : '0 4px 12px rgba(22, 163, 74, 0.25)',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {isDialing ? (
-                            <>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'stretch',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ flex: '1 1 180px', minWidth: '150px' }}>
+                          {sipRegStatus === 'connecting' ? (
+                            <button
+                              type="button"
+                              disabled
+                              title="Hệ thống đang bắt tay kết nối WebSocket WSS với tổng đài, nút gọi sẽ tự động sẵn sàng sau giây lát"
+                              style={{
+                                width: '100%',
+                                padding: '11px 18px',
+                                borderRadius: '8px',
+                                background: '#f1f5f9',
+                                color: '#64748b',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                              }}
+                            >
                               <Loader2
                                 size={18}
                                 style={{
-                                  color: '#ffffff',
+                                  color: '#2563eb',
                                   animation: 'spin 1s linear infinite',
                                 }}
                               />
-                              <span>Đang kết nối...</span>
-                            </>
+                              <span>
+                                Đang kết nối tổng đài... Vui lòng đợi
+                              </span>
+                            </button>
+                          ) : sipRegStatus === 'registered' ? (
+                            <button
+                              type="button"
+                              disabled={isDialing || activeTab.status === 'calling'}
+                              onClick={() =>
+                                onDial(
+                                  activeTab.selectedMemberId ||
+                                  selectedMember?.member_id,
+                                )
+                              }
+                              style={{
+                                width: '100%',
+                                padding: '11px 18px',
+                                borderRadius: '8px',
+                                background: isDialing ? '#94a3b8' : '#16a34a', // Màu xám khi đang kết nối, xanh lá cây khi sẵn sàng
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '13.5px',
+                                fontWeight: 700,
+                                cursor: isDialing ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: isDialing
+                                  ? 'none'
+                                  : '0 4px 12px rgba(22, 163, 74, 0.25)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {isDialing ? (
+                                <>
+                                  <Loader2
+                                    size={18}
+                                    style={{
+                                      color: '#ffffff',
+                                      animation: 'spin 1s linear infinite',
+                                    }}
+                                  />
+                                  <span>Đang kết nối...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <PhoneCall size={18} />
+                                  <span>Bắt đầu gọi</span>
+                                </>
+                              )}
+                            </button>
+                          ) : !sipExtension ? (
+                            <div
+                              style={{
+                                width: '100%',
+                                padding: '11px 18px',
+                                borderRadius: '8px',
+                                background: '#fff1f2',
+                                color: '#b91c1c',
+                                border: '1.5px solid #fecdd3',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                              }}
+                            >
+                              <PhoneOff size={17} style={{ color: '#b91c1c' }} />
+                              <span>Chưa cấu hình máy nhánh SIP từ máy chủ</span>
+                            </div>
                           ) : (
-                            <>
-                              <PhoneCall size={18} />
-                              <span>Bắt đầu gọi</span>
-                            </>
+                            <button
+                              type="button"
+                              onClick={onReconnectSip}
+                              title="Bấm để kích hoạt kết nối lại máy nhánh SIP với tổng đài"
+                              style={{
+                                width: '100%',
+                                padding: '11px 18px',
+                                borderRadius: '8px',
+                                background: '#fff1f2',
+                                color: '#e11d48',
+                                border: '1.5px solid #fecdd3',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 2px 8px rgba(225, 29, 72, 0.1)',
+                              }}
+                            >
+                              <RotateCw size={17} style={{ color: '#e11d48' }} />
+                              <span>Tổng đài chưa kết nối — Bấm để kết nối lại</span>
+                            </button>
                           )}
-                        </button>
-                      ) : !sipExtension ? (
-                        <div
-                          style={{
-                            width: '100%',
-                            padding: '11px 18px',
-                            borderRadius: '8px',
-                            background: '#fff1f2',
-                            color: '#b91c1c',
-                            border: '1.5px solid #fecdd3',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          <PhoneOff size={17} style={{ color: '#b91c1c' }} />
-                          <span>Chưa cấu hình máy nhánh SIP từ máy chủ</span>
                         </div>
-                      ) : (
+
                         <button
                           type="button"
-                          onClick={onReconnectSip}
-                          title="Bấm để kích hoạt kết nối lại máy nhánh SIP với tổng đài"
+                          disabled={
+                            isFetchingCustomer ||
+                            isDialing ||
+                            activeTab.status === 'calling'
+                          }
+                          onClick={() => onFetchCustomerForTab(activeTab.id)}
+                          title="Đổi sang khách hàng tiếp theo trong chiến dịch cho tab này"
                           style={{
-                            width: '100%',
-                            padding: '11px 18px',
+                            flex: '0 0 auto',
+                            padding: '11px 16px',
                             borderRadius: '8px',
-                            background: '#fff1f2',
-                            color: '#e11d48',
-                            border: '1.5px solid #fecdd3',
+                            background: '#f8fafc',
+                            color: '#334155',
+                            border: '1.5px solid #cbd5e1',
                             fontSize: '13px',
                             fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
+                            cursor:
+                              isFetchingCustomer ||
+                              isDialing ||
+                              activeTab.status === 'calling'
+                                ? 'not-allowed'
+                                : 'pointer',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '8px',
-                            boxShadow: '0 2px 8px rgba(225, 29, 72, 0.1)',
+                            gap: '6px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
                           }}
                         >
-                          <RotateCw size={17} style={{ color: '#e11d48' }} />
-                          <span>Tổng đài chưa kết nối — Bấm để kết nối lại</span>
+                          {isFetchingCustomer ? (
+                            <Loader2
+                              size={16}
+                              style={{
+                                color: '#2563eb',
+                                animation: 'spin 1s linear infinite',
+                              }}
+                            />
+                          ) : (
+                            <SkipForward size={16} style={{ color: '#475569' }} />
+                          )}
+                          <span>
+                            {isFetchingCustomer ? 'Đang đổi...' : 'Đổi khách khác'}
+                          </span>
                         </button>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -759,55 +819,105 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                           </div>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        disabled={sipRegStatus === 'connecting' || isDialing}
-                        onClick={() => {
-                          if (sipRegStatus !== 'registered') {
-                            onReconnectSip?.()
-                            return
-                          }
-                          onDial(
-                            activeTab.selectedMemberId ||
-                            selectedMember?.member_id,
-                          )
-                        }}
+                      <div
                         style={{
-                          padding: '7px 16px',
-                          borderRadius: '6px',
-                          background:
-                            sipRegStatus === 'connecting' || isDialing
-                              ? '#94a3b8'
-                              : '#2563eb',
-                          color: '#fff',
-                          border: 'none',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor:
-                            sipRegStatus === 'connecting' || isDialing
-                              ? 'not-allowed'
-                              : 'pointer',
-                          display: 'inline-flex',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          marginTop: '4px',
+                          flexWrap: 'wrap',
                         }}
                       >
-                        {sipRegStatus === 'connecting' || isDialing ? (
-                          <Loader2
-                            size={14}
-                            style={{ animation: 'spin 1s linear infinite' }}
-                          />
-                        ) : (
-                          <PhoneCall size={14} />
-                        )}
-                        <span>
-                          {sipRegStatus === 'connecting'
-                            ? 'Đang kết nối lại tổng đài...'
-                            : isDialing
-                              ? 'Đang kết nối...'
-                              : 'Gọi lại'}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          disabled={sipRegStatus === 'connecting' || isDialing}
+                          onClick={() => {
+                            if (sipRegStatus !== 'registered') {
+                              onReconnectSip?.()
+                              return
+                            }
+                            onDial(
+                              activeTab.selectedMemberId ||
+                              selectedMember?.member_id,
+                            )
+                          }}
+                          style={{
+                            padding: '8px 18px',
+                            borderRadius: '6px',
+                            background:
+                              sipRegStatus === 'connecting' || isDialing
+                                ? '#94a3b8'
+                                : '#2563eb',
+                            color: '#fff',
+                            border: 'none',
+                            fontSize: '12.5px',
+                            fontWeight: 600,
+                            cursor:
+                              sipRegStatus === 'connecting' || isDialing
+                                ? 'not-allowed'
+                                : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.2)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {sipRegStatus === 'connecting' || isDialing ? (
+                            <Loader2
+                              size={14}
+                              style={{ animation: 'spin 1s linear infinite' }}
+                            />
+                          ) : (
+                            <PhoneCall size={14} />
+                          )}
+                          <span>
+                            {sipRegStatus === 'connecting'
+                              ? 'Đang kết nối lại tổng đài...'
+                              : isDialing
+                                ? 'Đang kết nối...'
+                                : 'Gọi lại'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isFetchingCustomer || isDialing}
+                          onClick={() => onFetchCustomerForTab(activeTab.id)}
+                          title="Chuyển sang khách hàng tiếp theo trong chiến dịch cho tab này"
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            background: '#f8fafc',
+                            color: '#334155',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '12.5px',
+                            fontWeight: 600,
+                            cursor:
+                              isFetchingCustomer || isDialing ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {isFetchingCustomer ? (
+                            <Loader2
+                              size={14}
+                              style={{
+                                color: '#2563eb',
+                                animation: 'spin 1s linear infinite',
+                              }}
+                            />
+                          ) : (
+                            <SkipForward size={14} style={{ color: '#475569' }} />
+                          )}
+                          <span>
+                            {isFetchingCustomer ? 'Đang đổi...' : 'Đổi khách khác'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </>

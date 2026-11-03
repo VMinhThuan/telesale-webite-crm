@@ -31,6 +31,7 @@ import {
   TelesaleCustomerPanel,
   resultOptions,
 } from './components/TelesaleCustomerPanel'
+import { TelesaleHotkeysModal } from './components/TelesaleHotkeysModal'
 
 // Re-export để đảm bảo tính tương thích ngược toàn dự án
 export {
@@ -107,12 +108,13 @@ export const Telesale: React.FC = () => {
   const [orderDate, setOrderDate] = useState(() => dayjs().format('YYYY-MM-DD'))
   const [orderTime, setOrderTime] = useState('08:30')
   const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
+  const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false)
 
-  const currentDraftBranchId = activeTab?.draftResult?.branchId
-  const branchId = currentDraftBranchId || selectedCampaign?.branch_id || 3
+  // Chi nhánh ưu tiên trực tiếp theo chiến dịch đang chọn (mỗi chiến dịch đã ứng với 1 chi nhánh)
+  const branchId = selectedCampaign?.branch_id || activeTab?.draftResult?.branchId || 3
   const branchName =
-    availableBranches.find((b) => b.id === branchId)?.name ||
     selectedCampaign?.branch_name ||
+    availableBranches.find((b) => b.id === branchId)?.name ||
     'Trụ sở Hà Nội'
 
   const handleBranchChange = React.useCallback(
@@ -418,6 +420,162 @@ export const Telesale: React.FC = () => {
     }
   }
 
+  // Giữ tham chiếu mới nhất cho các hàm thao tác cuộc gọi và dữ liệu tab để phím tắt luôn chạy mượt mà
+  const hotkeyContextRef = useRef({
+    activeTab,
+    activeTabId,
+    currentCustomer,
+    isDialing,
+    isFetchingCustomer: nextCustomerMutation.isPending,
+    sipRegStatus,
+    handleSelectTab,
+    handleDial,
+    handleToggleMute,
+    handleToggleHold,
+    handleEndCall,
+    handleFetchCustomerForTab,
+  })
+
+  useEffect(() => {
+    hotkeyContextRef.current = {
+      activeTab,
+      activeTabId,
+      currentCustomer,
+      isDialing,
+      isFetchingCustomer: nextCustomerMutation.isPending,
+      sipRegStatus,
+      handleSelectTab,
+      handleDial,
+      handleToggleMute,
+      handleToggleHold,
+      handleEndCall,
+      handleFetchCustomerForTab,
+    }
+  })
+
+  // Lắng nghe các phím tắt toàn cục cho Telesale
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const {
+        activeTab: curTab,
+        activeTabId: curTabId,
+        currentCustomer: curCustomer,
+        isDialing: curDialing,
+        isFetchingCustomer: curFetching,
+        sipRegStatus: curSipStatus,
+        handleSelectTab: doSelectTab,
+        handleDial: doDial,
+        handleToggleMute: doToggleMute,
+        handleToggleHold: doToggleHold,
+        handleEndCall: doEndCall,
+        handleFetchCustomerForTab: doFetchCustomer,
+      } = hotkeyContextRef.current
+
+      // 1. Phím tắt chuyển Line: Alt + 1, Alt + 2, Alt + 3 (luôn hoạt động)
+      if (e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+        e.preventDefault()
+        const targetTabId = Number(e.key)
+        doSelectTab(targetTabId)
+        return
+      }
+
+      // 2. Chống kích hoạt nhầm khi người dùng đang nhập liệu trong input, textarea, select
+      const target = e.target as HTMLElement
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+
+      if (isInput) {
+        if (e.key === 'Escape') {
+          target.blur()
+        }
+        return
+      }
+
+      // Nếu đang mở modal phím tắt, modal sẽ tự lắng nghe Escape để đóng
+      if (isHotkeysModalOpen) {
+        return
+      }
+
+      const isInCall =
+        curTab.status === 'calling' ||
+        curTab.status === 'connected' ||
+        curTab.status === 'paused'
+
+      // Phím Escape: Gác máy / Kết thúc cuộc gọi
+      if (e.key === 'Escape') {
+        if (isInCall) {
+          e.preventDefault()
+          doEndCall()
+        }
+        return
+      }
+
+      // Phím Space: Giữ máy / Tiếp tục (Hold / Unhold)
+      if (e.code === 'Space' || e.key === ' ') {
+        if (isInCall) {
+          e.preventDefault()
+          doToggleHold()
+        }
+        return
+      }
+
+      // Phím M: Bật / Tắt micro
+      if (e.key === 'm' || e.key === 'M') {
+        if (isInCall) {
+          e.preventDefault()
+          doToggleMute()
+        }
+        return
+      }
+
+      // Phím Enter: Bắt đầu gọi (khi idle) hoặc Gọi lại (khi ended)
+      if (e.key === 'Enter') {
+        if (
+          (curTab.status === 'idle' || curTab.status === 'ended') &&
+          !curDialing &&
+          curSipStatus === 'registered' &&
+          curCustomer
+        ) {
+          e.preventDefault()
+          doDial()
+        }
+        return
+      }
+
+      // Phím N: Đổi sang khách hàng khác (Next customer)
+      if (e.key === 'n' || e.key === 'N') {
+        if (!isInCall && !curFetching && !curDialing) {
+          e.preventDefault()
+          doFetchCustomer(curTabId)
+        }
+        return
+      }
+
+      // Phím R: Gọi lại số vừa kết thúc
+      if (e.key === 'r' || e.key === 'R') {
+        if (
+          curTab.status === 'ended' &&
+          !curDialing &&
+          curSipStatus === 'registered' &&
+          curCustomer
+        ) {
+          e.preventDefault()
+          doDial()
+        }
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isHotkeysModalOpen])
+
   return (
     <div className="content telesale-content">
       {/* Banner cảnh báo khi mở nhiều tab và tab này không giữ quyền SIP Master */}
@@ -518,9 +676,8 @@ export const Telesale: React.FC = () => {
           <button
             className="help"
             type="button"
-            onClick={() =>
-              notify('Phím tắt: [Space]: Giữ máy, [M]: Bật/tắt mic, [Esc]: Gác máy')
-            }
+            onClick={() => setIsHotkeysModalOpen(true)}
+            title="Xem danh sách phím tắt thao tác nhanh"
           >
             <CircleHelp size={17} /> Phím tắt
           </button>
@@ -646,6 +803,12 @@ export const Telesale: React.FC = () => {
           onSaveResultSuccess={handleSaveResultSuccess}
         />
       </div>
+
+      {/* Modal tra cứu phím tắt đàm thoại Telesale */}
+      <TelesaleHotkeysModal
+        isOpen={isHotkeysModalOpen}
+        onClose={() => setIsHotkeysModalOpen(false)}
+      />
     </div>
   )
 }

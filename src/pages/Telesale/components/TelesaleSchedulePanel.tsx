@@ -19,8 +19,6 @@ export interface TelesaleSchedulePanelProps {
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   branchName,
   branchId,
-  availableBranches,
-  onBranchChange,
   orderDate,
   onDateChange,
   selectedSlotId,
@@ -204,35 +202,9 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
     <section className="call-panel schedule-panel">
       {/* Tiêu đề Lịch hẹn chi nhánh */}
       <div className="call-panel-heading">
-        <div style={{ width: '100%' }}>
+        <div>
           <p className="eyebrow">LỊCH HẸN CHI NHÁNH</p>
-          {availableBranches && availableBranches.length > 1 ? (
-            <select
-              value={branchId}
-              onChange={(e) => onBranchChange?.(Number(e.target.value))}
-              style={{
-                fontSize: '14px',
-                fontWeight: 700,
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                marginTop: '3px',
-                backgroundColor: '#ffffff',
-                cursor: 'pointer',
-                width: '100%',
-              }}
-              title="Chọn chi nhánh để xem lịch slot"
-            >
-              {availableBranches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <h2>{branchName}</h2>
-          )}
+          <h2>{branchName || 'Chi nhánh'}</h2>
         </div>
       </div>
 
