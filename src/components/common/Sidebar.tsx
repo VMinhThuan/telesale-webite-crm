@@ -18,6 +18,7 @@ import { PageType } from '../../types'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useChatThreads } from '../../hooks/useChat'
 import { SidebarBanner } from './SidebarBanner'
+import { SalesFlowLogo } from './SalesFlowLogo'
 
 interface NavItemDef {
   label: string
@@ -86,7 +87,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className={`sidebar ${open ? 'is-open' : ''} ${collapsed ? 'is-collapsed' : ''}`}>
       <div className="sidebar-top">
-        <div className="brand brand-text" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
+        <div
+          className="brand brand-text"
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
+          onClick={() => navigate('/')}
+        >
+          <SalesFlowLogo size={30} />
           <span>SalesFlow</span>
         </div>
         <button

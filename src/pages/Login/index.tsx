@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { SalesFlowLogo } from '../../components/common/SalesFlowLogo'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -115,19 +116,13 @@ export const LoginPage: React.FC = () => {
         {/* Logo & Header thương hiệu */}
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <div
+            <SalesFlowLogo
+              size={40}
               style={{
-                width: '40px',
-                height: '40px',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
-                display: 'grid',
-                placeItems: 'center',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
               }}
-            >
-              <Zap size={22} color="#ffffff" />
-            </div>
+            />
             <div>
               <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>
                 SalesFlow
