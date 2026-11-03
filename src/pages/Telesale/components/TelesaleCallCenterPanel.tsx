@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   ChevronDown,
   Loader2,
@@ -92,6 +92,34 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   const [activeScriptId, setActiveScriptId] = useState<string>('')
   const [isScriptDropdownOpen, setIsScriptDropdownOpen] = useState(false)
   const [isEditScriptModalOpen, setIsEditScriptModalOpen] = useState(false)
+  const scriptDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Đóng dropdown kịch bản khi click ra ngoài hoặc bấm Escape
+  useEffect(() => {
+    if (!isScriptDropdownOpen) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        scriptDropdownRef.current &&
+        !scriptDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsScriptDropdownOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsScriptDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isScriptDropdownOpen])
 
   // Script đang hiển thị
   const currentScript =
@@ -741,7 +769,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
       </section>
 
       {/* Kịch bản tư vấn theo tình huống */}
-      <section className="call-panel script-panel">
+      <section className="call-panel script-panel" style={{ overflow: 'visible' }}>
         <div className="call-panel-heading">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -771,14 +799,34 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
           </div>
 
           {/* Dropdown chọn tình huống kịch bản */}
-          <div style={{ position: 'relative' }}>
+          <div ref={scriptDropdownRef} style={{ position: 'relative' }}>
             <button
               className="subtle-select"
               type="button"
               onClick={() => setIsScriptDropdownOpen(!isScriptDropdownOpen)}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                borderRadius: '6px',
+                padding: '6px 10px',
+              }}
             >
-              {currentScript?.name || 'Bảo dưỡng / Thay lõi'} <ChevronDown size={15} />
+              <span
+                style={{
+                  maxWidth: '160px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={currentScript?.name || 'Bảo dưỡng / Thay lõi'}
+              >
+                {currentScript?.name || 'Bảo dưỡng / Thay lõi'}
+              </span>
+              <ChevronDown size={15} style={{ flexShrink: 0 }} />
             </button>
 
             {isScriptDropdownOpen && (
@@ -787,20 +835,23 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                   position: 'absolute',
                   top: '100%',
                   right: 0,
-                  marginTop: '4px',
+                  marginTop: '6px',
                   background: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  zIndex: 20,
-                  minWidth: '190px',
-                  overflow: 'hidden',
+                  boxShadow: '0 12px 24px -4px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  zIndex: 50,
+                  minWidth: '200px',
+                  maxWidth: '280px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
                 }}
               >
                 {scripts.map((sc) => (
                   <button
                     key={sc.id}
                     type="button"
+                    title={sc.name}
                     onClick={() => {
                       setActiveScriptId(sc.id)
                       setIsScriptDropdownOpen(false)
@@ -808,7 +859,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                     }}
                     style={{
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: '9px 12px',
                       border: 'none',
                       background: sc.id === currentScript?.id ? '#eff6ff' : 'transparent',
                       color: sc.id === currentScript?.id ? '#2563eb' : '#334155',
@@ -817,6 +868,20 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                       fontSize: '12px',
                       cursor: 'pointer',
                       display: 'block',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sc.id !== currentScript?.id) {
+                        e.currentTarget.style.background = '#f8fafc'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sc.id !== currentScript?.id) {
+                        e.currentTarget.style.background = 'transparent'
+                      }
                     }}
                   >
                     {sc.name}
