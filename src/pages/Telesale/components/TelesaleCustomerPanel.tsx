@@ -5,15 +5,15 @@ import {
   CheckCircle2,
   CircleX,
   Clock3,
+  Droplets,
   FileText,
   MapPin,
   Phone,
+  PhoneCall,
   Save,
   ShoppingCart,
-  Timer,
   UserRound,
   Users,
-  Voicemail,
 } from 'lucide-react'
 import clsx from 'clsx'
 import dayjs from '../../../lib/dayjs'
@@ -35,13 +35,13 @@ export const resultOptions: {
   icon: any
   tone: string
 }[] = [
-    { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
-    { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
-    { key: 'callback', label: 'Hẹn gọi lại', icon: Timer, tone: 'amber' },
-    { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
-    { key: 'no_answer', label: 'Không nghe máy', icon: Voicemail, tone: 'gray' },
-    { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
-  ]
+  { key: 'callback', label: 'Gọi chốt', icon: PhoneCall, tone: 'amber' },
+  { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
+  { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
+  { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
+  { key: 'no_filter_machine', label: 'Không dùng máy lọc nước', icon: Droplets, tone: 'rose' },
+  { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
+]
 
 export interface TelesaleCustomerPanelProps {
   currentCustomer: NextCustomerDto | null
@@ -104,6 +104,21 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   const [callbackTime, setCallbackTime] = useState('14:30')
   const [note, setNote] = useState('')
 
+  // Chế độ tự động lưu kết quả & nạp khách mới khi khách không nghe máy / thuê bao / lỗi số
+  const [autoNextOnNoAnswer, setAutoNextOnNoAnswer] = useState(true)
+  const [autoNextCountdown, setAutoNextCountdown] = useState<number | null>(null)
+  const autoNextTimerRef = useRef<any>(null)
+  const lastAutoHandledCallRef = useRef<string | null>(null)
+
+  const handleCancelAutoNext = () => {
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current)
+      autoNextTimerRef.current = null
+    }
+    setAutoNextCountdown(null)
+    notify('Đã dừng tự động chuyển khách.')
+  }
+
   // Cây lý do từ chối 3 tầng & Nỗi đau KH
   const [deniedLevel1, setDeniedLevel1] = useState<string>('')
   const [deniedLevel2, setDeniedLevel2] = useState<string>('')
@@ -126,6 +141,13 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   // 1. Khi activeTabId hoặc customer_id thay đổi: Hydrate dữ liệu nháp của Tab đó từ Store
   useEffect(() => {
     isHydratingRef.current = true
+
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current)
+      autoNextTimerRef.current = null
+    }
+    setAutoNextCountdown(null)
+    lastAutoHandledCallRef.current = null
 
     const draft = useTelesaleCallStore.getState().getTabDraft(activeTabId)
 
@@ -184,12 +206,107 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
 
   useEffect(() => {
     if (activeTabTerminationInfo?.suggestedOutcome && activeTabStatus === 'ended') {
-      setSelectedOutcome(activeTabTerminationInfo.suggestedOutcome)
-      if (activeTabTerminationInfo.suggestedOutcome === 'callback') {
+      const outcome = activeTabTerminationInfo.suggestedOutcome
+      setSelectedOutcome(outcome === 'no_answer' ? 'callback' : outcome)
+      if (outcome === 'callback') {
         setCallbackDate((prev) => prev || dayjs().format('YYYY-MM-DD'))
       }
     }
   }, [activeTabTerminationInfo, activeTabStatus])
+
+  // Tự động lưu "Không nghe máy" và chuyển khách mới khi cuộc gọi không kết nối được
+  useEffect(() => {
+    if (
+      activeTabStatus === 'calling' ||
+      activeTabStatus === 'connected' ||
+      activeTabStatus === 'paused'
+    ) {
+      if (autoNextTimerRef.current) {
+        clearInterval(autoNextTimerRef.current)
+        autoNextTimerRef.current = null
+      }
+      setAutoNextCountdown(null)
+      return
+    }
+
+    if (!autoNextOnNoAnswer || !currentCustomer || activeTabStatus !== 'ended') {
+      return
+    }
+
+    if (!activeTabTerminationInfo) return
+
+    // Nhận biết các trường hợp không kết nối được (không nghe máy, thuê bao, máy bận, từ chối, sai số)
+    const isUnconnected =
+      activeTabTerminationInfo.isNormalEnd === false &&
+      activeTabTerminationInfo.code !== 'local_canceled' &&
+      (activeTabTerminationInfo.suggestedOutcome === 'no_answer' ||
+        activeTabTerminationInfo.suggestedOutcome === 'wrong_number' ||
+        ['no_answer', 'unreachable', 'user_busy', 'call_rejected', 'invalid_number'].includes(
+          activeTabTerminationInfo.code,
+        ))
+
+    if (!isUnconnected) return
+
+    const callKey = `${activeTabId}_${currentCustomer.customer_id}_${activeTabTerminationInfo.code}_${activeTabTerminationInfo.sipStatusCode || 0}`
+    if (lastAutoHandledCallRef.current === callKey) return
+    lastAutoHandledCallRef.current = callKey
+
+    let timeLeft = 2
+    setAutoNextCountdown(timeLeft)
+
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current)
+    }
+
+    autoNextTimerRef.current = setInterval(async () => {
+      timeLeft -= 1
+      if (timeLeft > 0) {
+        setAutoNextCountdown(timeLeft)
+      } else {
+        clearInterval(autoNextTimerRef.current)
+        autoNextTimerRef.current = null
+        setAutoNextCountdown(null)
+
+        try {
+          const autoResult =
+            activeTabTerminationInfo.suggestedOutcome === 'wrong_number'
+              ? 'wrong_number'
+              : 'no_answer'
+          const label = activeTabTerminationInfo.shortLabel || 'Không nghe máy'
+
+          await saveCallResultMutation.mutateAsync({
+            customerId: currentCustomer.customer_id,
+            payload: {
+              result: autoResult,
+              note: `Hệ thống tự động ghi nhận: ${label}`,
+            },
+            idempotencyKey: currentOrderKeyRef.current,
+          })
+
+          currentOrderKeyRef.current = generateIdempotencyKey()
+          notify(`Cuộc gọi không nghe máy (${label}) - Đã tự động lưu & nạp khách tiếp theo.`)
+          onSaveResultSuccess()
+        } catch (err: any) {
+          notify(err?.message || 'Lỗi khi tự động lưu kết quả cuộc gọi.')
+        }
+      }
+    }, 1000)
+
+    return () => {
+      if (autoNextTimerRef.current) {
+        clearInterval(autoNextTimerRef.current)
+        autoNextTimerRef.current = null
+      }
+    }
+  }, [
+    activeTabStatus,
+    activeTabTerminationInfo,
+    autoNextOnNoAnswer,
+    currentCustomer,
+    activeTabId,
+    saveCallResultMutation,
+    onSaveResultSuccess,
+  ])
 
   // 2. Tự động lưu mọi thay đổi form vào bản nháp của activeTabId trong Store
   useEffect(() => {
@@ -353,18 +470,25 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
 
     if (selectedOutcome === 'callback' || selectedOutcome === 'potential') {
       if (!callbackDate) {
-        notify('Vui lòng chọn ngày hẹn gọi lại cho khách hàng.')
+        notify(
+          selectedOutcome === 'callback'
+            ? 'Vui lòng chọn ngày hẹn gọi chốt cho khách hàng.'
+            : 'Vui lòng chọn ngày hẹn gọi lại cho khách hàng.',
+        )
         return
       }
       if (!callbackTime) {
-        notify('Vui lòng chọn giờ hẹn gọi lại.')
+        notify('Vui lòng chọn giờ hẹn.')
         return
       }
       if (dayjs(callbackDate).isBefore(dayjs().startOf('day'))) {
-        notify('Ngày hẹn gọi lại không được ở trong quá khứ. Vui lòng chọn từ hôm nay trở đi.')
+        notify('Ngày hẹn không được ở trong quá khứ. Vui lòng chọn từ hôm nay trở đi.')
         return
       }
       payload.callback_at = `${callbackDate} ${callbackTime}:00`
+    } else if (selectedOutcome === 'no_filter_machine') {
+      payload.result = 'not_interested'
+      payload.denied_note = 'Không dùng máy lọc nước'
     } else if (selectedOutcome === 'not_interested') {
       if (!deniedLevel1) {
         notify('Vui lòng chọn nhóm lý do từ chối (Cấp 1).')
@@ -496,10 +620,77 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       {/* Khối form ghi nhận kết quả cuộc gọi */}
       <section className="call-panel outcome-panel">
         <div className="call-panel-heading">
-          <div>
-            <h2>Ghi nhận kết quả</h2>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+          >
+            <h2 style={{ margin: 0 }}>Ghi nhận kết quả</h2>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                color: '#64748b',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+              title="Tự động lưu 'Không nghe máy' và nạp khách mới khi cuộc gọi không kết nối"
+            >
+              <input
+                type="checkbox"
+                checked={autoNextOnNoAnswer}
+                onChange={(e) => setAutoNextOnNoAnswer(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span>Tự động chuyển khách</span>
+            </label>
           </div>
         </div>
+
+        {/* Banner đếm ngược tự động lưu và chuyển khách khi không nghe máy */}
+        {autoNextCountdown !== null && (
+          <div
+            style={{
+              margin: '0 16px 12px',
+              padding: '10px 14px',
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#1e40af',
+              fontSize: '12px',
+            }}
+          >
+            <span>
+              ⚡ <b>Không kết nối:</b> Tự động lưu & nạp khách mới sau <b>{autoNextCountdown}s</b>...
+            </span>
+            <button
+              type="button"
+              onClick={handleCancelAutoNext}
+              style={{
+                padding: '4px 10px',
+                background: '#fff',
+                border: '1px solid #93c5fd',
+                borderRadius: '5px',
+                color: '#1d4ed8',
+                fontWeight: 600,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Dừng lại
+            </button>
+          </div>
+        )}
 
         {/* Các nút lựa chọn kết quả */}
         <div className="result-grid">
@@ -516,11 +707,12 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           ))}
         </div>
 
-        {/* Nếu là hẹn gọi lại hoặc tiềm năng */}
+        {/* Nếu là hẹn gọi lại (Gọi chốt) hoặc tiềm năng */}
         {(selectedOutcome === 'callback' || selectedOutcome === 'potential') && (
           <div className="appointment-fields">
             <label>
-              Ngày hẹn gọi lại <b style={{ color: '#e11d48' }}>*</b>
+              {selectedOutcome === 'callback' ? 'Ngày hẹn gọi chốt' : 'Ngày hẹn gọi lại'}{' '}
+              <b style={{ color: '#e11d48' }}>*</b>
               <span>
                 <CalendarCheck size={15} />
                 <input
@@ -542,6 +734,27 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 />
               </span>
             </label>
+          </div>
+        )}
+
+        {/* Nếu là không dùng máy lọc nước */}
+        {selectedOutcome === 'no_filter_machine' && (
+          <div
+            style={{
+              margin: '0 16px 12px',
+              padding: '10px 12px',
+              background: '#fff1f2',
+              borderRadius: '7px',
+              border: '1px solid #fecdd3',
+              fontSize: '11px',
+              color: '#be123c',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <Droplets size={16} />
+            <span>Ghi nhận: Khách hàng không dùng máy lọc nước (Lưu trực tiếp).</span>
           </div>
         )}
 
@@ -1184,7 +1397,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Nhập ghi chú hoặc yêu cầu của khách hàng..."
+            placeholder={
+              selectedOutcome === 'callback'
+                ? 'Nhập ghi chú hẹn gọi chốt (nếu có)...'
+                : 'Nhập ghi chú hoặc yêu cầu của khách hàng...'
+            }
           />
         </label>
 

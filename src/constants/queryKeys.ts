@@ -43,6 +43,7 @@ export const queryKeys = {
     campaigns: () => [...queryKeys.telesale.all, 'campaigns'] as const,
     dailyResults: (date?: string) => [...queryKeys.telesale.all, 'dailyResults', date] as const,
     dailyResultsList: (params?: any) => [...queryKeys.telesale.all, 'dailyResultsList', params] as const,
+    last7DaysCommission: () => [...queryKeys.telesale.all, 'last7DaysCommission'] as const,
   },
 
   // 6. Báo cáo & Chấm công

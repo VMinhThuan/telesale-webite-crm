@@ -212,6 +212,7 @@ export type CallResultOutcome =
   | 'not_interested'
   | 'wrong_number'
   | 'closed'
+  | 'no_filter_machine'
 
 export interface SaveCallResultPayload {
   result: CallResultOutcome
@@ -301,6 +302,10 @@ export interface DailyResultDto {
   doanh_so?: number
   date?: string
   ngay?: string
+  don_phat_sinh?: number
+  thoi_gian_lam_viec?: number
+  ti_le_chot_kh_lanh?: number
+  ti_le_chot_kh_tiem_nang?: number
 }
 
 // 7. Thông báo hệ thống (API 06 & 07)

@@ -1,21 +1,27 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle,
   ArrowRight,
   Calendar,
   Clock3,
+  Coins,
   MoreHorizontal,
   Phone,
   PhoneCall,
-  ShieldCheck,
   ShoppingCart,
+  Sparkles,
   Target,
-  TrendingUp,
+  Users,
 } from 'lucide-react'
 import { PeriodType, SummaryCardItem } from '../../types'
 import { notify } from '../../utils/notify'
-import { useDailyResults } from '../../hooks/useTelesale'
+import {
+  calculateCommission,
+  calculateTotalWorkingMinutes,
+  formatWorkingTime,
+  useAttendance,
+  useDailyResults,
+} from '../../hooks/useTelesale'
 import { useOrdersList } from '../../hooks/useOrders'
 import { useCustomersList } from '../../hooks/useCustomers'
 import {
@@ -24,6 +30,7 @@ import {
   isTerminatedOrderStatus,
 } from '../../utils/formatters'
 import dayjs from '../../lib/dayjs'
+import { Commission7DaysChart } from './components/Commission7DaysChart'
 
 interface DashboardProps {
   period?: PeriodType
@@ -86,32 +93,31 @@ function CallConversionFunnel({
   totalCalls,
   connectedCalls,
   leadsCount,
-  closedOrders,
-  confirmedOrders,
-  returnedOrders,
+  donPhatSinh,
   talkTimeMins,
   periodLabel,
+  coldLeadCloseRate = 0,
+  potentialLeadCloseRate = 0,
 }: {
   totalCalls: number
   connectedCalls: number
   leadsCount: number
-  closedOrders: number
-  confirmedOrders: number
-  returnedOrders: number
+  donPhatSinh: number
   talkTimeMins: number
   periodLabel: string
+  coldLeadCloseRate?: number
+  potentialLeadCloseRate?: number
 }) {
   // Tính toán các tỷ lệ chuyển đổi
   const answerRate = totalCalls > 0 ? ((connectedCalls / totalCalls) * 100).toFixed(1) : '0'
-  const closeRate = connectedCalls > 0 ? ((closedOrders / connectedCalls) * 100).toFixed(1) : '0'
-  const returnRate = closedOrders > 0 ? ((returnedOrders / closedOrders) * 100).toFixed(1) : '0'
+  const closeRate = connectedCalls > 0 ? ((donPhatSinh / connectedCalls) * 100).toFixed(1) : '0'
   const avgTalkSec = connectedCalls > 0 ? Math.round((talkTimeMins * 60) / connectedCalls) : 0
 
-  // 5 Tầng của phễu chuyển đổi
+  // 4 Tầng của phễu chuyển đổi (Đã loại bỏ Tầng 5 Đơn xác nhận thành công theo yêu cầu)
   const funnelSteps = [
     {
       id: 'step-total',
-      title: '1. Tổng cuộc gọi phát sinh',
+      title: '1. Tổng cuộc gọi',
       value: totalCalls,
       unit: 'cuộc',
       percentOfTotal: 100,
@@ -122,7 +128,7 @@ function CallConversionFunnel({
     },
     {
       id: 'step-connected',
-      title: '2. Kết nối thành công (Nghe máy)',
+      title: '2. Tổng cuộc gọi nghe máy',
       value: connectedCalls,
       unit: 'cuộc',
       percentOfTotal: totalCalls > 0 ? Math.max((connectedCalls / totalCalls) * 100, 3) : 0,
@@ -145,24 +151,13 @@ function CallConversionFunnel({
     {
       id: 'step-closed',
       title: '4. Đơn hàng chốt thành công',
-      value: closedOrders,
+      value: donPhatSinh,
       unit: 'đơn',
-      percentOfTotal: totalCalls > 0 ? Math.max((closedOrders / totalCalls) * 100, 1.5) : 0,
+      percentOfTotal: totalCalls > 0 ? Math.max((donPhatSinh / totalCalls) * 100, 1.5) : 0,
       color: '#6366f1',
       bgColor: '#e0e7ff',
       barColor: 'linear-gradient(90deg, #6366f1 0%, #818cf8 100%)',
       icon: ShoppingCart,
-    },
-    {
-      id: 'step-confirmed',
-      title: '5. Đơn hàng đã xác nhận thành công',
-      value: confirmedOrders,
-      unit: 'đơn',
-      percentOfTotal: totalCalls > 0 ? Math.max((confirmedOrders / totalCalls) * 100, 1) : 0,
-      color: '#10b981',
-      bgColor: '#d1fae5',
-      barColor: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)',
-      icon: ShieldCheck,
     },
   ]
 
@@ -180,7 +175,7 @@ function CallConversionFunnel({
         </div>
       </div>
 
-      {/* Bố cục 2 cột (Phương án A): Cột trái (Phễu 5 tầng Compact) + Cột phải (4 KPI Tỷ lệ Vàng 2x2) */}
+      {/* Bố cục 2 cột: Cột trái (Phễu 4 tầng Compact) + Cột phải (5 Khối chỉ số hiệu suất) */}
       <div
         className="funnel-container"
         style={{
@@ -190,7 +185,7 @@ function CallConversionFunnel({
           alignItems: 'stretch',
         }}
       >
-        {/* Cột trái: Phễu chuyển đổi 5 tầng dạng Compact Streamlined List */}
+        {/* Cột trái: Phễu chuyển đổi 4 tầng dạng Compact Streamlined List */}
         <div
           style={{
             background: '#ffffff',
@@ -272,7 +267,7 @@ function CallConversionFunnel({
           })}
         </div>
 
-        {/* Cột phải: 4 Chỉ số KPI Tỷ lệ vàng dạng lưới 2x2 */}
+        {/* Cột phải: 5 Khối chỉ số hiệu suất bên phải */}
         <div
           className="funnel-kpi-grid"
           style={{
@@ -281,6 +276,7 @@ function CallConversionFunnel({
             gap: '12px',
           }}
         >
+          {/* 1. Tỷ lệ nghe máy */}
           <div
             style={{
               padding: '14px 16px',
@@ -304,6 +300,7 @@ function CallConversionFunnel({
             </small>
           </div>
 
+          {/* 2. Thời gian đàm thoại trung bình */}
           <div
             style={{
               padding: '14px 16px',
@@ -327,6 +324,7 @@ function CallConversionFunnel({
             </small>
           </div>
 
+          {/* 3. Tỷ lệ chốt đơn */}
           <div
             style={{
               padding: '14px 16px',
@@ -346,10 +344,11 @@ function CallConversionFunnel({
               <strong style={{ fontSize: '20px', color: '#6366f1', display: 'block' }}>{closeRate}%</strong>
             </div>
             <small style={{ fontSize: '11px', color: '#8898b0', marginTop: '4px' }}>
-              {closedOrders} đơn / {connectedCalls} kết nối
+              {donPhatSinh} đơn / {connectedCalls} kết nối
             </small>
           </div>
 
+          {/* 4. Tỉ lệ chốt khách hàng lạnh */}
           <div
             style={{
               padding: '14px 16px',
@@ -363,15 +362,41 @@ function CallConversionFunnel({
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                <AlertTriangle size={14} color={returnedOrders > 0 ? '#e11d48' : '#059669'} />
-                <span style={{ fontSize: '11px', color: '#6e809c', fontWeight: 600 }}>Đơn trả về (Rủi ro)</span>
+                <Users size={14} color="#0284c7" />
+                <span style={{ fontSize: '11px', color: '#6e809c', fontWeight: 600 }}>Tỉ lệ chốt KH lạnh</span>
               </div>
-              <strong style={{ fontSize: '20px', color: returnedOrders > 0 ? '#e11d48' : '#059669', display: 'block' }}>
-                {returnedOrders} đơn
+              <strong style={{ fontSize: '20px', color: '#0284c7', display: 'block' }}>
+                {coldLeadCloseRate}%
               </strong>
             </div>
             <small style={{ fontSize: '11px', color: '#8898b0', marginTop: '4px' }}>
-              Tỷ lệ trả về: {returnRate}%
+              {coldLeadCloseRate > 0 ? 'Dữ liệu từ ERP' : 'Mặc định: 0%'}
+            </small>
+          </div>
+
+          {/* 5. Tỉ lệ chốt khách hàng tiềm năng */}
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: '10px',
+              background: '#f8fafc',
+              border: '1px solid #e4ecf7',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                <Sparkles size={14} color="#d97706" />
+                <span style={{ fontSize: '11px', color: '#6e809c', fontWeight: 600 }}>Tỉ lệ chốt KH tiềm năng</span>
+              </div>
+              <strong style={{ fontSize: '20px', color: '#d97706', display: 'block' }}>
+                {potentialLeadCloseRate}%
+              </strong>
+            </div>
+            <small style={{ fontSize: '11px', color: '#8898b0', marginTop: '4px' }}>
+              {potentialLeadCloseRate > 0 ? 'Dữ liệu từ ERP' : 'Mặc định: 0%'}
             </small>
           </div>
         </div>
@@ -446,11 +471,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
     to_date: dateRange.toDate,
   })
 
-  // 3. Dữ liệu đơn hàng theo khoảng ngày chọn (API 11b & 12: POST /api/telesale/orders)
-  const { data: ordersData } = useOrdersList({
+  // 3. Dữ liệu chấm công nhân viên (API 09: POST /api/telesale/attendance)
+  const { data: attendanceData } = useAttendance({
     from_date: dateRange.fromDate,
     to_date: dateRange.toDate,
-    page_size: 100,
   })
 
   // 4. Lấy danh sách việc cần làm của NGÀY HÔM NAY (cố định để tác nghiệp trong ca)
@@ -467,16 +491,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
     next_care_date: todayStr,
     page_size: 5,
   })
-
-  // Danh sách đơn hàng trong khoảng ngày đã chọn
-  const ordersList = useMemo(() => ordersData?.items || [], [ordersData])
-
-  // Tính tổng doanh số theo khoảng thời gian đã chọn (loại trừ đơn hủy/trả về/lùi)
-  const actualRevenue = useMemo(() => {
-    return ordersList
-      .filter((o) => !['huy', 'tra_ve', 'lui', 'sai_may'].includes(o.status))
-      .reduce((sum, o) => sum + (Number(o.doanh_so) || 0), 0)
-  }, [ordersList])
 
   // Đơn hàng cần gọi xác nhận của HÔM NAY (loại trừ các đơn đã xác nhận và đơn hủy / trả về / sai máy)
   const pendingConfirmOrders = useMemo(() => {
@@ -497,34 +511,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
   // Trích xuất các chỉ số đàm thoại từ API 10b
   const totalCalls = dailyResults?.tong_total_call ?? 0
   const connectedCalls = dailyResults?.tong_call_answer ?? 0
-  const closedOrders = dailyResults?.tong_da_chot ?? 0
   const confirmedOrders = dailyResults?.tong_don_da_xac_nhan ?? 0
   const returnedOrders = dailyResults?.tong_don_tra_ve ?? 0
   const leadsCount =
     (dailyResults?.tong_giu_lai_cs || 0) + (dailyResults?.tong_hen_goi_lai || 0)
   const talkTimeMins = dailyResults?.tong_tg_dam_thoai ?? 0
-  const closeRate =
-    connectedCalls > 0 ? `${((closedOrders / connectedCalls) * 100).toFixed(1)}%` : '0%'
 
-  // 4 Thẻ KPI chính
+  // Đơn phát sinh theo yêu cầu nghiệp vụ:
+  // Fallback: dailyResults?.don_phat_sinh ?? dailyResults?.tong_da_chot ?? 0
+  const donPhatSinh = dailyResults?.don_phat_sinh ?? dailyResults?.tong_da_chot ?? 0
+
+  // Hoa hồng tính theo công thức:
+  // don_phat_sinh * 75.000đ (nếu don_phat_sinh > 100 thì don_phat_sinh * 100.000đ)
+  const totalCommission = calculateCommission(donPhatSinh)
+
+  // Thời gian làm việc: ưu tiên trường API thoi_gian_lam_viec, nếu chưa có thì tính từ các ca chấm công
+  const totalWorkingMinutes = useMemo(() => {
+    if (typeof dailyResults?.thoi_gian_lam_viec === 'number') {
+      return dailyResults.thoi_gian_lam_viec
+    }
+    return calculateTotalWorkingMinutes(attendanceData?.items)
+  }, [dailyResults?.thoi_gian_lam_viec, attendanceData?.items])
+
+  const answerRateStr =
+    totalCalls > 0 ? `${((connectedCalls / totalCalls) * 100).toFixed(1)}%` : '0%'
+
+  // 5 Thẻ KPI chính
   const cards: SummaryCardItem[] = [
     {
-      label: 'Tổng doanh số',
-      value: formatVND(actualRevenue),
-      change: `${ordersList.length} đơn (${dateRange.preset === 'today' ? 'Hôm nay' : 'Lũy kế'})`,
-      icon: TrendingUp,
+      label: 'Tổng hoa hồng',
+      value: formatVND(totalCommission),
+      change: `${donPhatSinh} đơn (${dateRange.preset === 'today' ? 'Hôm nay' : 'Lũy kế'})`,
+      icon: Coins,
       tone: 'blue',
     },
     {
       label: 'Tổng cuộc gọi',
       value: `${totalCalls} cuộc`,
-      change: `${connectedCalls} kết nối (${closeRate})`,
+      change: `${connectedCalls} kết nối (${answerRateStr})`,
       icon: Phone,
       tone: 'teal',
     },
     {
-      label: 'Đơn đã chốt',
-      value: `${closedOrders} đơn`,
+      label: 'Đơn phát sinh',
+      value: `${donPhatSinh} đơn`,
       change: `${confirmedOrders} đơn đã xác nhận`,
       icon: ShoppingCart,
       tone: 'blue',
@@ -535,6 +565,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
       change: `${dailyResults?.tong_giu_lai_cs || 0} giữ lại · ${dailyResults?.tong_hen_goi_lai || 0} hẹn lại`,
       icon: Target,
       tone: 'rose',
+    },
+    {
+      label: 'Thời gian làm việc',
+      value: formatWorkingTime(totalWorkingMinutes),
+      change: 'Từ dữ liệu chấm công',
+      icon: Clock3,
+      tone: 'amber',
     },
   ]
 
@@ -716,8 +753,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
           </div>
         )}
 
-        {/* 4 Thẻ KPI đầu trang */}
-        <div className="summary-grid">
+        {/* 5 Thẻ KPI đầu trang */}
+        <div
+          className="summary-grid"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+          }}
+        >
           {cards.map(({ label, value, change, icon: Icon, tone }) => (
             <article className={`summary-card ${tone}`} key={label}>
               <div className="card-icon">
@@ -739,16 +781,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
         </div>
       </section>
 
-      {/* Phương án 1: Phễu chuyển đổi cuộc gọi (Call Conversion Funnel) */}
+      {/* Biểu đồ hoa hồng 7 ngày gần nhất (theo công thức 75.000đ / 100.000đ) */}
+      <Commission7DaysChart />
+
+      {/* Phễu chuyển đổi cuộc gọi (Call Conversion Funnel 4 tầng + 5 khối chỉ số) */}
       <CallConversionFunnel
         totalCalls={totalCalls}
         connectedCalls={connectedCalls}
         leadsCount={leadsCount}
-        closedOrders={closedOrders}
-        confirmedOrders={confirmedOrders}
-        returnedOrders={returnedOrders}
+        donPhatSinh={donPhatSinh}
         talkTimeMins={talkTimeMins}
         periodLabel={dateRange.label}
+        coldLeadCloseRate={dailyResults?.ti_le_chot_kh_lanh ?? 0}
+        potentialLeadCloseRate={dailyResults?.ti_le_chot_kh_tiem_nang ?? 0}
       />
 
       {/* Khối Việc ưu tiên trong ca làm HÔM NAY (Action Center) */}
@@ -960,13 +1005,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
               <tr>
                 {[
                   'Khoảng thời gian',
+                  'Thời gian làm việc',
                   'Đàm thoại',
                   'Tổng cuộc gọi',
                   'Kết nối',
-                  'Giữ lại CS',
-                  'Hẹn gọi lại',
-                  'Đã chốt',
-                  'Đã xác nhận',
+                  'Khách hàng tiềm năng',
+                  'Đơn phát sinh',
+                  'Đã đi',
                   'Trả về (Rủi ro)',
                 ].map((x) => (
                   <th key={x}>{x}</th>
@@ -976,12 +1021,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
             <tbody>
               <tr>
                 <td style={{ fontWeight: 600 }}>{dateRange.label}</td>
+                <td style={{ color: '#2575df', fontWeight: 600 }}>{formatWorkingTime(totalWorkingMinutes)}</td>
                 <td>{talkTimeMins} phút</td>
                 <td><b>{totalCalls}</b></td>
                 <td><b>{connectedCalls}</b> ({totalCalls > 0 ? ((connectedCalls / totalCalls) * 100).toFixed(1) : 0}%)</td>
-                <td>{dailyResults?.tong_giu_lai_cs || 0}</td>
-                <td>{dailyResults?.tong_hen_goi_lai || 0}</td>
-                <td><span className="closed">{closedOrders}</span></td>
+                <td style={{ fontWeight: 600 }}>{leadsCount}</td>
+                <td><span className="closed">{donPhatSinh}</span></td>
                 <td style={{ color: '#0bad79', fontWeight: 700 }}>{confirmedOrders}</td>
                 <td style={{ color: returnedOrders > 0 ? '#e11d48' : '#6b7280', fontWeight: 600 }}>
                   {returnedOrders}

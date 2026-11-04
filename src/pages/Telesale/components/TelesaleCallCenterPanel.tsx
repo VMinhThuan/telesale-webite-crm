@@ -470,16 +470,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
 
                   {/* TRẠNG THÁI 1: CHƯA GỌI -> Điều chỉnh UX chống xung đột theo trạng thái SIP */}
                   {isIdle && (
-                    <div style={{ padding: '6px 16px 14px' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '8px',
-                          alignItems: 'stretch',
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <div style={{ flex: '1 1 180px', minWidth: '150px' }}>
+                    <div style={{ padding: '6px 16px 14px', width: '100%' }}>
                           {sipRegStatus === 'connecting' ? (
                             <button
                               type="button"
@@ -606,56 +597,6 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                               <span>Tổng đài chưa kết nối — Bấm để kết nối lại</span>
                             </button>
                           )}
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={
-                            isFetchingCustomer ||
-                            isDialing ||
-                            activeTab.status === 'calling'
-                          }
-                          onClick={() => onFetchCustomerForTab(activeTab.id)}
-                          title="Đổi sang khách hàng tiếp theo trong chiến dịch cho tab này"
-                          style={{
-                            flex: '0 0 auto',
-                            padding: '11px 16px',
-                            borderRadius: '8px',
-                            background: '#f8fafc',
-                            color: '#334155',
-                            border: '1.5px solid #cbd5e1',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            cursor:
-                              isFetchingCustomer ||
-                              isDialing ||
-                              activeTab.status === 'calling'
-                                ? 'not-allowed'
-                                : 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {isFetchingCustomer ? (
-                            <Loader2
-                              size={16}
-                              style={{
-                                color: '#2563eb',
-                                animation: 'spin 1s linear infinite',
-                              }}
-                            />
-                          ) : (
-                            <SkipForward size={16} style={{ color: '#475569' }} />
-                          )}
-                          <span>
-                            {isFetchingCustomer ? 'Đang đổi...' : 'Đổi khách khác'}
-                          </span>
-                        </button>
-                      </div>
                     </div>
                   )}
 
@@ -811,7 +752,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                               }}
                             >
                               {activeTab.terminationInfo.suggestedOutcome === 'callback'
-                                ? 'Hẹn gọi lại'
+                                ? 'Gọi chốt'
                                 : activeTab.terminationInfo.suggestedOutcome === 'no_answer'
                                   ? 'Không nghe máy'
                                   : 'Sai số'}

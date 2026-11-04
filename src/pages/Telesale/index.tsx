@@ -62,10 +62,27 @@ export const Telesale: React.FC = () => {
   const selectedCampaignId = useTelesaleCallStore((s) => s.selectedCampaignId)
   const setSelectedCampaignId = useTelesaleCallStore((s) => s.setSelectedCampaignId)
 
-  // Tự động chọn chiến dịch đầu tiên khi danh sách tải xong nếu chưa có chiến dịch nào được chọn
+  // Ưu tiên chọn chiến dịch Hà Nội làm mặc định khi danh sách tải xong nếu chưa có chiến dịch nào được chọn
   useEffect(() => {
     if (campaignsList.length > 0 && !selectedCampaignId) {
-      setSelectedCampaignId(campaignsList[0].campaign_id)
+      const hanoiCampaign = campaignsList.find((c) => {
+        const name = (c.name || '').toLowerCase()
+        const branchName = (c.branch_name || '').toLowerCase()
+        return (
+          name.includes('hà nội') ||
+          name.includes('ha noi') ||
+          branchName.includes('hà nội') ||
+          branchName.includes('ha noi') ||
+          branchName.includes('đại kim') ||
+          branchName.includes('dai kim')
+        )
+      })
+
+      if (hanoiCampaign) {
+        setSelectedCampaignId(hanoiCampaign.campaign_id)
+      } else {
+        setSelectedCampaignId(campaignsList[0].campaign_id)
+      }
     }
   }, [campaignsList, selectedCampaignId, setSelectedCampaignId])
 
