@@ -905,9 +905,29 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   </span>
                 </div>
 
+                {/* Nút Xác nhận lịch hẹn (Phương án 1: Ẩn đi khi đơn đã ở trạng thái Đã xác nhận hoặc Đã kết thúc) */}
+                {!isConfirmedOrderStatus(activeOrder) &&
+                  !isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai) && (
+                    <button
+                      type="button"
+                      className="confirm-appointment-button"
+                      onClick={() => confirmOrderMutation.mutate(activeOrder.order_id)}
+                      disabled={confirmOrderMutation.isPending}
+                    >
+                      <CheckCircle2 size={16} />
+                      <span>{confirmOrderMutation.isPending ? 'Đang gửi xác nhận...' : 'Xác nhận lịch hẹn'}</span>
+                    </button>
+                  )}
+
                 <CallActionControl
                   customerId={activeOrder.customer_id}
                   customerName={activeOrder.ten_khach_hang}
+                  style={
+                    !isConfirmedOrderStatus(activeOrder) &&
+                    !isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
+                      ? { marginTop: '9px' }
+                      : undefined
+                  }
                   buttonText={
                     isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
                       ? 'Gọi cho khách'
