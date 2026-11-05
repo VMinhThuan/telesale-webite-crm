@@ -192,7 +192,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     toPagePageSize,
     paginationProps,
   } = usePagination({
-    initialPageSize: 6,
+    initialPageSize: 10,
     resetDeps: [debouncedQuery, activeDateTab, statusFilter, selectedBranchId],
   })
 
@@ -269,13 +269,13 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     queryClient.prefetchQuery({
       queryKey: queryKeys.orders.list({
         ...orderQueryParams,
-        start: (targetPage - 1) * 5,
+        start: (targetPage - 1) * 10,
       }),
       queryFn: () =>
         orderService.getOrders({
           ...orderQueryParams,
           page: targetPage,
-          page_size: 5,
+          page_size: 10,
         }),
       staleTime: 1000 * 60 * 2,
     })
@@ -359,11 +359,34 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
       )
     }).length
 
+    // Đơn trả về
+    const returnedCount = ordersList.filter((o) => {
+      const s = (o.status || '').toLowerCase()
+      const t = (o.trang_thai || '').toLowerCase()
+      return s === 'tra_ve' || t.includes('trả về')
+    }).length
+
+    // Đơn lùi / hủy
+    const postponedOrCanceledCount = ordersList.filter((o) => {
+      const s = (o.status || '').toLowerCase()
+      const t = (o.trang_thai || '').toLowerCase()
+      return (
+        s === 'lui' ||
+        s === 'huy' ||
+        s === 'sai_may' ||
+        t.includes('lùi') ||
+        t.includes('hủy') ||
+        t.includes('sai máy')
+      )
+    }).length
+
     return {
       total,
       confirmedCount,
       pendingCount,
       daDiCount,
+      returnedCount,
+      postponedOrCanceledCount,
     }
   }, [ordersResponse, ordersList])
 
@@ -494,6 +517,28 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
             <strong>{statsOverview.daDiCount} đơn</strong>
           </div>
           <BadgeCheck size={19} />
+        </article>
+
+        <article className="call-stat rose">
+          <div className="card-icon">
+            <Undo2 size={21} />
+          </div>
+          <div>
+            <p>Đơn trả về</p>
+            <strong>{statsOverview.returnedCount} đơn</strong>
+          </div>
+          <CircleX size={19} />
+        </article>
+
+        <article className="call-stat purple">
+          <div className="card-icon">
+            <History size={21} />
+          </div>
+          <div>
+            <p>Đơn lùi / hủy</p>
+            <strong>{statsOverview.postponedOrCanceledCount} đơn</strong>
+          </div>
+          <Clock3 size={19} />
         </article>
       </section>
 
@@ -721,7 +766,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <TableSkeleton rows={6} cols={6} />
+                      <TableSkeleton rows={10} cols={6} />
                     ) : ordersList.length > 0 ? (
                       ordersList.map((order) => {
                         const tone = getStatusBadgeTone(order.trang_thai)
