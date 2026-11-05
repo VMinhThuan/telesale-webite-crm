@@ -78,3 +78,27 @@ export function useDeleteMaterialMutation() {
   })
 }
 
+/**
+ * Mutation xóa phân loại danh mục / tab và toàn bộ tài liệu thuộc danh mục đó
+ */
+export function useDeleteCategoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (categoryName: string) =>
+      trainingStorageService.deleteCategory(categoryName),
+    onSuccess: (result, categoryName) => {
+      queryClient.invalidateQueries({ queryKey: TRAINING_QUERY_KEY })
+      notify(
+        `Đã xóa danh mục "${categoryName}"${
+          result.deletedCount > 0 ? ` và ${result.deletedCount} tài liệu liên quan` : ''
+        } thành công!`,
+      )
+    },
+    onError: (err: any) => {
+      notify(err.message || 'Không thể xóa danh mục đào tạo.')
+    },
+  })
+}
+
+

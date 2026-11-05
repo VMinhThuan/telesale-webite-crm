@@ -7,6 +7,7 @@ import {
   getStatusBadgeTone,
   isConfirmedOrderStatus,
   isTerminatedOrderStatus,
+  maskAddress,
 } from './formatters'
 
 describe('Formatters Unit Tests', () => {
@@ -135,6 +136,28 @@ describe('Formatters Unit Tests', () => {
         }),
       ).toBe(false)
       expect(isConfirmedOrderStatus(null)).toBe(false)
+    })
+  })
+
+  describe('maskAddress()', () => {
+    it('che khoảng 30% phần đầu địa chỉ bằng chuỗi ******', () => {
+      const address = 'Số nhà 21 Ngõ 82 Nguyễn Phúc Lai, Đống Đa, Hà Nội'
+      const masked = maskAddress(address)
+      expect(masked.startsWith('****** ')).toBe(true)
+      expect(masked).toContain('Đống Đa, Hà Nội')
+      expect(masked).not.toContain('Số nhà 21')
+    })
+
+    it('giữ nguyên nếu địa chỉ đã được mask sẵn trên server', () => {
+      const preMasked = '****** Dĩnh Kế - TP Bắc Giang'
+      expect(maskAddress(preMasked)).toBe(preMasked)
+    })
+
+    it('xử lý an toàn khi địa chỉ null, undefined hoặc rỗng', () => {
+      expect(maskAddress(null)).toBe('Chưa cập nhật địa chỉ')
+      expect(maskAddress(undefined)).toBe('Chưa cập nhật địa chỉ')
+      expect(maskAddress('')).toBe('Chưa cập nhật địa chỉ')
+      expect(maskAddress('   ')).toBe('Chưa cập nhật địa chỉ')
     })
   })
 })

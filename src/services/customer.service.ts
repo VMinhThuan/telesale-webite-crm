@@ -16,6 +16,7 @@ export interface CustomerQueryParams {
   from_date?: string
   to_date?: string
   search?: string
+  branch_id?: number
   page?: number
   page_size?: number
 }
@@ -50,6 +51,7 @@ export const customerService = {
     if (params?.next_care_date) query.set('next_care_date', params.next_care_date)
     if (params?.from_date) query.set('from_date', params.from_date)
     if (params?.to_date) query.set('to_date', params.to_date)
+    if (params?.branch_id) query.set('branch_id', String(params.branch_id))
     query.set('page', String(params?.page || 1))
     query.set('page_size', String(params?.page_size || 10))
 

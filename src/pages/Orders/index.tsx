@@ -18,7 +18,6 @@ import {
   Search,
   ShoppingCart,
   Undo2,
-  UserCheck,
   UserRound,
   X,
 } from 'lucide-react'
@@ -51,6 +50,7 @@ import {
   getStatusBadgeTone,
   isConfirmedOrderStatus,
   isTerminatedOrderStatus,
+  maskAddress,
 } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 
@@ -644,7 +644,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       <Phone size={13} /> {activeOrder.sdt_masked}
                     </p>
                     <p>
-                      <MapPin size={13} /> {activeOrder.dia_chi || 'Chưa cập nhật địa chỉ'}
+                      <MapPin size={13} /> {maskAddress(activeOrder.dia_chi)}
                     </p>
                   </div>
                 </div>
@@ -666,22 +666,6 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   </span>
                   <span>
                     Chi nhánh phục vụ <b>{activeOrder.chi_nhanh || 'Trụ sở Hà Nội'}</b>
-                  </span>
-                  <span>
-                    Kỹ thuật viên phục vụ{' '}
-                    <b style={{ color: activeOrder.ten_ktv ? '#0f172a' : '#94a3b8' }}>
-                      {activeOrder.ten_ktv ? (
-                        <>
-                          <UserCheck
-                            size={13}
-                            style={{ color: '#2563eb', verticalAlign: 'middle', marginRight: '4px' }}
-                          />
-                          {activeOrder.ten_ktv}
-                        </>
-                      ) : (
-                        'Chưa phân bổ KTV'
-                      )}
-                    </b>
                   </span>
                   {activeOrder.machine_problem && (
                     <span>

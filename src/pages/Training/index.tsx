@@ -6,6 +6,7 @@ import {
   Eye,
   FileText,
   FileVideo,
+  FolderCog,
   GraduationCap,
   Info,
   Loader2,
@@ -20,6 +21,7 @@ import {
 import { DialogState, PageType } from '../../types'
 import { TrainingMaterial } from '../../types/training'
 import {
+  useDeleteCategoryMutation,
   useDeleteMaterialMutation,
   useTrainingManifest,
 } from '../../hooks/useTraining'
@@ -28,6 +30,8 @@ import { formatDate } from '../../utils/formatters'
 import { TrainingUploadModal } from './components/TrainingUploadModal'
 import { TrainingViewerModal } from './components/TrainingViewerModal'
 import { TrainingEditModal } from './components/TrainingEditModal'
+import { DeleteCategoryConfirmModal } from './components/DeleteCategoryConfirmModal'
+import { TrainingCategoriesManageModal } from './components/TrainingCategoriesManageModal'
 
 interface TrainingProps {
   onOpenDialog?: (dialog: DialogState) => void
@@ -47,12 +51,15 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
 
   // State quản lý Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false)
   const [viewerMaterial, setViewerMaterial] = useState<TrainingMaterial | null>(null)
   const [editingMaterial, setEditingMaterial] = useState<TrainingMaterial | null>(null)
+  const [categoryPendingDelete, setCategoryPendingDelete] = useState<string | null>(null)
 
   // Truy vấn danh mục và tài liệu từ Cloudflare R2
   const { data: manifest, isLoading } = useTrainingManifest()
   const deleteMutation = useDeleteMaterialMutation()
+  const deleteCategoryMutation = useDeleteCategoryMutation()
 
   const categories = useMemo(
     () =>
@@ -170,6 +177,23 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
     }
   }
 
+  const handleRequestDeleteCategory = (catName: string) => {
+    setCategoryPendingDelete(catName)
+  }
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryPendingDelete) return
+    try {
+      await deleteCategoryMutation.mutateAsync(categoryPendingDelete)
+      if (category === categoryPendingDelete) {
+        setCategory('Tất cả')
+      }
+      setCategoryPendingDelete(null)
+    } catch {
+      // Đã xử lý trong onError của mutation
+    }
+  }
+
   return (
     <div className="content training-content">
       {/* Tiêu đề trang & Nút tải lên R2 */}
@@ -186,6 +210,30 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
               placeholder="Tìm tài liệu, video, kịch bản..."
             />
           </label>
+
+          <button
+            type="button"
+            onClick={() => setIsManageCategoriesOpen(true)}
+            style={{
+              height: '38px',
+              padding: '0 14px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <FolderCog size={16} style={{ color: '#2563eb' }} />
+            <span>Quản lý danh mục</span>
+          </button>
 
           <button
             type="button"
@@ -212,7 +260,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         </div>
       </div>
 
-      {/* Tabs danh mục */}
+      {/* Tabs danh mục sạch sẽ, an toàn 100% không lo bấm nhầm */}
       <div className="training-tabs">
         {categories.map((item) => (
           <button
@@ -486,6 +534,29 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         <TrainingViewerModal
           material={viewerMaterial}
           onClose={() => setViewerMaterial(null)}
+        />
+      )}
+
+      {/* Modal Xác nhận xóa Phân loại danh mục / Tab */}
+      {categoryPendingDelete && (
+        <DeleteCategoryConfirmModal
+          categoryName={categoryPendingDelete}
+          materialCount={
+            materialsList.filter((m) => m.category === categoryPendingDelete).length
+          }
+          isDeleting={deleteCategoryMutation.isPending}
+          onClose={() => setCategoryPendingDelete(null)}
+          onConfirm={handleConfirmDeleteCategory}
+        />
+      )}
+
+      {/* Modal Quản lý phân loại danh mục / Tabs */}
+      {isManageCategoriesOpen && (
+        <TrainingCategoriesManageModal
+          categories={categories}
+          materials={materialsList}
+          onClose={() => setIsManageCategoriesOpen(false)}
+          onRequestDeleteCategory={handleRequestDeleteCategory}
         />
       )}
     </div>

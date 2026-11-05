@@ -58,7 +58,13 @@ export interface EnumsCatalog {
 
 // 3. Khách hàng & Leads tiềm năng
 export type CustomerStatusType = 'new' | 'no_answer' | 'potential' | 'invalid'
-export type CareStatusType = 'callback' | 'scheduled' | 'no_need' | 'unreachable'
+export type CareStatusType =
+  | 'consulting'
+  | 'callback'
+  | 'scheduled'
+  | 'no_need'
+  | 'unreachable'
+  | 'closed'
 
 export interface CustomerMemberDto {
   member_id: number

@@ -8,6 +8,7 @@ import {
   Droplets,
   FileText,
   MapPin,
+  Pencil,
   Phone,
   PhoneCall,
   Save,
@@ -28,6 +29,7 @@ import {
 import { generateIdempotencyKey } from '../../../services/apiClient'
 import { formatVND } from '../../../utils/formatters'
 import { notify } from '../../../utils/notify'
+import { CustomerEditModal } from './CustomerEditModal'
 
 export const resultOptions: {
   key: CallResultOutcome
@@ -60,6 +62,7 @@ export interface TelesaleCustomerPanelProps {
   activeTabLabel?: string
   activeTabStatus?: string
   onFetchNextCustomer?: () => void
+  onCustomerUpdate?: (updatedCustomer: NextCustomerDto) => void
   onSaveResultSuccess: () => void
 }
 
@@ -78,8 +81,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   activeTabId = 1,
   activeTabLabel,
   activeTabStatus,
+  onCustomerUpdate,
   onSaveResultSuccess,
 }) => {
+  // Modal chỉnh sửa thông tin khách hàng (sửa địa chỉ, thêm số điện thoại)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   // Đồng bộ bản nháp đa tab với useTelesaleCallStore
   const updateTabDraft = useTelesaleCallStore((s) => s.updateTabDraft)
   // Lấy dữ liệu danh mục Enums hệ thống
@@ -576,16 +582,61 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     }
   }
 
+  // Xử lý cập nhật thông tin khách hàng từ Modal (sửa địa chỉ, thêm số điện thoại)
+  const handleSaveCustomerInfo = (updatedCustomer: NextCustomerDto) => {
+    useTelesaleCallStore.getState().updateTab(activeTabId, {
+      customer: updatedCustomer,
+    })
+    if (onCustomerUpdate) {
+      onCustomerUpdate(updatedCustomer)
+    }
+  }
+
   return (
     <aside className="right-call-column">
       {/* Khối hồ sơ thông tin khách hàng */}
       <section className="call-panel customer-panel">
         <div className="call-panel-heading">
-          <div>
-            <p className="eyebrow">
-              HỒ SƠ KHÁCH HÀNG {activeTabLabel ? `(${activeTabLabel})` : ''}
-            </p>
-            <h2>Thông tin liên hệ</h2>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              gap: '8px',
+            }}
+          >
+            <div>
+              <p className="eyebrow">
+                HỒ SƠ KHÁCH HÀNG {activeTabLabel ? `(${activeTabLabel})` : ''}
+              </p>
+              <h2>Thông tin liên hệ</h2>
+            </div>
+            {currentCustomer && (
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  borderRadius: '6px',
+                  border: '1.5px solid #bfdbfe',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Sửa thông tin khách hàng: sửa họ tên, địa chỉ, thêm số điện thoại"
+              >
+                <Pencil size={13} />
+                <span>Sửa thông tin</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -593,12 +644,48 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           <div className="customer-avatar small">
             <UserRound size={26} />
           </div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h3>{currentCustomer?.customer_name || 'Chưa chọn khách'}</h3>
-            <p>
-              <Phone size={13} /> {currentCustomer?.members?.[0]?.phone_masked || '—'}
-            </p>
-            <p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '2px' }}>
+              {currentCustomer?.members && currentCustomer.members.length > 0 ? (
+                currentCustomer.members.map((m, idx) => (
+                  <p
+                    key={m.member_id || idx}
+                    style={{
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <Phone size={12} style={{ color: '#2563eb', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 500 }}>
+                      <b>{m.name || 'Người liên hệ'}:</b> {m.phone_masked || '—'}
+                    </span>
+                    {m.relationship && (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {m.relationship}
+                      </span>
+                    )}
+                  </p>
+                ))
+              ) : (
+                <p style={{ margin: 0 }}>
+                  <Phone size={13} /> —
+                </p>
+              )}
+            </div>
+            <p style={{ marginTop: '5px' }}>
               <MapPin size={13} /> {currentCustomer?.masked_address || '—'}
             </p>
           </div>
@@ -1432,6 +1519,14 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               : 'Lưu kết quả cuộc gọi'}
         </button>
       </section>
+
+      {/* Modal Chỉnh sửa thông tin khách hàng (sửa địa chỉ, thêm số điện thoại) */}
+      <CustomerEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        customer={currentCustomer}
+        onSave={handleSaveCustomerInfo}
+      />
     </aside>
   )
 }

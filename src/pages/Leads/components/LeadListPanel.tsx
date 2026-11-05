@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Building2,
   CalendarCheck,
   CalendarDays,
   ChevronDown,
   CircleX,
   History,
+  MapPin,
   Phone,
   RotateCw,
   Search,
-  Timer,
+  ShoppingCart,
   UserRound,
   Users,
   Voicemail,
@@ -34,17 +36,18 @@ export const CARE_STATUS_OPTIONS: {
   icon: any
 }[] = [
   { value: 'all', label: 'Tất cả trạng thái', icon: Users },
-  { value: 'callback', label: 'Hẹn gọi lại', tone: 'amber', icon: Timer },
+  { value: 'consulting', label: 'Đang tư vấn', tone: 'blue', icon: Phone },
   { value: 'scheduled', label: 'Đã hẹn lịch', tone: 'green', icon: CalendarCheck },
+  { value: 'closed', label: 'Đã chốt đơn', tone: 'rose', icon: ShoppingCart },
   { value: 'unreachable', label: 'Không nghe máy', tone: 'purple', icon: CircleX },
   { value: 'no_need', label: 'Chưa có nhu cầu', tone: 'gray', icon: Voicemail },
 ]
 
 export const DATE_PRESET_OPTIONS = [
-  { value: 'all', label: 'Tất cả lịch hẹn', icon: CalendarDays },
+  { value: 'all', label: 'Tất cả thời gian', icon: CalendarDays },
   { value: 'today', label: 'Hôm nay', icon: CalendarCheck },
-  { value: 'tomorrow', label: 'Ngày mai', icon: CalendarDays },
-  { value: '7days', label: '7 ngày tới', icon: CalendarDays },
+  { value: '7days', label: '7 ngày qua', icon: CalendarDays },
+  { value: 'month', label: 'Tháng này', icon: CalendarDays },
 ]
 
 const PAGE_SIZE = 10
@@ -52,21 +55,31 @@ const PAGE_SIZE = 10
 export interface LeadListPanelProps {
   selectedCustomerId: number | null
   onSelectCustomer: (id: number) => void
+  selectedBranchId?: number
+  onBranchChange?: (branchId?: number) => void
+  availableBranches?: { id: number; name: string }[]
 }
 
 export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   selectedCustomerId,
   onSelectCustomer,
+  selectedBranchId,
+  onBranchChange,
+  availableBranches = [],
 }) => {
+  const [internalBranchId, setInternalBranchId] = useState<number | undefined>(selectedBranchId)
+  const currentBranchId = selectedBranchId !== undefined ? selectedBranchId : internalBranchId
+
   const [careStatusFilter, setCareStatusFilter] = useState<'all' | CareStatusType>('all')
-  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'tomorrow' | '7days'>('all')
-  const [nextCareDateFilter, setNextCareDateFilter] = useState<string | undefined>(undefined)
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | 'month' | 'custom'>('all')
 
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
-  const [dateMenuOpen, setDateMenuOpen] = useState(false)
 
+  const branchMenuRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
-  const dateMenuRef = useRef<HTMLDivElement>(null)
 
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -75,11 +88,11 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node
+      if (branchMenuRef.current && !branchMenuRef.current.contains(target)) {
+        setBranchMenuOpen(false)
+      }
       if (statusMenuRef.current && !statusMenuRef.current.contains(target)) {
         setStatusMenuOpen(false)
-      }
-      if (dateMenuRef.current && !dateMenuRef.current.contains(target)) {
-        setDateMenuOpen(false)
       }
     }
 
@@ -87,16 +100,21 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const currentBranchLabel = useMemo(() => {
+    if (!currentBranchId) return 'Tất cả chi nhánh'
+    const found = availableBranches.find((b) => b.id === currentBranchId)
+    return found ? found.name : `Chi nhánh #${currentBranchId}`
+  }, [currentBranchId, availableBranches])
+
   const currentStatusOption = useMemo(() => {
     return CARE_STATUS_OPTIONS.find((opt) => opt.value === careStatusFilter) || CARE_STATUS_OPTIONS[0]
   }, [careStatusFilter])
 
-  const currentDateLabel = useMemo(() => {
-    if (datePreset === 'today') return 'Hôm nay'
-    if (datePreset === 'tomorrow') return 'Ngày mai'
-    if (datePreset === '7days') return '7 ngày tới'
-    return 'Lịch hẹn'
-  }, [datePreset])
+  const handleBranchSelect = (bId: number | undefined) => {
+    setInternalBranchId(bId)
+    onBranchChange?.(bId)
+    setPage(1)
+  }
 
   // Debounce ô tìm kiếm 400ms chống spam API
   const debouncedQuery = useDebounce(query, 400)
@@ -110,7 +128,9 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
       queryKey: queryKeys.customers.list({
         customer_status: 'potential',
         care_status: activeCareStatus,
-        next_care_date: nextCareDateFilter,
+        branch_id: currentBranchId,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
         search: debouncedQuery || undefined,
         page: targetPage,
         page_size: PAGE_SIZE,
@@ -119,7 +139,9 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
         customerService.getCustomers({
           customer_status: 'potential',
           care_status: activeCareStatus,
-          next_care_date: nextCareDateFilter,
+          branch_id: currentBranchId,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined,
           search: debouncedQuery || undefined,
           page: targetPage,
           page_size: PAGE_SIZE,
@@ -136,7 +158,9 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   } = useCustomersList({
     customer_status: 'potential',
     care_status: activeCareStatus,
-    next_care_date: nextCareDateFilter,
+    branch_id: currentBranchId,
+    from_date: fromDate || undefined,
+    to_date: toDate || undefined,
     search: debouncedQuery || undefined,
     page,
     page_size: PAGE_SIZE,
@@ -154,7 +178,8 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
 
   const getStatusLabel = (item: CustomerDto): { text: string; tone: string } => {
     if (item.care_status === 'scheduled') return { text: 'Đã hẹn lịch', tone: 'green' }
-    if (item.care_status === 'callback') return { text: 'Cần gọi lại', tone: 'amber' }
+    if (item.care_status === 'consulting' || item.care_status === 'callback') return { text: 'Đang tư vấn', tone: 'blue' }
+    if (item.care_status === 'closed') return { text: 'Đã chốt', tone: 'rose' }
     if (item.care_status === 'unreachable') return { text: 'Không nghe máy', tone: 'purple' }
     if (item.care_status === 'no_need') return { text: 'Chưa có nhu cầu', tone: 'gray' }
     return { text: 'Chưa phân loại', tone: 'gray' }
@@ -177,6 +202,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
         </button>
       </div>
 
+      {/* Cụm bộ lọc: Hàng 1 (Tìm kiếm + Chi nhánh + Trạng thái) & Hàng 2 (Bộ lọc thời gian) */}
       <div className="lead-filters">
         <label>
           <Search size={15} />
@@ -190,34 +216,167 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
           />
         </label>
 
+        {/* Dropdown Lọc Theo Chi Nhánh */}
+        <div style={{ position: 'relative' }} ref={branchMenuRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setBranchMenuOpen(!branchMenuOpen)
+              setStatusMenuOpen(false)
+            }}
+            style={{
+              width: '100%',
+              minWidth: '155px',
+              height: '38px',
+              padding: '0 12px',
+              whiteSpace: 'nowrap',
+              backgroundColor: currentBranchId ? '#eff6ff' : '#ffffff',
+              borderColor: currentBranchId ? '#3b82f6' : '#dfe8f2',
+              color: currentBranchId ? '#1d4ed8' : '#475569',
+              fontWeight: currentBranchId ? 600 : 500,
+              fontSize: '11.5px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              cursor: 'pointer',
+            }}
+            title={currentBranchLabel}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+              <Building2 size={15} style={{ color: currentBranchId ? '#2563eb' : '#2c78d9', flexShrink: 0 }} />
+              <span>{currentBranchLabel}</span>
+            </span>
+            <ChevronDown
+              size={14}
+              style={{
+                transform: branchMenuOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.2s ease',
+                flexShrink: 0,
+                color: '#64748b',
+              }}
+            />
+          </button>
+
+          {branchMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                right: 0,
+                minWidth: '100%',
+                width: 'max-content',
+                maxWidth: '280px',
+                backgroundColor: '#ffffff',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(15, 23, 42, 0.08)',
+                padding: '4px',
+                zIndex: 60,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                maxHeight: '250px',
+                overflowY: 'auto',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  handleBranchSelect(undefined)
+                  setBranchMenuOpen(false)
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: !currentBranchId ? '#eff6ff' : 'transparent',
+                  color: !currentBranchId ? '#1d4ed8' : '#334155',
+                  fontWeight: !currentBranchId ? 600 : 400,
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                }}
+              >
+                <Building2 size={14} style={{ color: !currentBranchId ? '#2563eb' : '#64748b' }} />
+                <span>Tất cả chi nhánh</span>
+              </button>
+              {availableBranches.map((b) => {
+                const isSelected = currentBranchId === b.id
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      handleBranchSelect(b.id)
+                      setBranchMenuOpen(false)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: isSelected ? '#eff6ff' : 'transparent',
+                      color: isSelected ? '#1d4ed8' : '#334155',
+                      fontWeight: isSelected ? 600 : 400,
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                  >
+                    <MapPin size={14} style={{ color: isSelected ? '#2563eb' : '#64748b' }} />
+                    <span>{b.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Dropdown Lọc Theo Trạng Thái Chăm Sóc */}
         <div style={{ position: 'relative' }} ref={statusMenuRef}>
           <button
             type="button"
             onClick={() => {
               setStatusMenuOpen(!statusMenuOpen)
-              setDateMenuOpen(false)
+              setBranchMenuOpen(false)
             }}
             style={{
               width: '100%',
+              minWidth: '155px',
               height: '38px',
+              padding: '0 12px',
+              whiteSpace: 'nowrap',
               backgroundColor: careStatusFilter !== 'all' ? '#eff6ff' : '#ffffff',
               borderColor: careStatusFilter !== 'all' ? '#3b82f6' : '#dfe8f2',
-              color: careStatusFilter !== 'all' ? '#1d4ed8' : '#58708f',
-              fontWeight: careStatusFilter !== 'all' ? 600 : 400,
+              color: careStatusFilter !== 'all' ? '#1d4ed8' : '#475569',
+              fontWeight: careStatusFilter !== 'all' ? 600 : 500,
+              fontSize: '11.5px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              cursor: 'pointer',
             }}
-            title="Lọc theo trạng thái chăm sóc"
+            title={currentStatusOption.label}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <Users size={15} style={{ color: careStatusFilter !== 'all' ? '#2563eb' : '#2c78d9', flexShrink: 0 }} />
-              {currentStatusOption.label}
+              <span>{currentStatusOption.label}</span>
             </span>
             <ChevronDown
-              size={15}
+              size={14}
               style={{
                 transform: statusMenuOpen ? 'rotate(180deg)' : 'none',
                 transition: 'transform 0.2s ease',
                 flexShrink: 0,
+                color: '#64748b',
               }}
             />
           </button>
@@ -228,7 +387,9 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
                 right: 0,
-                minWidth: '175px',
+                minWidth: '100%',
+                width: 'max-content',
+                maxWidth: '260px',
                 backgroundColor: '#ffffff',
                 borderRadius: '8px',
                 boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(15, 23, 42, 0.08)',
@@ -271,8 +432,8 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                       size={14}
                       style={{
                         color:
-                          opt.tone === 'amber'
-                            ? '#d97706'
+                          opt.tone === 'rose'
+                            ? '#e11d48'
                             : opt.tone === 'green'
                               ? '#059669'
                               : opt.tone === 'blue'
@@ -290,102 +451,190 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
           )}
         </div>
 
-        {/* Dropdown Lọc Theo Lịch Hẹn */}
-        <div style={{ position: 'relative' }} ref={dateMenuRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setDateMenuOpen(!dateMenuOpen)
-              setStatusMenuOpen(false)
-            }}
-            style={{
-              width: '100%',
-              height: '38px',
-              backgroundColor: datePreset !== 'all' ? '#f0f9ff' : '#ffffff',
-              borderColor: datePreset !== 'all' ? '#0284c7' : '#dfe8f2',
-              color: datePreset !== 'all' ? '#0284c7' : '#58708f',
-              fontWeight: datePreset !== 'all' ? 600 : 400,
-            }}
-            title="Lọc theo ngày hẹn chăm sóc"
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <CalendarDays size={15} style={{ color: datePreset !== 'all' ? '#0284c7' : '#2c78d9', flexShrink: 0 }} />
-              {currentDateLabel}
-            </span>
-            <ChevronDown
-              size={15}
+        {/* HÀNG 2: Bộ lọc thời gian từ ngày … ngày & Nút chọn nhanh */}
+        <div
+          style={{
+            gridColumn: '1 / -1',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap',
+            padding: '7px 10px',
+            background: '#f8fafc',
+            borderRadius: '7px',
+            border: '1px solid #e2e8f0',
+            fontSize: '11px',
+          }}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#475569', fontWeight: 600 }}>
+            <CalendarDays size={13} style={{ color: '#2563eb' }} />
+            <span>Thời gian:</span>
+          </div>
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ color: '#64748b', fontSize: '10.5px' }}>Từ</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value)
+                setDatePreset('custom')
+                setPage(1)
+              }}
               style={{
-                transform: dateMenuOpen ? 'rotate(180deg)' : 'none',
-                transition: 'transform 0.2s ease',
-                flexShrink: 0,
+                height: '27px',
+                padding: '0 6px',
+                borderRadius: '5px',
+                border: '1px solid #cbd5e1',
+                fontSize: '11px',
+                color: '#1e293b',
+                background: '#ffffff',
+                outline: 'none',
+                cursor: 'pointer',
               }}
             />
-          </button>
-
-          {dateMenuOpen && (
-            <div
+            <span style={{ color: '#64748b', fontSize: '10.5px' }}>Đến</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value)
+                setDatePreset('custom')
+                setPage(1)
+              }}
               style={{
-                position: 'absolute',
-                top: 'calc(100% + 4px)',
-                right: 0,
-                minWidth: '175px',
-                backgroundColor: '#ffffff',
-                borderRadius: '8px',
-                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(15, 23, 42, 0.08)',
-                padding: '4px',
-                zIndex: 60,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
+                height: '27px',
+                padding: '0 6px',
+                borderRadius: '5px',
+                border: '1px solid #cbd5e1',
+                fontSize: '11px',
+                color: '#1e293b',
+                background: '#ffffff',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+
+          {/* Cụm nút bấm chọn nhanh */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate(dayjs().format('YYYY-MM-DD'))
+                setToDate(dayjs().format('YYYY-MM-DD'))
+                setDatePreset('today')
+                setPage(1)
+              }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: datePreset === 'today' ? '#2563eb' : '#cbd5e1',
+                background: datePreset === 'today' ? '#eff6ff' : '#ffffff',
+                color: datePreset === 'today' ? '#1d4ed8' : '#475569',
+                fontWeight: datePreset === 'today' ? 600 : 400,
+                fontSize: '10.5px',
+                cursor: 'pointer',
               }}
             >
-              {DATE_PRESET_OPTIONS.map((opt) => {
-                const Icon = opt.icon
-                const isSelected = datePreset === opt.value
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setDatePreset(opt.value as any)
-                      if (opt.value === 'all') {
-                        setNextCareDateFilter(undefined)
-                      } else if (opt.value === 'today') {
-                        setNextCareDateFilter(dayjs().format('YYYY-MM-DD'))
-                      } else if (opt.value === 'tomorrow') {
-                        setNextCareDateFilter(dayjs().add(1, 'day').format('YYYY-MM-DD'))
-                      } else if (opt.value === '7days') {
-                        setNextCareDateFilter(dayjs().format('YYYY-MM-DD'))
-                      }
-                      setPage(1)
-                      setDateMenuOpen(false)
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
-                      color: isSelected ? '#0284c7' : '#334155',
-                      fontWeight: isSelected ? 600 : 400,
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
-                    }}
-                  >
-                    <Icon size={14} style={{ color: isSelected ? '#0284c7' : '#64748b' }} />
-                    <span>{opt.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
+              Hôm nay
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate(dayjs().subtract(7, 'day').format('YYYY-MM-DD'))
+                setToDate(dayjs().format('YYYY-MM-DD'))
+                setDatePreset('7days')
+                setPage(1)
+              }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: datePreset === '7days' ? '#2563eb' : '#cbd5e1',
+                background: datePreset === '7days' ? '#eff6ff' : '#ffffff',
+                color: datePreset === '7days' ? '#1d4ed8' : '#475569',
+                fontWeight: datePreset === '7days' ? 600 : 400,
+                fontSize: '10.5px',
+                cursor: 'pointer',
+              }}
+            >
+              7 ngày qua
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate(dayjs().startOf('month').format('YYYY-MM-DD'))
+                setToDate(dayjs().endOf('month').format('YYYY-MM-DD'))
+                setDatePreset('month')
+                setPage(1)
+              }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: datePreset === 'month' ? '#2563eb' : '#cbd5e1',
+                background: datePreset === 'month' ? '#eff6ff' : '#ffffff',
+                color: datePreset === 'month' ? '#1d4ed8' : '#475569',
+                fontWeight: datePreset === 'month' ? 600 : 400,
+                fontSize: '10.5px',
+                cursor: 'pointer',
+              }}
+            >
+              Tháng này
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate('')
+                setToDate('')
+                setDatePreset('all')
+                setPage(1)
+              }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: datePreset === 'all' ? '#2563eb' : '#cbd5e1',
+                background: datePreset === 'all' ? '#eff6ff' : '#ffffff',
+                color: datePreset === 'all' ? '#1d4ed8' : '#475569',
+                fontWeight: datePreset === 'all' ? 600 : 400,
+                fontSize: '10.5px',
+                cursor: 'pointer',
+              }}
+            >
+              Tất cả
+            </button>
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                title="Xóa bộ lọc thời gian"
+                onClick={() => {
+                  setFromDate('')
+                  setToDate('')
+                  setDatePreset('all')
+                  setPage(1)
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                <CircleX size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Tabs nhanh trạng thái chăm sóc */}
       <div className="lead-tabs">
         <button
           type="button"
@@ -399,13 +648,13 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
         </button>
         <button
           type="button"
-          className={clsx({ active: careStatusFilter === 'callback' })}
+          className={clsx({ active: careStatusFilter === 'consulting' })}
           onClick={() => {
-            setCareStatusFilter('callback')
+            setCareStatusFilter('consulting')
             setPage(1)
           }}
         >
-          Cần chăm sóc {careStatusFilter === 'callback' ? `(${totalItems})` : ''}
+          Đang tư vấn {careStatusFilter === 'consulting' ? `(${totalItems})` : ''}
         </button>
         <button
           type="button"
@@ -477,12 +726,14 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                     <td>{formatDateTime(lead.next_care_at)}</td>
                     <td>
                       <span className={clsx('lead-status', tone)}>
-                        {tone === 'amber' ? (
-                          <Timer size={14} />
+                        {tone === 'rose' ? (
+                          <ShoppingCart size={14} />
                         ) : tone === 'green' ? (
                           <CalendarCheck size={14} />
                         ) : tone === 'blue' ? (
                           <Phone size={14} />
+                        ) : tone === 'purple' ? (
+                          <CircleX size={14} />
                         ) : (
                           <History size={14} />
                         )}{' '}
@@ -501,8 +752,10 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                 onAction={() => {
                   setQuery('')
                   setCareStatusFilter('all')
+                  setFromDate('')
+                  setToDate('')
                   setDatePreset('all')
-                  setNextCareDateFilter(undefined)
+                  handleBranchSelect(undefined)
                   setPage(1)
                 }}
               />

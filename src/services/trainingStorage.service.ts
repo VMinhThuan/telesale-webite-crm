@@ -338,6 +338,80 @@ class TrainingStorageService {
       }),
     )
   }
+
+  /**
+   * Xóa một Phân loại danh mục / Tab và toàn bộ tài liệu thuộc danh mục đó
+   */
+  async deleteCategory(categoryName: string): Promise<{ deletedCount: number }> {
+    if (!categoryName || categoryName === 'Tất cả') {
+      throw new Error('Không thể xóa danh mục mặc định "Tất cả".')
+    }
+
+    const s3 = this.getS3Client()
+    const currentManifest = await this.getManifest()
+
+    // 1. Tìm các tài liệu thuộc danh mục này
+    const materialsToDelete = currentManifest.materials.filter(
+      (m) => m.category === categoryName,
+    )
+    const remainingMaterials = currentManifest.materials.filter(
+      (m) => m.category !== categoryName,
+    )
+
+    // 2. Xóa các tệp vật lý trên Cloudflare R2
+    for (const mat of materialsToDelete) {
+      if (mat.fileKey) {
+        try {
+          await s3.send(
+            new DeleteObjectCommand({
+              Bucket: R2_CONFIG.bucketName,
+              Key: mat.fileKey,
+            }),
+          )
+        } catch (err) {
+          console.warn(`Lỗi khi xóa file ${mat.fileKey} trên R2:`, err)
+        }
+      }
+    }
+
+    // 3. Lọc danh mục khỏi danh sách categories
+    const updatedCategories = (currentManifest.categories || []).filter(
+      (c) => c !== categoryName,
+    )
+
+    // Đảm bảo luôn có ít nhất danh mục 'Tất cả'
+    if (!updatedCategories.includes('Tất cả')) {
+      updatedCategories.unshift('Tất cả')
+    }
+
+    // 4. Lọc lộ trình journeys nếu có
+    const updatedJourneys = { ...(currentManifest.journeys || {}) }
+    delete updatedJourneys[categoryName]
+
+    // 5. Cập nhật file manifest.json trên R2
+    const updatedManifest: TrainingManifest = {
+      ...currentManifest,
+      categories: updatedCategories,
+      materials: remainingMaterials,
+      journeys: updatedJourneys,
+      updatedAt: new Date().toISOString(),
+    }
+
+    const manifestBytes = new TextEncoder().encode(
+      JSON.stringify(updatedManifest, null, 2),
+    )
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: R2_CONFIG.bucketName,
+        Key: 'manifest.json',
+        Body: manifestBytes,
+        ContentType: 'application/json',
+      }),
+    )
+
+    return { deletedCount: materialsToDelete.length }
+  }
 }
 
 export const trainingStorageService = new TrainingStorageService()

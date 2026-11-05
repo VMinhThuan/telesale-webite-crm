@@ -6,6 +6,7 @@ import {
   Clock3,
   Phone,
   ShoppingCart,
+  Upload,
   Users,
 } from 'lucide-react'
 import dayjs from '../../lib/dayjs'
@@ -32,12 +33,14 @@ import {
   resultOptions,
 } from './components/TelesaleCustomerPanel'
 import { TelesaleHotkeysModal } from './components/TelesaleHotkeysModal'
+import { TelesaleImportModal } from './components/TelesaleImportModal'
 
 // Re-export để đảm bảo tính tương thích ngược toàn dự án
 export {
   TelesaleSchedulePanel,
   TelesaleCallCenterPanel,
   TelesaleCustomerPanel,
+  TelesaleImportModal,
   resultOptions,
 }
 
@@ -126,6 +129,7 @@ export const Telesale: React.FC = () => {
   const [orderTime, setOrderTime] = useState('08:30')
   const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
   const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   // Chi nhánh ưu tiên trực tiếp theo chiến dịch đang chọn (mỗi chiến dịch đã ứng với 1 chi nhánh)
   const branchId = selectedCampaign?.branch_id || activeTab?.draftResult?.branchId || 3
@@ -691,6 +695,31 @@ export const Telesale: React.FC = () => {
           </div>
 
           <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            style={{
+              height: '36px',
+              padding: '0 13px',
+              borderRadius: '8px',
+              border: '1.5px solid #bfdbfe',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
+            title="Import tệp danh sách khách hàng (Excel/CSV) vào chiến dịch"
+          >
+            <Upload size={15} />
+            <span>Import dữ liệu</span>
+          </button>
+
+          <button
             className="help"
             type="button"
             onClick={() => setIsHotkeysModalOpen(true)}
@@ -825,6 +854,20 @@ export const Telesale: React.FC = () => {
       <TelesaleHotkeysModal
         isOpen={isHotkeysModalOpen}
         onClose={() => setIsHotkeysModalOpen(false)}
+      />
+
+      {/* Modal Import danh sách khách hàng vào chiến dịch từ Excel/CSV */}
+      <TelesaleImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        campaigns={campaignsList}
+        currentCampaignId={selectedCampaignId || undefined}
+        onImportSuccess={() => {
+          // Nếu tab hiện tại chưa có khách hàng, tự động kích hoạt nạp khách hàng mới
+          if (!activeTab.customer) {
+            handleFetchCustomerForTab(activeTabId)
+          }
+        }}
       />
     </div>
   )

@@ -32,7 +32,7 @@ import { generateIdempotencyKey } from '../../../services/apiClient'
 import dayjs from '../../../lib/dayjs'
 
 export const careOutcomes: {
-  key: 'consulting' | 'scheduled' | 'closed' | 'callback' | 'no_need' | 'unreachable'
+  key: 'consulting' | 'scheduled' | 'closed' | 'no_need' | 'unreachable'
   label: string
   icon: any
   tone: string
@@ -40,7 +40,6 @@ export const careOutcomes: {
     { key: 'consulting', label: 'Đang tư vấn', icon: Phone, tone: 'blue' },
     { key: 'scheduled', label: 'Đã hẹn lịch', icon: CalendarCheck, tone: 'green' },
     { key: 'closed', label: 'Đã chốt', icon: ShoppingCart, tone: 'rose' },
-    { key: 'callback', label: 'Gọi lại', icon: Timer, tone: 'amber' },
     { key: 'no_need', label: 'Chưa có nhu cầu', icon: Voicemail, tone: 'gray' },
     { key: 'unreachable', label: 'Không liên lạc được', icon: CircleX, tone: 'purple' },
   ]
@@ -82,7 +81,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
   }, [campaignsData, userBranchId])
 
-  const [outcome, setOutcome] = useState<'consulting' | 'scheduled' | 'closed' | 'callback' | 'no_need' | 'unreachable'>('consulting')
+  const [outcome, setOutcome] = useState<'consulting' | 'scheduled' | 'closed' | 'no_need' | 'unreachable'>('consulting')
   const [nextCareDate, setNextCareDate] = useState('')
   const [nextCareTime, setNextCareTime] = useState('')
   const [note, setNote] = useState('')
@@ -174,8 +173,8 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
       return
     }
 
-    // 1. Ràng buộc Lịch hẹn (next_care_at): Bắt buộc khi 'consulting', 'callback', 'scheduled'
-    const isAppointmentRequired = ['consulting', 'callback', 'scheduled'].includes(outcome)
+    // 1. Ràng buộc Lịch hẹn (next_care_at): Bắt buộc khi 'consulting', 'scheduled'
+    const isAppointmentRequired = ['consulting', 'scheduled'].includes(outcome)
     if (isAppointmentRequired) {
       if (!nextCareDate) {
         notify('Vui lòng chọn Ngày hẹn cho khách hàng (bắt buộc với kết quả này).')
@@ -484,6 +483,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
               key={key}
               type="button"
               className={clsx(tone, { chosen: outcome === key })}
+              style={key === 'unreachable' ? { gridColumn: 'span 2' } : undefined}
               onClick={() => {
                 setOutcome(key)
                 if (key === 'closed' && !nextCareDate) {
@@ -501,7 +501,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
           <label>
             <span>
               Ngày hẹn{' '}
-              {['consulting', 'callback', 'scheduled', 'closed'].includes(outcome) && (
+              {['consulting', 'scheduled', 'closed'].includes(outcome) && (
                 <b style={{ color: '#e11d48' }}>*</b>
               )}
             </span>

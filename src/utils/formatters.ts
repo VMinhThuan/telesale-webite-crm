@@ -111,3 +111,28 @@ export const isConfirmedOrderStatus = (
     t.includes('da_xac_nhan')
   )
 }
+
+/**
+ * Che (mask) khoảng 30% phần đầu địa chỉ của khách hàng để bảo mật thông tin (số nhà, ngõ/ngách)
+ * Giữ nguyên phần sau (phường/xã, quận/huyện, tỉnh/thành phố) để telesale nắm được khu vực
+ */
+export const maskAddress = (address?: string | null, maskRatio = 0.3): string => {
+  if (!address || !address.trim()) return 'Chưa cập nhật địa chỉ'
+  const trimmed = address.trim()
+  if (trimmed.startsWith('*') || trimmed.includes('******')) {
+    return trimmed
+  }
+
+  // Tính vị trí cắt theo tỷ lệ mask (mặc định 30%)
+  const targetIndex = Math.max(3, Math.round(trimmed.length * maskRatio))
+
+  // Tìm khoảng trắng gần nhất sau targetIndex để tránh cắt cụt giữa một từ
+  let splitIndex = trimmed.indexOf(' ', targetIndex)
+  if (splitIndex === -1 || splitIndex > targetIndex + 12) {
+    splitIndex = targetIndex
+  }
+
+  const remaining = trimmed.slice(splitIndex).replace(/^[\s,.-]+/, '')
+  return remaining ? `****** ${remaining}` : '******'
+}
+
