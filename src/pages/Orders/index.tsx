@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
+  BadgeCheck,
   BarChart3,
+  Building2,
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   CircleX,
   ClipboardCheck,
   Clock3,
-  DollarSign,
   History,
   Info,
   MapPin,
@@ -17,6 +19,7 @@ import {
   Save,
   Search,
   ShoppingCart,
+  Truck,
   Undo2,
   UserRound,
   X,
@@ -39,6 +42,8 @@ import {
   useOrdersList,
   useRescheduleOrderMutation,
 } from '../../hooks/useOrders'
+import { useCampaigns } from '../../hooks/useTelesale'
+import { useAuthStore } from '../../store/useAuthStore'
 import { DialogState } from '../../types'
 import { CallActionControl } from '../../components/common/CallActionControl'
 import dayjs from '../../lib/dayjs'
@@ -46,7 +51,6 @@ import { BranchSlotDto, OrderDto } from '../../types/api'
 import { useEnums } from '../../hooks/useEnums'
 import {
   formatDate,
-  formatVND,
   getStatusBadgeTone,
   isConfirmedOrderStatus,
   isTerminatedOrderStatus,
@@ -132,10 +136,52 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     ]
   }, [])
 
+  // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
+  const { data: campaignsData } = useCampaigns()
+  const userBranchId = useAuthStore((s) => s.user?.branchId)
+
+  const availableBranches = useMemo(() => {
+    const map = new Map<number, string>()
+    const list = campaignsData?.items || []
+    list.forEach((c) => {
+      if (c.branch_id && c.branch_name) {
+        map.set(c.branch_id, c.branch_name)
+      }
+    })
+    if (userBranchId && !map.has(userBranchId)) {
+      map.set(userBranchId, `Chi nhánh #${userBranchId}`)
+    }
+    if (map.size === 0) {
+      map.set(3, 'Trụ sở Hà Nội')
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [campaignsData, userBranchId])
+
   // Bộ lọc tìm kiếm
   const [activeDateTab, setActiveDateTab] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined)
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false)
+  const branchMenuRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
+
+  // Đóng dropdown lọc chi nhánh khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (branchMenuRef.current && !branchMenuRef.current.contains(target)) {
+        setBranchMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const currentBranchLabel = useMemo(() => {
+    if (!selectedBranchId) return 'Tất cả chi nhánh'
+    const found = availableBranches.find((b) => b.id === selectedBranchId)
+    return found ? found.name : `Chi nhánh #${selectedBranchId}`
+  }, [selectedBranchId, availableBranches])
 
   // Debounce ô tìm kiếm 400ms
   const debouncedQuery = useDebounce(query, 400)
@@ -147,7 +193,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     paginationProps,
   } = usePagination({
     initialPageSize: 6,
-    resetDeps: [debouncedQuery, activeDateTab, statusFilter],
+    resetDeps: [debouncedQuery, activeDateTab, statusFilter, selectedBranchId],
   })
 
   // Đơn hàng đang được chọn xem chi tiết
@@ -201,8 +247,11 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     if (statusFilter !== 'all') {
       params.status = statusFilter
     }
+    if (selectedBranchId !== undefined) {
+      params.branch_id = selectedBranchId
+    }
     return params
-  }, [toPagePageSize, debouncedQuery, activeDateTab, statusFilter])
+  }, [toPagePageSize, debouncedQuery, activeDateTab, statusFilter, selectedBranchId])
 
   // Khởi tạo Query Client phục vụ chiến lược Prefetching tức thì
   const queryClient = useQueryClient()
@@ -232,10 +281,20 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     })
   }
 
-  // Toàn bộ danh sách đơn hàng trang hiện tại
+  // Toàn bộ danh sách đơn hàng trang hiện tại (kèm client-side fallback nếu Backend chưa lọc branch_id)
   const ordersList: OrderDto[] = useMemo(() => {
-    return ordersResponse?.items || []
-  }, [ordersResponse])
+    const rawList = ordersResponse?.items || []
+    if (selectedBranchId !== undefined) {
+      return rawList.filter((item) => {
+        if (item.branch_id !== undefined) {
+          return item.branch_id === selectedBranchId
+        }
+        const branchObj = availableBranches.find((b) => b.id === selectedBranchId)
+        return branchObj && item.chi_nhanh === branchObj.name
+      })
+    }
+    return rawList
+  }, [ordersResponse, selectedBranchId, availableBranches])
 
   // Đơn hàng đang hiển thị ở cột chi tiết
   const activeOrder: OrderDto | null = useMemo(() => {
@@ -257,9 +316,10 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     }
   }, [activeOrder])
 
-  // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh
+  // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh (ưu tiên chi nhánh đang lọc hoặc chi nhánh của đơn hàng)
+  const targetBranchId = selectedBranchId || activeOrder?.branch_id || availableBranches[0]?.id || 3
   const { data: rawBranchSlots = [] } = useBranchSlots(
-    activeOrder?.branch_id || 3,
+    targetBranchId,
     adjDate,
     adjDate,
   )
@@ -283,17 +343,27 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     const pendingCount = ordersList.filter(
       (o) => !isConfirmedOrderStatus(o) && !isTerminatedOrderStatus(o.status, o.trang_thai),
     ).length
-    const estimatedRevenue = ordersList.reduce((acc, cur) => {
-      // Loại trừ đơn bị hủy hoặc trả về khỏi doanh số thực tế
-      if (isTerminatedOrderStatus(cur.status, cur.trang_thai)) return acc
-      return acc + (cur.doanh_so || 0)
-    }, 0)
+    // Đơn hàng đã đi: Các đơn đã được xác nhận điều phối / KTV tiếp nhận di chuyển theo quy chuẩn ERP
+    const daDiCount = ordersList.filter((o) => {
+      if (isTerminatedOrderStatus(o.status, o.trang_thai)) return false
+      const s = (o.status || '').toLowerCase()
+      const t = (o.trang_thai || '').toLowerCase()
+      return (
+        s === 'da_di' ||
+        s === 'thanh_cong' ||
+        s === 'hoan_thanh' ||
+        t.includes('đã đi') ||
+        t.includes('hoàn thành') ||
+        t.includes('thành công') ||
+        isConfirmedOrderStatus(o)
+      )
+    }).length
 
     return {
       total,
       confirmedCount,
       pendingCount,
-      estimatedRevenue,
+      daDiCount,
     }
   }, [ordersResponse, ordersList])
 
@@ -415,15 +485,15 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
           <Clock3 size={19} />
         </article>
 
-        <article className="call-stat blue">
+        <article className="call-stat green">
           <div className="card-icon">
-            <DollarSign size={21} />
+            <Truck size={21} />
           </div>
           <div>
-            <p>Doanh số dự kiến</p>
-            <strong>{formatVND(statsOverview.estimatedRevenue)}</strong>
+            <p>Đơn hàng đã đi</p>
+            <strong>{statsOverview.daDiCount} đơn</strong>
           </div>
-          <BarChart3 size={19} />
+          <BadgeCheck size={19} />
         </article>
       </section>
 
@@ -446,7 +516,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
               </button>
             </div>
 
-            {/* Bộ lọc tìm kiếm và trạng thái */}
+            {/* Bộ lọc tìm kiếm, chi nhánh và trạng thái */}
             <div className="order-filters">
               <label>
                 <Search size={17} />
@@ -459,6 +529,130 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   placeholder="Tìm mã đơn, tên khách hoặc SĐT..."
                 />
               </label>
+
+              {/* Dropdown Lọc Theo Chi Nhánh (Phương án 1) */}
+              <div style={{ position: 'relative' }} ref={branchMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setBranchMenuOpen((prev) => !prev)}
+                  style={{
+                    width: '100%',
+                    minWidth: '155px',
+                    height: '38px',
+                    padding: '0 12px',
+                    whiteSpace: 'nowrap',
+                    backgroundColor: selectedBranchId ? '#eff6ff' : '#ffffff',
+                    borderColor: selectedBranchId ? '#3b82f6' : '#dfe8f2',
+                    color: selectedBranchId ? '#1d4ed8' : '#475569',
+                    fontWeight: selectedBranchId ? 600 : 500,
+                    fontSize: '11.5px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    borderRadius: '7px',
+                    border: '1px solid',
+                  }}
+                  title={currentBranchLabel}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <Building2 size={15} style={{ color: selectedBranchId ? '#2563eb' : '#2c78d9', flexShrink: 0 }} />
+                    <span>{currentBranchLabel}</span>
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: branchMenuOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s ease',
+                      flexShrink: 0,
+                      color: '#64748b',
+                    }}
+                  />
+                </button>
+
+                {branchMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      minWidth: '100%',
+                      width: 'max-content',
+                      maxWidth: '280px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(15, 23, 42, 0.08)',
+                      padding: '4px',
+                      zIndex: 60,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      maxHeight: '250px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedBranchId(undefined)
+                        setBranchMenuOpen(false)
+                        setPage(1)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: !selectedBranchId ? '#eff6ff' : 'transparent',
+                        color: !selectedBranchId ? '#1d4ed8' : '#334155',
+                        fontWeight: !selectedBranchId ? 600 : 400,
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                      }}
+                    >
+                      <Building2 size={14} style={{ color: !selectedBranchId ? '#2563eb' : '#64748b' }} />
+                      <span>Tất cả chi nhánh</span>
+                    </button>
+                    {availableBranches.map((b) => {
+                      const isSelected = selectedBranchId === b.id
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBranchId(b.id)
+                            setBranchMenuOpen(false)
+                            setPage(1)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: isSelected ? '#eff6ff' : 'transparent',
+                            color: isSelected ? '#1d4ed8' : '#334155',
+                            fontWeight: isSelected ? 600 : 400,
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            width: '100%',
+                          }}
+                        >
+                          <MapPin size={14} style={{ color: isSelected ? '#2563eb' : '#64748b' }} />
+                          <span>{b.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div style={{ position: 'relative' }}>
                 <select
@@ -520,13 +714,14 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       <th>Mã đơn</th>
                       <th>Khách hàng</th>
                       <th>Dịch vụ</th>
+                      <th>Chi nhánh</th>
                       <th>Lịch hẹn</th>
                       <th>Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <TableSkeleton rows={6} cols={5} />
+                      <TableSkeleton rows={6} cols={6} />
                     ) : ordersList.length > 0 ? (
                       ordersList.map((order) => {
                         const tone = getStatusBadgeTone(order.trang_thai)
@@ -558,6 +753,22 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                               </span>
                             </td>
                             <td>
+                              <span
+                                title={order.chi_nhanh || 'Trụ sở Hà Nội'}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  color: '#3b587d',
+                                  fontSize: '10.5px',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                <Building2 size={12} style={{ color: '#2563eb', flexShrink: 0 }} />
+                                <span>{order.chi_nhanh || 'Trụ sở Hà Nội'}</span>
+                              </span>
+                            </td>
+                            <td>
                               <b>{formatDate(order.ngay_hen_khach, 'DD/MM')}</b> · {order.gio_hen_khach}
                             </td>
                             <td>
@@ -578,7 +789,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       })
                     ) : (
                       <EmptyState
-                        colSpan={5}
+                        colSpan={6}
                         title="Không tìm thấy đơn hàng"
                         description="Không có đơn hàng nào khớp với điều kiện tìm kiếm hoặc ngày hẹn đang chọn."
                         actionText="Xem tất cả đơn hàng"
@@ -586,6 +797,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                           setQuery('')
                           setActiveDateTab('all')
                           setStatusFilter('all')
+                          setSelectedBranchId(undefined)
                           setPage(1)
                         }}
                       />
@@ -672,9 +884,6 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       Vấn đề của máy <b>{activeOrder.machine_problem}</b>
                     </span>
                   )}
-                  <span>
-                    Doanh số dự kiến <b>{formatVND(activeOrder.doanh_so)}</b>
-                  </span>
                   <span>
                     Xác nhận với khách{' '}
                     {isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai) ? (
@@ -942,7 +1151,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
               {/* Chọn lý do tương ứng */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4a5d78', marginBottom: '6px' }}>
-                  Lý do theo quy chuẩn ERP:
+                  Lý do:
                 </label>
                 <select
                   value={luiHuyReason}

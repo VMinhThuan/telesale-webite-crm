@@ -10,6 +10,7 @@ export interface OrderQueryParams {
   page?: number
   page_size?: number
   user_id?: number
+  branch_id?: number
 }
 
 export interface RescheduleOrderPayload {
@@ -46,6 +47,7 @@ export const orderService = {
     if (params?.to_date) payload.to_date = params.to_date
     if (params?.status && params.status !== 'all') payload.status = params.status
     if (params?.search) payload.search = params.search
+    if (params?.branch_id !== undefined) payload.branch_id = params.branch_id
 
     const response = await apiClient.post<any, { result: ApiPaginatedResult<OrderDto> }>(
       API_ENDPOINTS.ORDERS,
