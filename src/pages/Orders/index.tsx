@@ -138,7 +138,10 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
 
   // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
   const { data: campaignsData } = useCampaigns()
-  const userBranchId = useAuthStore((s) => s.user?.branchId)
+  const user = useAuthStore((s) => s.user)
+  const userBranchId = user?.branchId
+  // Phân quyền: Chỉ trưởng nhóm và admin mới được thao tác điều chỉnh lịch hẹn đơn hàng, sale thì ẩn
+  const canAdjustAppointment = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
 
   const availableBranches = useMemo(() => {
     const map = new Map<number, string>()
@@ -393,6 +396,10 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   // Xử lý lưu điều chỉnh lịch hẹn & ghi chú
   const handleSaveAdjustment = () => {
     if (!activeOrder) return
+    if (!canAdjustAppointment) {
+      notify('Chỉ Trưởng nhóm và Admin mới có quyền điều chỉnh lịch hẹn')
+      return
+    }
 
     const dateChanged =
       adjDate !== activeOrder.ngay_hen_khach || adjTime !== activeOrder.gio_hen_khach
@@ -427,7 +434,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
 
   // Mở modal trả về / lùi / hủy
   const handleOpenLuiHuyModal = () => {
-    if (!activeOrder) return
+    if (!activeOrder || !canAdjustAppointment) return
     setLuiHuyType('tra_ve')
     setLuiHuyReason(returnReasonOptions[0]?.value || RETURN_REASONS[0])
     setLuiHuyNote('')
@@ -992,8 +999,9 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                 />
               </section>
 
-              {/* Panel Điều chỉnh lịch hẹn */}
-              <section className="call-panel care-form">
+              {/* Panel Điều chỉnh lịch hẹn - Chỉ hiển thị và thao tác với Trưởng nhóm và Admin */}
+              {canAdjustAppointment && (
+                <section className="call-panel care-form">
                 <div className="call-panel-heading">
                   <div>
                     <p className="eyebrow">ĐIỀU CHỈNH</p>
@@ -1093,6 +1101,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   <Undo2 size={18} /> Đơn trả về / Hủy / Lùi
                 </button>
               </section>
+              )}
             </>
           ) : (
             <section className="call-panel" style={{ padding: '30px 20px', textAlign: 'center' }}>
@@ -1105,8 +1114,8 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
         </aside>
       </div>
 
-      {/* Modal Trả về / Lùi / Hủy đơn hàng */}
-      {isLuiHuyModalOpen && activeOrder && (
+      {/* Modal Trả về / Lùi / Hủy đơn hàng - Chỉ Trưởng nhóm và Admin */}
+      {canAdjustAppointment && isLuiHuyModalOpen && activeOrder && (
         <div className="mock-dialog-backdrop" onClick={() => setIsLuiHuyModalOpen(false)}>
           <div
             className="mock-dialog"

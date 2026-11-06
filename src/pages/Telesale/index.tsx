@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleHelp,
   Clock3,
+  History,
   Phone,
   ShoppingCart,
   Upload,
@@ -34,6 +35,7 @@ import {
 } from './components/TelesaleCustomerPanel'
 import { TelesaleHotkeysModal } from './components/TelesaleHotkeysModal'
 import { TelesaleImportModal } from './components/TelesaleImportModal'
+import { TelesaleCallLogsDrawer } from './components/TelesaleCallLogsDrawer'
 
 // Re-export để đảm bảo tính tương thích ngược toàn dự án
 export {
@@ -41,6 +43,7 @@ export {
   TelesaleCallCenterPanel,
   TelesaleCustomerPanel,
   TelesaleImportModal,
+  TelesaleCallLogsDrawer,
   resultOptions,
 }
 
@@ -130,6 +133,7 @@ export const Telesale: React.FC = () => {
   const [orderSlotId, setOrderSlotId] = useState<number | undefined>(undefined)
   const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isCallLogsDrawerOpen, setIsCallLogsDrawerOpen] = useState(false)
 
   // Chi nhánh ưu tiên trực tiếp theo chiến dịch đang chọn (mỗi chiến dịch đã ứng với 1 chi nhánh)
   const branchId = selectedCampaign?.branch_id || activeTab?.draftResult?.branchId || 3
@@ -720,6 +724,46 @@ export const Telesale: React.FC = () => {
           </button>
 
           <button
+            type="button"
+            onClick={() => setIsCallLogsDrawerOpen(true)}
+            style={{
+              height: '36px',
+              padding: '0 13px',
+              borderRadius: '8px',
+              border: '1.5px solid #c7d2fe',
+              background: '#eef2ff',
+              color: '#4338ca',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
+            title="Xem danh sách cuộc gọi đã thực hiện hôm nay & nghe file ghi âm"
+          >
+            <History size={15} />
+            <span>Lịch sử cuộc gọi hôm nay</span>
+            {dailyResults?.tong_total_call !== undefined && dailyResults.tong_total_call > 0 && (
+              <span
+                style={{
+                  background: '#4f46e5',
+                  color: '#ffffff',
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  marginLeft: '2px',
+                }}
+              >
+                {dailyResults.tong_total_call}
+              </span>
+            )}
+          </button>
+
+          <button
             className="help"
             type="button"
             onClick={() => setIsHotkeysModalOpen(true)}
@@ -747,7 +791,12 @@ export const Telesale: React.FC = () => {
           <BarChart3 size={19} />
         </article>
 
-        <article className="call-stat blue">
+        <article
+          className="call-stat blue"
+          onClick={() => setIsCallLogsDrawerOpen(true)}
+          style={{ cursor: 'pointer' }}
+          title="Bấm để xem danh sách lịch sử cuộc gọi hôm nay"
+        >
           <div className="card-icon">
             <Phone size={21} />
           </div>
@@ -758,7 +807,12 @@ export const Telesale: React.FC = () => {
           <BarChart3 size={19} />
         </article>
 
-        <article className="call-stat green">
+        <article
+          className="call-stat green"
+          onClick={() => setIsCallLogsDrawerOpen(true)}
+          style={{ cursor: 'pointer' }}
+          title="Bấm để xem danh sách lịch sử cuộc gọi hôm nay"
+        >
           <div className="card-icon">
             <Users size={21} />
           </div>
@@ -868,6 +922,12 @@ export const Telesale: React.FC = () => {
             handleFetchCustomerForTab(activeTabId)
           }
         }}
+      />
+
+      {/* Drawer xem lại lịch sử cuộc gọi hôm nay và phát bản ghi âm */}
+      <TelesaleCallLogsDrawer
+        isOpen={isCallLogsDrawerOpen}
+        onClose={() => setIsCallLogsDrawerOpen(false)}
       />
     </div>
   )

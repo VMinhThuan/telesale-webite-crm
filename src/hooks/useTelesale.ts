@@ -147,18 +147,26 @@ export function useLast7DaysDailyResults() {
  * Hook truy vấn lịch sử cuộc gọi telesale (API 10a)
  * Tích hợp placeholderData: keepPreviousData giúp chuyển trang lịch sử mượt mà
  */
-export function useCallLogs(payload?: {
-  from_date?: string
-  to_date?: string
-  start?: number
-  length?: number
-  user_id?: number
-}) {
+export function useCallLogs(
+  payload?: {
+    from_date?: string
+    to_date?: string
+    start?: number
+    length?: number
+    user_id?: number
+  },
+  options?: {
+    enabled?: boolean
+    refetchInterval?: number | false
+  },
+) {
   return useQuery({
     queryKey: queryKeys.reports.callLogs(payload),
     queryFn: () => telesaleService.getCallLogs(payload),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30, // 30s
+    enabled: options?.enabled,
+    refetchInterval: options?.refetchInterval,
   })
 }
 

@@ -167,13 +167,19 @@ export const telesaleService = {
       API_ENDPOINTS.CALL_LOGS,
       payload || { start: 0, length: 50 },
     )
-    const result = response.result || response || {}
+    const result = response?.result !== undefined ? response.result : response
     if (Array.isArray(result)) {
       return { items: result, total: result.length }
     }
+    const items = result?.items || result?.data || []
+    const total =
+      result?.total ??
+      result?.recordsTotal ??
+      result?.count ??
+      (Array.isArray(items) ? items.length : 0)
     return {
-      items: result.items || [],
-      total: result.total ?? (result.items?.length || 0),
+      items: Array.isArray(items) ? items : [],
+      total: typeof total === 'number' ? total : 0,
     }
   },
 
@@ -185,13 +191,19 @@ export const telesaleService = {
       API_ENDPOINTS.ATTENDANCE,
       payload || { start: 0, length: 50 },
     )
-    const result = response.result || response || {}
+    const result = response?.result !== undefined ? response.result : response
     if (Array.isArray(result)) {
       return { items: result, total: result.length }
     }
+    const items = result?.items || result?.data || []
+    const total =
+      result?.total ??
+      result?.recordsTotal ??
+      result?.count ??
+      (Array.isArray(items) ? items.length : 0)
     return {
-      items: result.items || [],
-      total: result.total ?? (result.items?.length || 0),
+      items: Array.isArray(items) ? items : [],
+      total: typeof total === 'number' ? total : 0,
     }
   },
 }
