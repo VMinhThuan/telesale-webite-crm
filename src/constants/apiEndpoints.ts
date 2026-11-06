@@ -29,6 +29,9 @@ export const API_ENDPOINTS = {
   CUSTOMER_DETAIL: (customerId: number | string) => `/api/telesale/customers/${customerId}`,
   CUSTOMER_HISTORY: (customerId: number | string) => `/api/telesale/customers/${customerId}/history`,
   CUSTOMER_CARE_LOGS: (customerId: number | string) => `/api/telesale/customers/${customerId}/care-logs`,
+  CUSTOMER_UPDATE: (customerId: number | string) => `/api/telesale/customers/${customerId}/update`,
+  CUSTOMER_MEMBERS: (customerId: number | string) => `/api/telesale/customers/${customerId}/members`,
+  CUSTOMER_MEMBER_UPDATE: (customerId: number | string, memberId: number | string) => `/api/telesale/customers/${customerId}/members/${memberId}`,
 
   // 5. Đơn hàng & Slot hẹn
   BRANCH_SLOTS: '/api/telesale/branch-slots',

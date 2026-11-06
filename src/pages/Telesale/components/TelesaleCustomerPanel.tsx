@@ -686,7 +686,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               )}
             </div>
             <p style={{ marginTop: '5px' }}>
-              <MapPin size={13} /> {currentCustomer?.masked_address || '—'}
+              <MapPin size={13} /> {currentCustomer?.landmark || currentCustomer?.masked_address || '—'}
             </p>
           </div>
         </div>
@@ -698,6 +698,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           <span>
             Chiến dịch <b>{selectedCampaignName || 'Mặc định'}</b>
           </span>
+          {currentCustomer?.custom_field1 && (
+            <span>
+              Loại máy <b>{currentCustomer.custom_field1}</b>
+            </span>
+          )}
           <span>
             Khóa thông tin chi tiết <b>{currentCustomer?.lock_info ? 'Đang khóa' : 'Mở'}</b>
           </span>

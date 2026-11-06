@@ -51,6 +51,7 @@ export interface EnumsCatalog {
   machine_problem?: EnumItem[]
   huy_note?: EnumItem[]
   tra_ve_note?: EnumItem[]
+  relationship?: EnumItem[]
   phong_ban?: OrgEnumItem[]
   bo_phan?: OrgEnumItem[]
   to?: OrgEnumItem[]
@@ -123,6 +124,33 @@ export interface CustomerHistoryDto {
   result?: string | null
   note?: string | null
   ord_code?: string | null
+}
+
+export interface UpdateCustomerPayload {
+  name?: string
+  landmark?: string
+  custom_field1?: string
+  city_id?: number
+  district_id?: number
+  sub_district_id?: number
+}
+
+export interface AddCustomerMemberPayload {
+  first_name: string
+  phone_number: string
+  relationship: string
+}
+
+export interface UpdateCustomerMemberPayload {
+  first_name?: string
+  phone_number?: string
+  relationship?: string
+}
+
+export interface CustomerMemberMutationResponse {
+  member_id: number
+  members: CustomerMemberDto[]
+  msg?: string
 }
 
 // 4. Đơn hàng & Slot hẹn chi nhánh
@@ -201,6 +229,8 @@ export interface NextCustomerDto {
   lock_info: boolean
   lock_info_reason?: string | null
   members: CustomerMemberDto[]
+  custom_field1?: string
+  landmark?: string
 }
 
 export interface DialCallResponse {

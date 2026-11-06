@@ -68,7 +68,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Theo dõi số tin nhắn chưa đọc thực tế từ API chats khi đã đăng nhập
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const user = useAuthStore((s) => s.user)
   const { data: threadsData } = useChatThreads(1, 20, Boolean(isAuthenticated))
+
+  // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo, nhân viên thì ẩn
+  const canViewReports = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
+
+  const visibleNavItems = useMemo(() => {
+    return navItems.filter((item) => {
+      if (item.page === 'reports') {
+        return canViewReports
+      }
+      return true
+    })
+  }, [canViewReports])
 
   const unreadCount = useMemo(() => {
     if (!isAuthenticated || !threadsData?.threads) return 0
@@ -114,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <nav>
-        {navItems.map(({ label, page: itemPage, path, icon: Icon }) => (
+        {visibleNavItems.map(({ label, page: itemPage, path, icon: Icon }) => (
           <button
             key={label}
             title={label}

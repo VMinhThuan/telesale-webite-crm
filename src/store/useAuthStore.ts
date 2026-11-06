@@ -16,6 +16,8 @@ export interface UserProfile {
   name: string
   username: string
   role: string
+  phan_quyen?: 'admin' | 'truong_nhom' | 'nhan_vien'
+  phanQuyen?: 'admin' | 'truong_nhom' | 'nhan_vien'
   department?: string
   branchId?: number
   avatarUrl?: string

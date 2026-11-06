@@ -54,6 +54,7 @@ export function useEnums(types?: string[]) {
     callDirections: enums.call_direction || [],
     departments: enums.bo_phan || [],
     teams: enums.to || [],
+    relationships: enums.relationship || [],
   }
 }
 

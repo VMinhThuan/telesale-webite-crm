@@ -16,6 +16,7 @@ const emptyEnumsCatalog: EnumsCatalog = {
   bo_phan: [],
   huy_note: [],
   tra_ve_note: [],
+  relationship: [],
 }
 
 export const enumsService = {

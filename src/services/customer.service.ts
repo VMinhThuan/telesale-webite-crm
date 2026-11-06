@@ -5,7 +5,11 @@ import {
   CustomerDetailDto,
   CustomerDto,
   CustomerHistoryDto,
+  CustomerMemberMutationResponse,
   CustomerStatusType,
+  UpdateCustomerPayload,
+  AddCustomerMemberPayload,
+  UpdateCustomerMemberPayload,
 } from '../types/api'
 import apiClient, { generateIdempotencyKey } from './apiClient'
 
@@ -105,6 +109,49 @@ export const customerService = {
     }
 
     return apiClient.post(API_ENDPOINTS.CUSTOMER_CARE_LOGS(customerId), bodyPayload, { headers })
+  },
+
+  /**
+   * Sửa thông tin / địa chỉ khách hàng trên ERP
+   */
+  async updateCustomer(
+    customerId: number,
+    payload: UpdateCustomerPayload,
+  ): Promise<CustomerDetailDto & { msg?: string }> {
+    const response = await apiClient.post<any, any>(
+      API_ENDPOINTS.CUSTOMER_UPDATE(customerId),
+      payload,
+    )
+    return response.result || response
+  },
+
+  /**
+   * Thêm số điện thoại / người liên hệ mới cho khách hàng
+   */
+  async addCustomerMember(
+    customerId: number,
+    payload: AddCustomerMemberPayload,
+  ): Promise<CustomerMemberMutationResponse> {
+    const response = await apiClient.post<any, any>(
+      API_ENDPOINTS.CUSTOMER_MEMBERS(customerId),
+      payload,
+    )
+    return response.result || response
+  },
+
+  /**
+   * Sửa số điện thoại / tên / quan hệ của một thành viên
+   */
+  async updateCustomerMember(
+    customerId: number,
+    memberId: number,
+    payload: UpdateCustomerMemberPayload,
+  ): Promise<CustomerMemberMutationResponse> {
+    const response = await apiClient.post<any, any>(
+      API_ENDPOINTS.CUSTOMER_MEMBER_UPDATE(customerId, memberId),
+      payload,
+    )
+    return response.result || response
   },
 }
 

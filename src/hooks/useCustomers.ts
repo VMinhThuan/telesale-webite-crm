@@ -1,5 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import customerService, { CustomerQueryParams, SaveCareLogPayload } from '../services/customer.service'
+import {
+  AddCustomerMemberPayload,
+  UpdateCustomerMemberPayload,
+  UpdateCustomerPayload,
+} from '../types/api'
 import { queryKeys } from '../constants/queryKeys'
 import { notify } from '../utils/notify'
 
@@ -83,6 +88,111 @@ export function useSaveCareLogMutation() {
 
     onError: (err: any) => {
       notify(err.message || 'Lỗi khi lưu kết quả chăm sóc. Vui lòng thử lại.')
+    },
+  })
+}
+
+/**
+ * Mutation cập nhật thông tin khách hàng (tên, địa chỉ, loại máy, v.v.)
+ */
+export function useUpdateCustomerMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      customerId,
+      payload,
+    }: {
+      customerId: number
+      payload: UpdateCustomerPayload
+    }) => customerService.updateCustomer(customerId, payload),
+
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.lists() })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.customers.detail(variables.customerId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.customers.history(variables.customerId),
+      })
+      notify(data?.msg || 'Cập nhật thông tin khách hàng thành công!')
+    },
+
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.msg ||
+        err?.message ||
+        'Lỗi khi cập nhật thông tin khách hàng.'
+      notify(msg)
+    },
+  })
+}
+
+/**
+ * Mutation thêm số điện thoại / người liên hệ mới cho khách hàng
+ */
+export function useAddCustomerMemberMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      customerId,
+      payload,
+    }: {
+      customerId: number
+      payload: AddCustomerMemberPayload
+    }) => customerService.addCustomerMember(customerId, payload),
+
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.customers.detail(variables.customerId),
+      })
+      notify(data?.msg || 'Thêm số điện thoại thành công!')
+    },
+
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.msg ||
+        err?.message ||
+        'Lỗi khi thêm số điện thoại.'
+      notify(msg)
+    },
+  })
+}
+
+/**
+ * Mutation cập nhật số điện thoại / người liên hệ của khách hàng
+ */
+export function useUpdateCustomerMemberMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      customerId,
+      memberId,
+      payload,
+    }: {
+      customerId: number
+      memberId: number
+      payload: UpdateCustomerMemberPayload
+    }) => customerService.updateCustomerMember(customerId, memberId, payload),
+
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.customers.detail(variables.customerId),
+      })
+      notify(data?.msg || 'Cập nhật thông tin thành viên thành công!')
+    },
+
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.msg ||
+        err?.message ||
+        'Lỗi khi cập nhật thành viên.'
+      notify(msg)
     },
   })
 }

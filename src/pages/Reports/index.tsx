@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import {
   BadgeCheck,
   BarChart3,
@@ -25,10 +26,19 @@ import {
 import { useOrdersList } from '../../hooks/useOrders'
 import { formatVND } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
+import { useAuthStore } from '../../store/useAuthStore'
 
 type DatePreset = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom'
 
 export const Reports: React.FC = () => {
+  // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo, nhân viên thì chuyển hướng
+  const user = useAuthStore((s) => s.user)
+  const canViewReports = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
+
+  if (!canViewReports) {
+    return <Navigate to="/" replace />
+  }
+
   // 1. Quản lý trạng thái bộ lọc khoảng ngày (Từ ngày ... đến ngày)
   const [datePreset, setDatePreset] = useState<DatePreset>('7days')
   const [fromDate, setFromDate] = useState(() => dayjs().subtract(6, 'day').format('YYYY-MM-DD'))

@@ -13,6 +13,27 @@ export interface LoginResponse {
   user: UserProfile
 }
 
+// Xác định phân quyền người dùng theo đặc tả API 03 (admin, truong_nhom, nhan_vien)
+function determinePhanQuyen(raw: any): 'admin' | 'truong_nhom' | 'nhan_vien' {
+  if (raw.phan_quyen === 'admin' || raw.phan_quyen === 'truong_nhom' || raw.phan_quyen === 'nhan_vien') {
+    return raw.phan_quyen
+  }
+  const roleStr = String(raw.chuc_vu || raw.role_name || raw.role || raw.loai_nv || '').toLowerCase()
+  if (raw.is_admin === true || raw.is_admin === 1 || roleStr.includes('admin') || roleStr.includes('giám đốc')) {
+    return 'admin'
+  }
+  if (
+    raw.is_leader === true ||
+    raw.is_leader === 1 ||
+    roleStr.includes('trưởng') ||
+    roleStr.includes('leader') ||
+    roleStr.includes('quản lý')
+  ) {
+    return 'truong_nhom'
+  }
+  return 'nhan_vien'
+}
+
 export const authService = {
   /**
    * Đăng nhập lấy access_token từ hệ thống ERP
@@ -52,6 +73,8 @@ export const authService = {
       throw new Error(errorMsg)
     }
 
+    const userRaw = response.user || response.result?.user || response.result || {}
+    const phanQuyen = determinePhanQuyen(userRaw)
     const user: UserProfile =
       response.user ||
       response.result?.user || {
@@ -59,6 +82,8 @@ export const authService = {
         name: response.result?.name || response.name || credentials.username,
         username: credentials.username,
         role: response.result?.role || 'Telesale',
+        phan_quyen: phanQuyen,
+        phanQuyen: phanQuyen,
         department: response.result?.department || 'Phòng Telesale',
         branchId: response.result?.branch_id || 3,
       }
@@ -97,11 +122,15 @@ export const authService = {
       response.user ||
       response
 
+    const pq = determinePhanQuyen(raw)
+
     const userProfile: UserProfile = {
       id: raw.id || raw.user_id || 1,
       name: raw.full_name || raw.name || 'Nhân viên Telesale',
       username: raw.username || raw.contact_number || '',
       role: raw.chuc_vu || raw.role_name || raw.role || 'Nhân viên',
+      phan_quyen: pq,
+      phanQuyen: pq,
       department: raw.department_name || raw.department || 'Phòng Telesale',
       branchId: raw.branch_id || 3,
       avatarUrl: raw.avatar || undefined,

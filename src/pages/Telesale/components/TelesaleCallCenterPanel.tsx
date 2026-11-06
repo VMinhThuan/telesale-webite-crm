@@ -24,6 +24,7 @@ import { useTelesaleConfig } from '../../../hooks/useTelesaleConfig'
 import { defaultTelesaleConfig } from '../../../services/telesaleConfig.service'
 import { ParsedCallTermination } from '../../../utils/sipCallParser'
 import { TelesaleScriptEditModal } from './TelesaleScriptEditModal'
+import { useAuthStore } from '../../../store/useAuthStore'
 
 export interface TelesaleCallTab {
   id: number
@@ -84,6 +85,10 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   // Lấy tab đang active
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
   const currentCustomer = activeTab?.customer
+
+  // Phân quyền: Chỉ admin mới có quyền chỉnh sửa kịch bản tư vấn
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = user?.phan_quyen === 'admin'
 
   // Hook nạp kịch bản từ Cloudflare R2
   const { data: config } = useTelesaleConfig()
@@ -903,26 +908,28 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <p className="eyebrow" style={{ margin: 0 }}>KỊCH BẢN TƯ VẤN</p>
-              {/* Nút Chỉnh sửa Kịch bản */}
-              <button
-                type="button"
-                title="Chỉnh sửa kịch bản tư vấn"
-                onClick={() => setIsEditScriptModalOpen(true)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  borderRadius: '4px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
-              >
-                <Pencil size={13} />
-              </button>
+              {/* Nút Chỉnh sửa Kịch bản - Chỉ Admin mới có quyền */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  title="Chỉnh sửa kịch bản tư vấn (Chỉ Quản trị viên)"
+                  onClick={() => setIsEditScriptModalOpen(true)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
             </div>
             <h2>{currentScript?.title || 'Tư vấn máy lọc nước'}</h2>
           </div>
@@ -1030,8 +1037,8 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
         </ol>
       </section>
 
-      {/* Modal Chỉnh sửa Kịch bản tư vấn */}
-      {isEditScriptModalOpen && (
+      {/* Modal Chỉnh sửa Kịch bản tư vấn - Chỉ Admin có quyền */}
+      {isAdmin && isEditScriptModalOpen && (
         <TelesaleScriptEditModal
           scripts={scripts}
           activeScriptId={currentScript?.id || ''}

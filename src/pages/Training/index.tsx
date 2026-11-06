@@ -27,6 +27,7 @@ import {
 } from '../../hooks/useTraining'
 import { notify } from '../../utils/notify'
 import { formatDate } from '../../utils/formatters'
+import { useAuthStore } from '../../store/useAuthStore'
 import { TrainingUploadModal } from './components/TrainingUploadModal'
 import { TrainingViewerModal } from './components/TrainingViewerModal'
 import { TrainingEditModal } from './components/TrainingEditModal'
@@ -46,6 +47,10 @@ const getMaterialIcon = (type: string, tone?: string) => {
 }
 
 export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
+  // Phân quyền: Chỉ admin mới có quyền tải lên, sửa, xóa, quản lý tab/danh mục. Trưởng nhóm và nhân viên chỉ được xem
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = user?.phan_quyen === 'admin'
+
   const [category, setCategory] = useState('Tất cả')
   const [query, setQuery] = useState('')
 
@@ -211,52 +216,56 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
             />
           </label>
 
-          <button
-            type="button"
-            onClick={() => setIsManageCategoriesOpen(true)}
-            style={{
-              height: '38px',
-              padding: '0 14px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#334155',
-              fontSize: '13px',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <FolderCog size={16} style={{ color: '#2563eb' }} />
-            <span>Quản lý danh mục</span>
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#334155',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <FolderCog size={16} style={{ color: '#2563eb' }} />
+                <span>Quản lý danh mục</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setIsUploadOpen(true)}
-            style={{
-              height: '38px',
-              padding: '0 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#2563eb',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <UploadCloud size={16} /> Tải tài liệu lên
-          </button>
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                style={{
+                  height: '38px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <UploadCloud size={16} /> Tải tài liệu lên
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -328,55 +337,57 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
                           }}
                         >
                           <h3>{item.title}</h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {/* Nút chỉnh sửa tài liệu */}
-                            <button
-                              type="button"
-                              title="Chỉnh sửa tài liệu"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setEditingMaterial(item)
-                              }}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                borderRadius: '4px',
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.color = '#3b82f6')
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.color = '#94a3b8')
-                              }
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            {/* Nút xóa tài liệu */}
-                            <button
-                              type="button"
-                              title="Xóa tài liệu"
-                              onClick={(e) => handleDeleteMaterial(e, item)}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                borderRadius: '4px',
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.color = '#ef4444')
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.color = '#94a3b8')
-                              }
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                          {isAdmin && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {/* Nút chỉnh sửa tài liệu */}
+                              <button
+                                type="button"
+                                title="Chỉnh sửa tài liệu"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingMaterial(item)
+                                }}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#94a3b8',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.color = '#3b82f6')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.color = '#94a3b8')
+                                }
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              {/* Nút xóa tài liệu */}
+                              <button
+                                type="button"
+                                title="Xóa tài liệu"
+                                onClick={(e) => handleDeleteMaterial(e, item)}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#94a3b8',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.color = '#ef4444')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.color = '#94a3b8')
+                                }
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <p>{item.desc}</p>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -511,8 +522,8 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         </aside>
       </div>
 
-      {/* Modal Tải tài liệu lên */}
-      {isUploadOpen && (
+      {/* Modal Tải tài liệu lên - Chỉ Admin */}
+      {isAdmin && isUploadOpen && (
         <TrainingUploadModal
           categories={categories}
           activeCategory={category}
@@ -520,8 +531,8 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         />
       )}
 
-      {/* Modal Chỉnh sửa thông tin tài liệu */}
-      {editingMaterial && (
+      {/* Modal Chỉnh sửa thông tin tài liệu - Chỉ Admin */}
+      {isAdmin && editingMaterial && (
         <TrainingEditModal
           material={editingMaterial}
           categories={categories}
@@ -529,7 +540,7 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         />
       )}
 
-      {/* Modal Xem Video / Đọc PDF tài liệu thực tế từ R2 */}
+      {/* Modal Xem Video / Đọc PDF tài liệu thực tế từ R2 - Mọi người dùng đều xem được */}
       {viewerMaterial && (
         <TrainingViewerModal
           material={viewerMaterial}
@@ -537,8 +548,8 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         />
       )}
 
-      {/* Modal Xác nhận xóa Phân loại danh mục / Tab */}
-      {categoryPendingDelete && (
+      {/* Modal Xác nhận xóa Phân loại danh mục / Tab - Chỉ Admin */}
+      {isAdmin && categoryPendingDelete && (
         <DeleteCategoryConfirmModal
           categoryName={categoryPendingDelete}
           materialCount={
@@ -550,8 +561,8 @@ export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
         />
       )}
 
-      {/* Modal Quản lý phân loại danh mục / Tabs */}
-      {isManageCategoriesOpen && (
+      {/* Modal Quản lý phân loại danh mục / Tabs - Chỉ Admin */}
+      {isAdmin && isManageCategoriesOpen && (
         <TrainingCategoriesManageModal
           categories={categories}
           materials={materialsList}

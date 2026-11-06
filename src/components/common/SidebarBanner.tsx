@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useTelesaleConfig } from '../../hooks/useTelesaleConfig'
 import { SidebarBannerModal } from './SidebarBannerModal'
+import { useAuthStore } from '../../store/useAuthStore'
 
 interface SidebarBannerProps {
   collapsed?: boolean
@@ -15,6 +16,9 @@ interface SidebarBannerProps {
 
 export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
   const { data: config } = useTelesaleConfig()
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = user?.phan_quyen === 'admin'
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -76,41 +80,43 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Nút Cài đặt / Quản lý Banner */}
-      <button
-        type="button"
-        title="Quản lý banner"
-        onClick={() => setIsModalOpen(true)}
-        style={{
-          position: 'absolute',
-          top: '6px',
-          right: '6px',
-          zIndex: 10,
-          width: '26px',
-          height: '26px',
-          borderRadius: '50%',
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(4px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          color: '#ffffff',
-          display: 'grid',
-          placeItems: 'center',
-          cursor: 'pointer',
-          padding: 0,
-          transition: 'all 0.2s',
-        }}
-      >
-        <Settings size={13} />
-      </button>
+      {/* Nút Cài đặt / Quản lý Banner - Chỉ dành cho Admin */}
+      {isAdmin && (
+        <button
+          type="button"
+          title="Quản lý banner (Chỉ Quản trị viên)"
+          onClick={() => setIsModalOpen(true)}
+          style={{
+            position: 'absolute',
+            top: '6px',
+            right: '6px',
+            zIndex: 10,
+            width: '26px',
+            height: '26px',
+            borderRadius: '50%',
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#ffffff',
+            display: 'grid',
+            placeItems: 'center',
+            cursor: 'pointer',
+            padding: 0,
+            transition: 'all 0.2s',
+          }}
+        >
+          <Settings size={13} />
+        </button>
+      )}
 
       {/* Trường hợp chưa có ảnh nào */}
       {count === 0 ? (
         <div
-          onClick={() => setIsModalOpen(true)}
+          onClick={isAdmin ? () => setIsModalOpen(true) : undefined}
           style={{
             padding: '18px 12px',
             textAlign: 'center',
-            cursor: 'pointer',
+            cursor: isAdmin ? 'pointer' : 'default',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -133,28 +139,36 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
           <strong style={{ fontSize: '12px', color: '#f1f5f9' }}>
             Banner thông báo
           </strong>
-          <span style={{ fontSize: '10px', color: '#94a3b8' }}>
-            Nhấn để thêm ảnh trình chiếu
-          </span>
-          <button
-            type="button"
-            style={{
-              marginTop: '4px',
-              border: 'none',
-              background: '#2563eb',
-              color: '#ffffff',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '11px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            <Plus size={12} /> Thêm banner
-          </button>
+          {isAdmin ? (
+            <>
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                Nhấn để thêm ảnh trình chiếu
+              </span>
+              <button
+                type="button"
+                style={{
+                  marginTop: '4px',
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={12} /> Thêm banner
+              </button>
+            </>
+          ) : (
+            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+              Chưa có hình ảnh trình chiếu
+            </span>
+          )}
         </div>
       ) : (
         /* Trường hợp có ảnh */
@@ -292,8 +306,8 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
         </div>
       )}
 
-      {/* Modal Quản lý */}
-      {isModalOpen && bannerConfig && (
+      {/* Modal Quản lý - Chỉ Admin */}
+      {isAdmin && isModalOpen && bannerConfig && (
         <SidebarBannerModal
           bannerConfig={bannerConfig}
           onClose={() => setIsModalOpen(false)}

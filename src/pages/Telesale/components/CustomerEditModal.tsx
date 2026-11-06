@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import {
   AlertCircle,
+  Check,
+  Cpu,
+  Loader2,
   MapPin,
   Pencil,
   Phone,
   Plus,
-  Trash2,
   User,
   X,
 } from 'lucide-react'
-import { CustomerMemberDto, NextCustomerDto } from '../../../types/api'
+import { CustomerMemberDto, NextCustomerDto, UpdateCustomerPayload } from '../../../types/api'
+import {
+  useAddCustomerMemberMutation,
+  useUpdateCustomerMemberMutation,
+  useUpdateCustomerMutation,
+} from '../../../hooks/useCustomers'
+import { useEnums } from '../../../hooks/useEnums'
 import { notify } from '../../../utils/notify'
 
 export interface CustomerEditModalProps {
@@ -19,7 +27,7 @@ export interface CustomerEditModalProps {
   onSave: (updatedCustomer: NextCustomerDto) => void
 }
 
-const RELATIONSHIP_OPTIONS = [
+const DEFAULT_RELATIONSHIPS = [
   'Chính chủ',
   'Người quyết định',
   'Vợ',
@@ -36,20 +44,41 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   customer,
   onSave,
 }) => {
+  // 1. Tải danh mục quan hệ từ ERP
+  const { relationships } = useEnums(['relationship'])
+  const relationshipOptions =
+    relationships && relationships.length > 0
+      ? relationships.map((r) => r.label || r.code)
+      : DEFAULT_RELATIONSHIPS
+
+  // 2. State thông tin chung khách hàng
   const [customerName, setCustomerName] = useState('')
   const [address, setAddress] = useState('')
+  const [machineModel, setMachineModel] = useState('')
   const [members, setMembers] = useState<CustomerMemberDto[]>([])
 
-  // State cho form thêm số điện thoại mới
+  // 3. State thêm số điện thoại mới
   const [newMemberName, setNewMemberName] = useState('')
   const [newMemberPhone, setNewMemberPhone] = useState('')
-  const [newMemberRelationship, setNewMemberRelationship] = useState('Chính chủ')
+  const [newMemberRelationship, setNewMemberRelationship] = useState(relationshipOptions[0] || 'Chính chủ')
+
+  // 4. State chỉnh sửa inline thành viên đang có
+  const [editingMemberId, setEditingMemberId] = useState<number | null>(null)
+  const [editMemberName, setEditMemberName] = useState('')
+  const [editMemberPhone, setEditMemberPhone] = useState('')
+  const [editMemberRelationship, setEditMemberRelationship] = useState('')
+
+  // 5. React Query Mutations kết nối trực tiếp Backend
+  const updateCustomerMutation = useUpdateCustomerMutation()
+  const addMemberMutation = useAddCustomerMemberMutation()
+  const updateMemberMutation = useUpdateCustomerMemberMutation()
 
   // Đổ dữ liệu khi mở Modal hoặc khi khách hàng thay đổi
   useEffect(() => {
     if (customer && isOpen) {
       setCustomerName(customer.customer_name || '')
-      setAddress(customer.masked_address || '')
+      setAddress(customer.landmark || customer.masked_address || '')
+      setMachineModel(customer.custom_field1 || '')
       setMembers(
         Array.isArray(customer.members) && customer.members.length > 0
           ? [...customer.members]
@@ -64,16 +93,17 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
       )
       setNewMemberName('')
       setNewMemberPhone('')
-      setNewMemberRelationship('Chính chủ')
+      setNewMemberRelationship(relationshipOptions[0] || 'Chính chủ')
+      setEditingMemberId(null)
     }
   }, [customer, isOpen])
 
   if (!isOpen || !customer) return null
 
-  // Xử lý thêm số điện thoại mới vào danh sách
-  const handleAddMember = (e: React.FormEvent) => {
+  // Xử lý thêm số điện thoại mới (gọi API POST /members)
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
-    const cleanPhone = newMemberPhone.trim()
+    const cleanPhone = newMemberPhone.trim().replace(/\s+/g, '')
     const cleanName = newMemberName.trim() || customerName || 'Người liên hệ'
 
     if (!cleanPhone) {
@@ -81,52 +111,194 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
       return
     }
 
-    // Kiểm tra định dạng cơ bản của số điện thoại Việt Nam (10 số)
-    const phoneRegex = /^(0|\+84)[0-9]{8,11}$/
-    if (!phoneRegex.test(cleanPhone.replace(/\s+/g, ''))) {
+    // Kiểm tra định dạng số điện thoại (10 chữ số bắt đầu bằng 0 hoặc +84 / 84)
+    const phoneRegex = /^(0|\+84|84)[0-9]{9}$/
+    if (!phoneRegex.test(cleanPhone)) {
       notify('Số điện thoại không đúng định dạng. Vui lòng nhập 10 chữ số (VD: 0912345678).')
       return
     }
 
-    const newMember: CustomerMemberDto = {
-      member_id: -Math.floor(Date.now() % 1000000), // ID âm tượng trưng cho member tạo mới ở FE
-      name: cleanName,
-      phone_masked: cleanPhone,
-      relationship: newMemberRelationship,
-    }
+    try {
+      const response = await addMemberMutation.mutateAsync({
+        customerId: customer.customer_id,
+        payload: {
+          first_name: cleanName,
+          phone_number: cleanPhone,
+          relationship: newMemberRelationship,
+        },
+      })
 
-    setMembers((prev) => [...prev, newMember])
-    setNewMemberPhone('')
-    setNewMemberName('')
-    notify(`Đã thêm số điện thoại: ${cleanPhone} (${cleanName})`)
+      // Backend trả về danh sách members cập nhật
+      let updatedMembers: CustomerMemberDto[] = []
+      if (response?.members && Array.isArray(response.members)) {
+        updatedMembers = response.members
+      } else {
+        // Fallback nếu response dạng tối giản
+        const masked = cleanPhone.length === 10
+          ? `${cleanPhone.slice(0, 2)}******${cleanPhone.slice(8)}`
+          : cleanPhone
+        updatedMembers = [
+          ...members,
+          {
+            member_id: response?.member_id || Date.now(),
+            name: cleanName,
+            phone_masked: masked,
+            relationship: newMemberRelationship,
+          },
+        ]
+      }
+
+      setMembers(updatedMembers)
+      setNewMemberName('')
+      setNewMemberPhone('')
+
+      // Cập nhật ngay phiên làm việc ở store cha để cột gọi có số mới
+      onSave({
+        ...customer,
+        customer_name: customerName.trim() || customer.customer_name,
+        masked_address: address.trim() || customer.masked_address,
+        landmark: address.trim(),
+        custom_field1: machineModel.trim(),
+        members: updatedMembers,
+      })
+    } catch {
+      // Lỗi đã được xử lý và hiển thị thông báo qua onError của useAddCustomerMemberMutation
+    }
   }
 
-  // Xử lý xóa một số điện thoại
-  const handleRemoveMember = (memberId: number) => {
-    if (members.length <= 1) {
-      notify('Khách hàng phải có tối thiểu 1 số điện thoại liên hệ!')
-      return
-    }
-    setMembers((prev) => prev.filter((m) => m.member_id !== memberId))
+  // Mở chế độ sửa thông tin thành viên
+  const handleStartEditMember = (m: CustomerMemberDto) => {
+    setEditingMemberId(m.member_id)
+    setEditMemberName(m.name || '')
+    setEditMemberPhone('') // Mặc định để trống nếu không đổi số
+    setEditMemberRelationship(m.relationship || relationshipOptions[0] || 'Chính chủ')
   }
 
-  // Lưu lại các thay đổi vào hồ sơ khách hàng
-  const handleSubmitSave = () => {
+  // Hủy sửa thành viên
+  const handleCancelEditMember = () => {
+    setEditingMemberId(null)
+  }
+
+  // Lưu sửa thông tin thành viên (gọi API POST /members/{memberId})
+  const handleSaveEditMember = async (memberId: number) => {
+    try {
+      const payload: { first_name?: string; phone_number?: string; relationship?: string } = {}
+      if (editMemberName.trim()) payload.first_name = editMemberName.trim()
+      if (editMemberRelationship) payload.relationship = editMemberRelationship
+      if (editMemberPhone.trim()) {
+        const cleanPhone = editMemberPhone.trim().replace(/\s+/g, '')
+        const phoneRegex = /^(0|\+84|84)[0-9]{9}$/
+        if (!phoneRegex.test(cleanPhone)) {
+          notify('Số điện thoại mới không hợp lệ. Vui lòng nhập 10 chữ số.')
+          return
+        }
+        payload.phone_number = cleanPhone
+      }
+
+      const response = await updateMemberMutation.mutateAsync({
+        customerId: customer.customer_id,
+        memberId,
+        payload,
+      })
+
+      let updatedMembers: CustomerMemberDto[] = []
+      if (response?.members && Array.isArray(response.members)) {
+        updatedMembers = response.members
+      } else {
+        updatedMembers = members.map((m) =>
+          m.member_id === memberId
+            ? {
+                ...m,
+                name: editMemberName.trim() || m.name,
+                relationship: editMemberRelationship || m.relationship,
+                ...(editMemberPhone.trim()
+                  ? {
+                      phone_masked: `${editMemberPhone.slice(0, 2)}******${editMemberPhone.slice(8)}`,
+                    }
+                  : {}),
+              }
+            : m,
+        )
+      }
+
+      setMembers(updatedMembers)
+      setEditingMemberId(null)
+
+      onSave({
+        ...customer,
+        members: updatedMembers,
+      })
+    } catch {
+      // Đã notify trong hook
+    }
+  }
+
+  // Lưu thông tin chung khách hàng (Tên, Địa chỉ chi tiết, Loại máy)
+  const handleSubmitSave = async () => {
     if (!customerName.trim()) {
       notify('Họ tên khách hàng không được để trống!')
       return
     }
 
-    const updatedCustomer: NextCustomerDto = {
-      ...customer,
-      customer_name: customerName.trim(),
-      masked_address: address.trim() || customer.masked_address,
-      members,
+    const currentName = (customer.customer_name || '').trim()
+    const currentAddr = (customer.landmark || customer.masked_address || '').trim()
+    const currentMachine = (customer.custom_field1 || '').trim()
+
+    const newName = customerName.trim()
+    const newAddr = address.trim()
+    const newMachine = machineModel.trim()
+
+    const payload: UpdateCustomerPayload = {}
+    let hasChanges = false
+
+    if (newName !== currentName) {
+      payload.name = newName
+      hasChanges = true
+    }
+    if (newAddr !== currentAddr && newAddr !== '') {
+      payload.landmark = newAddr
+      hasChanges = true
+    }
+    if (newMachine !== currentMachine) {
+      payload.custom_field1 = newMachine
+      hasChanges = true
     }
 
-    onSave(updatedCustomer)
-    notify('Đã cập nhật thông tin khách hàng thành công!')
-    onClose()
+    // Nếu không có thay đổi nào ở thông tin chung nhưng có thể đã thêm số
+    if (!hasChanges) {
+      const updatedCustomer: NextCustomerDto = {
+        ...customer,
+        customer_name: newName,
+        masked_address: newAddr || customer.masked_address,
+        landmark: newAddr,
+        custom_field1: newMachine,
+        members,
+      }
+      onSave(updatedCustomer)
+      onClose()
+      return
+    }
+
+    try {
+      await updateCustomerMutation.mutateAsync({
+        customerId: customer.customer_id,
+        payload,
+      })
+
+      const updatedCustomer: NextCustomerDto = {
+        ...customer,
+        customer_name: newName,
+        masked_address: newAddr || customer.masked_address,
+        landmark: newAddr,
+        custom_field1: newMachine,
+        members,
+      }
+
+      onSave(updatedCustomer)
+      onClose()
+    } catch {
+      // Đã notify trong hook
+    }
   }
 
   return (
@@ -149,8 +321,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           background: '#ffffff',
           borderRadius: '14px',
           width: '100%',
-          maxWidth: '720px',
-          maxHeight: '90vh',
+          maxWidth: '740px',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -162,7 +334,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         {/* Header Modal */}
         <div
           style={{
-            padding: '18px 24px',
+            padding: '16px 22px',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
@@ -184,14 +356,14 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                 border: '1px solid #bfdbfe',
               }}
             >
-              <Pencil size={19} />
+              <Pencil size={18} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
-                Sửa thông tin khách hàng
+              <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: 700, color: '#0f172a' }}>
+                Cập nhật thông tin khách hàng
               </h3>
-              <p style={{ margin: '3px 0 0 0', fontSize: '12.5px', color: '#64748b' }}>
-                Mã KH: <b>{customer.customer_code}</b>
+              <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                Mã KH: <b>{customer.customer_code}</b> • ID: #{customer.customer_id}
               </p>
             </div>
           </div>
@@ -214,134 +386,204 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           </button>
         </div>
 
-        {/* Body Modal (Scrollable, không cuộn ngang) */}
+        {/* Body Modal (Scrollable) */}
         <div
           style={{
-            padding: '24px',
+            padding: '20px 24px',
             overflowY: 'auto',
             overflowX: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
+            gap: '18px',
           }}
         >
-          {/* Thông báo API */}
+          {/* Banner thông báo */}
           <div
             style={{
-              padding: '10px 12px',
+              padding: '10px 14px',
               background: '#f0f9ff',
               border: '1px solid #bae6fd',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '8px',
+              gap: '9px',
               fontSize: '12px',
               color: '#0369a1',
-              lineHeight: '1.4',
+              lineHeight: '1.45',
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span>
-              <b>Lưu ý:</b> Dữ liệu chỉnh sửa sẽ được cập nhật trực tiếp vào phiên gọi của tab hiện tại.
-              Khi Backend hoàn thiện API, hệ thống sẽ tự động đồng bộ vĩnh viễn lên cơ sở dữ liệu ERP.
+              <b>Lưu ý đồng bộ:</b> Dữ liệu chỉnh sửa được lưu vĩnh viễn lên cơ sở dữ liệu ERP và tự động ghi 1 dòng lịch sử CSKH.
+              Số điện thoại mới thêm sẽ lập tức sẵn sàng để quay số trên bàn softphone.
             </span>
           </div>
 
-          {/* 1. Tên khách hàng */}
-          <div>
-            <label
+          {/* KHỐI 1: THÔNG TIN HỘ GIA ĐÌNH & THIẾT BỊ */}
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '16px',
+              background: '#ffffff',
+            }}
+          >
+            <div
               style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: '#1e293b',
+                marginBottom: '14px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.4px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: '6px',
+                gap: '7px',
               }}
             >
               <User size={15} style={{ color: '#2563eb' }} />
-              <span>Họ và tên khách hàng</span> <b style={{ color: '#e11d48' }}>*</b>
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Nhập họ tên khách hàng..."
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '13.5px',
-                color: '#1e293b',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
+              <span>Thông tin khách hàng & Thiết bị</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+              {/* 1.1 Họ tên */}
+              <div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  <span>Họ và tên khách hàng</span> <b style={{ color: '#e11d48' }}>*</b>
+                </label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nhập họ tên khách hàng..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '7px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    color: '#1e293b',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* 1.2 Loại máy đang dùng */}
+              <div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  <Cpu size={14} style={{ color: '#2563eb' }} />
+                  <span>Loại máy / Thiết bị đang dùng</span>
+                </label>
+                <input
+                  type="text"
+                  value={machineModel}
+                  onChange={(e) => setMachineModel(e.target.value)}
+                  placeholder="VD: Karofi 8 lõi, Kangaroo, AO Smith..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '7px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    color: '#1e293b',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* 1.3 Địa chỉ chi tiết */}
+            <div>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#334155',
+                  marginBottom: '5px',
+                }}
+              >
+                <MapPin size={14} style={{ color: '#2563eb' }} />
+                <span>Địa chỉ chi tiết (Số nhà, ngõ ngách, tên đường, thôn xóm)</span>
+              </label>
+              <textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={2}
+                placeholder="Nhập số nhà, ngõ/ngách, đường phố, phường/xã, quận/huyện..."
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '7px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  color: '#1e293b',
+                  outline: 'none',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.45',
+                }}
+              />
+            </div>
           </div>
 
-          {/* 2. Địa chỉ */}
-          <div>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#334155',
-                marginBottom: '6px',
-              }}
-            >
-              <MapPin size={15} style={{ color: '#2563eb' }} />
-              <span>Địa chỉ liên hệ / Lắp đặt</span>
-            </label>
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={3}
-              placeholder="Nhập số nhà, tên đường, phường/xã, quận/huyện..."
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '13.5px',
-                color: '#1e293b',
-                outline: 'none',
-                resize: 'vertical',
-                boxSizing: 'border-box',
-                fontFamily: 'inherit',
-                lineHeight: '1.5',
-              }}
-            />
-          </div>
-
-          {/* 3. Danh sách số điện thoại & Người liên hệ */}
-          <div>
+          {/* KHỐI 2: DANH SÁCH SỐ ĐIỆN THOẠI & NGƯỜI NGHE MÁY */}
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '16px',
+              background: '#ffffff',
+            }}
+          >
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '8px',
+                marginBottom: '12px',
               }}
             >
-              <label
+              <div
                 style={{
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#334155',
-                  margin: 0,
+                  gap: '7px',
                 }}
               >
                 <Phone size={15} style={{ color: '#2563eb' }} />
                 <span>Số điện thoại người liên hệ ({members.length})</span>
-              </label>
+              </div>
             </div>
 
             {/* Danh sách các số hiện có */}
@@ -349,116 +591,238 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '6px',
-                marginBottom: '12px',
+                gap: '8px',
+                marginBottom: '14px',
               }}
             >
-              {members.map((m, idx) => (
-                <div
-                  key={m.member_id || idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: '7px',
-                    border: '1px solid #e2e8f0',
-                    background: '#f8fafc',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {members.map((m, idx) => {
+                const isEditing = editingMemberId === m.member_id
+
+                if (isEditing) {
+                  return (
                     <div
+                      key={m.member_id}
                       style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '50%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #93c5fd',
                         background: '#eff6ff',
-                        color: '#2563eb',
-                        display: 'flex',
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(120px, 1fr) minmax(130px, 1.2fr) minmax(120px, 1fr) auto',
+                        gap: '8px',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 700,
                       }}
                     >
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
-                        {m.name || 'Người liên hệ'}
+                      <input
+                        type="text"
+                        value={editMemberName}
+                        onChange={(e) => setEditMemberName(e.target.value)}
+                        placeholder="Tên liên hệ"
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12px',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={editMemberPhone}
+                        onChange={(e) => setEditMemberPhone(e.target.value)}
+                        placeholder="Số ĐT mới (bỏ trống nếu giữ nguyên)"
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12px',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                      <select
+                        value={editMemberRelationship}
+                        onChange={(e) => setEditMemberRelationship(e.target.value)}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '12px',
+                          outline: 'none',
+                          background: '#ffffff',
+                          color: '#334155',
+                        }}
+                      >
+                        {relationshipOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEditMember(m.member_id)}
+                          disabled={updateMemberMutation.isPending}
+                          title="Lưu cập nhật thành viên"
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {updateMemberMutation.isPending ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Check size={13} />
+                          )}
+                          Lưu
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditMember}
+                          title="Hủy"
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            background: '#ffffff',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{m.phone_masked}</span>
-                        {m.relationship && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              background: '#e0f2fe',
-                              color: '#0369a1',
-                              padding: '1px 6px',
-                              borderRadius: '4px',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {m.relationship}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                  </div>
+                  )
+                }
 
-                  {members.length > 1 && (
+                return (
+                  <div
+                    key={m.member_id || idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: '7px',
+                      border: '1px solid #e2e8f0',
+                      background: '#f8fafc',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                          {m.name || 'Người liên hệ'}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <span>{m.phone_masked}</span>
+                          {m.relationship && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                background: '#e0f2fe',
+                                color: '#0369a1',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 500,
+                              }}
+                            >
+                              {m.relationship}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <button
                       type="button"
-                      onClick={() => handleRemoveMember(m.member_id)}
-                      title="Xóa số điện thoại này"
+                      onClick={() => handleStartEditMember(m)}
+                      title="Sửa thông tin hoặc số điện thoại người này"
                       style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#ef4444',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#475569',
                         cursor: 'pointer',
-                        padding: '4px',
-                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        borderRadius: '5px',
                         display: 'flex',
                         alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500,
                       }}
                     >
-                      <Trash2 size={15} />
+                      <Pencil size={12} /> Sửa
                     </button>
-                  )}
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Form thêm số điện thoại mới */}
             <div
               style={{
-                padding: '14px 16px',
-                borderRadius: '9px',
+                padding: '12px 14px',
+                borderRadius: '8px',
                 border: '1.5px dashed #cbd5e1',
                 background: '#fafafa',
               }}
             >
               <div
                 style={{
-                  fontSize: '12.5px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#475569',
-                  marginBottom: '10px',
+                  marginBottom: '9px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                 }}
               >
-                <Plus size={15} style={{ color: '#16a34a' }} />
+                <Plus size={14} style={{ color: '#16a34a' }} />
                 <span>Thêm số điện thoại mới cho khách hàng:</span>
               </div>
 
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(140px, 1.3fr) minmax(130px, 1fr) auto',
-                  gap: '10px',
+                  gridTemplateColumns: 'minmax(130px, 1.2fr) minmax(130px, 1.3fr) minmax(120px, 1fr) auto',
+                  gap: '8px',
                   alignItems: 'center',
                 }}
               >
@@ -468,8 +832,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '7px',
+                    padding: '7px 11px',
+                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     fontSize: '12.5px',
                     outline: 'none',
@@ -483,8 +847,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                   value={newMemberPhone}
                   onChange={(e) => setNewMemberPhone(e.target.value)}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '7px',
+                    padding: '7px 11px',
+                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     fontSize: '12.5px',
                     outline: 'none',
@@ -496,8 +860,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                   value={newMemberRelationship}
                   onChange={(e) => setNewMemberRelationship(e.target.value)}
                   style={{
-                    padding: '8px 10px',
-                    borderRadius: '7px',
+                    padding: '7px 8px',
+                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     fontSize: '12.5px',
                     outline: 'none',
@@ -506,7 +870,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                     boxSizing: 'border-box',
                   }}
                 >
-                  {RELATIONSHIP_OPTIONS.map((opt) => (
+                  {relationshipOptions.map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
                     </option>
@@ -515,15 +879,16 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddMember}
+                  disabled={addMemberMutation.isPending}
                   style={{
-                    padding: '8px 16px',
-                    borderRadius: '7px',
+                    padding: '7px 15px',
+                    borderRadius: '6px',
                     border: 'none',
-                    background: '#16a34a',
+                    background: addMemberMutation.isPending ? '#94a3b8' : '#16a34a',
                     color: '#ffffff',
-                    fontSize: '12.5px',
+                    fontSize: '12px',
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: addMemberMutation.isPending ? 'not-allowed' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
@@ -531,7 +896,15 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                     flexShrink: 0,
                   }}
                 >
-                  <Plus size={15} /> Thêm
+                  {addMemberMutation.isPending ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Đang thêm...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} /> Thêm số
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -541,47 +914,58 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         {/* Footer Modal */}
         <div
           style={{
-            padding: '16px 24px',
+            padding: '14px 22px',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
-            gap: '12px',
+            gap: '10px',
             background: '#f8fafc',
           }}
         >
           <button
             type="button"
             onClick={onClose}
+            disabled={updateCustomerMutation.isPending}
             style={{
-              padding: '9px 18px',
+              padding: '8px 16px',
               borderRadius: '7px',
               border: '1px solid #cbd5e1',
               background: '#ffffff',
               color: '#475569',
-              fontSize: '13.5px',
+              fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
             }}
           >
-            Hủy bỏ
+            Đóng
           </button>
           <button
             type="button"
             onClick={handleSubmitSave}
+            disabled={updateCustomerMutation.isPending}
             style={{
-              padding: '9px 24px',
+              padding: '8px 22px',
               borderRadius: '7px',
               border: 'none',
-              background: '#2563eb',
+              background: updateCustomerMutation.isPending ? '#93c5fd' : '#2563eb',
               color: '#ffffff',
-              fontSize: '13.5px',
+              fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: updateCustomerMutation.isPending ? 'not-allowed' : 'pointer',
               boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            Lưu thay đổi
+            {updateCustomerMutation.isPending ? (
+              <>
+                <Loader2 size={14} className="animate-spin" /> Đang lưu...
+              </>
+            ) : (
+              'Lưu thay đổi'
+            )}
           </button>
         </div>
       </div>
@@ -590,4 +974,3 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 }
 
 export default CustomerEditModal
-
