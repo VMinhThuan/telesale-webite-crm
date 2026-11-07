@@ -180,10 +180,14 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
           style={{
             position: 'relative',
             width: '100%',
-            aspectRatio: '16/9',
+            minHeight: '120px',
+            maxHeight: 'min(450px, calc(100vh - 440px))',
             overflow: 'hidden',
             cursor: 'pointer',
             background: '#091c3d',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           onClick={() => {
             if (currentBanner) {
@@ -210,14 +214,15 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
             }}
           />
 
-          {/* Ảnh chính hiển thị 100% nguyên vẹn (objectFit: contain), bảo toàn toàn bộ nội dung chữ, số liệu, không bị cắt viền */}
+          {/* Ảnh chính hiển thị 100% nguyên vẹn (objectFit: contain), tự động co giãn theo tỉ lệ dọc hoặc ngang, không bị cắt viền */}
           <img
             src={currentBanner?.imageUrl}
             alt={currentBanner?.title || 'Banner'}
             style={{
               position: 'relative',
               width: '100%',
-              height: '100%',
+              height: 'auto',
+              maxHeight: 'min(450px, calc(100vh - 440px))',
               objectFit: 'contain',
               display: 'block',
               zIndex: 1,

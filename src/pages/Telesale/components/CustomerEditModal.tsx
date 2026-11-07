@@ -83,13 +83,13 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         Array.isArray(customer.members) && customer.members.length > 0
           ? [...customer.members]
           : [
-              {
-                member_id: 1,
-                name: customer.customer_name || 'Chính chủ',
-                phone_masked: '—',
-                relationship: 'Chính chủ',
-              },
-            ],
+            {
+              member_id: 1,
+              name: customer.customer_name || 'Chính chủ',
+              phone_masked: '—',
+              relationship: 'Chính chủ',
+            },
+          ],
       )
       setNewMemberName('')
       setNewMemberPhone('')
@@ -208,15 +208,15 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         updatedMembers = members.map((m) =>
           m.member_id === memberId
             ? {
-                ...m,
-                name: editMemberName.trim() || m.name,
-                relationship: editMemberRelationship || m.relationship,
-                ...(editMemberPhone.trim()
-                  ? {
-                      phone_masked: `${editMemberPhone.slice(0, 2)}******${editMemberPhone.slice(8)}`,
-                    }
-                  : {}),
-              }
+              ...m,
+              name: editMemberName.trim() || m.name,
+              relationship: editMemberRelationship || m.relationship,
+              ...(editMemberPhone.trim()
+                ? {
+                  phone_masked: `${editMemberPhone.slice(0, 2)}******${editMemberPhone.slice(8)}`,
+                }
+                : {}),
+            }
             : m,
         )
       }
@@ -397,27 +397,6 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             gap: '18px',
           }}
         >
-          {/* Banner thông báo */}
-          <div
-            style={{
-              padding: '10px 14px',
-              background: '#f0f9ff',
-              border: '1px solid #bae6fd',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '9px',
-              fontSize: '12px',
-              color: '#0369a1',
-              lineHeight: '1.45',
-            }}
-          >
-            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <span>
-              <b>Lưu ý đồng bộ:</b> Dữ liệu chỉnh sửa được lưu vĩnh viễn lên cơ sở dữ liệu ERP và tự động ghi 1 dòng lịch sử CSKH.
-              Số điện thoại mới thêm sẽ lập tức sẵn sàng để quay số trên bàn softphone.
-            </span>
-          </div>
 
           {/* KHỐI 1: THÔNG TIN HỘ GIA ĐÌNH & THIẾT BỊ */}
           <div

@@ -306,8 +306,8 @@ export const SidebarBannerModal: React.FC<SidebarBannerModalProps> = ({
                     <p style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
                       Kéo thả ảnh vào đây hoặc click để chọn tệp
                     </p>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>
-                      Khuyến nghị ảnh tỉ lệ <strong>16:9</strong> (1920x1080) hoặc <strong>4:3</strong> (1024x768). Hệ thống tự căn giữa trọn vẹn, không cắt viền và hỗ trợ click phóng to xem rõ nét.
+                    <p style={{ margin: 0, fontSize: '11px', color: '#64748b', lineHeight: 1.5 }}>
+                      Khuyến nghị ảnh <strong>dạng dọc (poster / standee) tỉ lệ 9:16 hoặc 3:4</strong> (ví dụ 1080x1920 hoặc 768x1024) để phủ trọn vẹn và đẹp mắt khoảng trống của thanh Sidebar. Hệ thống cũng hỗ trợ ảnh vuông và ảnh ngang, tự co giãn vừa vặn 100% không bị cắt viền.
                     </p>
                   </div>
                 )}
