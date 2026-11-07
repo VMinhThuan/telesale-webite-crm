@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Image as ImageIcon,
+  Maximize2,
   Plus,
   Settings,
 } from 'lucide-react'
 import { useTelesaleConfig } from '../../hooks/useTelesaleConfig'
 import { SidebarBannerModal } from './SidebarBannerModal'
+import { ImageLightboxModal, LightboxImage } from './ImageLightboxModal'
 import { useAuthStore } from '../../store/useAuthStore'
 
 interface SidebarBannerProps {
@@ -22,6 +25,7 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [previewImage, setPreviewImage] = useState<LightboxImage | null>(null)
 
   const bannerConfig = config?.banners
   const items = bannerConfig?.items || []
@@ -172,36 +176,106 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
         </div>
       ) : (
         /* Trường hợp có ảnh */
-        <div style={{ position: 'relative', width: '100%', aspectRatio: '16/10' }}>
-          {currentBanner?.linkUrl ? (
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '16/9',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            background: '#091c3d',
+          }}
+          onClick={() => {
+            if (currentBanner) {
+              setPreviewImage({
+                url: currentBanner.imageUrl,
+                title: currentBanner.title,
+              })
+            }
+          }}
+          title="Bấm để xem ảnh phóng to chi tiết"
+        >
+          {/* Lớp nền mờ nghệ thuật: lấy chính ảnh làm mờ nhẹ để hòa hợp màu sắc, không để lại khoảng trống đơn điệu */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: -12,
+              backgroundImage: `url(${currentBanner?.imageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(14px) brightness(0.6)',
+              opacity: 0.85,
+              transform: 'scale(1.15)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Ảnh chính hiển thị 100% nguyên vẹn (objectFit: contain), bảo toàn toàn bộ nội dung chữ, số liệu, không bị cắt viền */}
+          <img
+            src={currentBanner?.imageUrl}
+            alt={currentBanner?.title || 'Banner'}
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              zIndex: 1,
+              transition: 'transform 0.2s ease',
+            }}
+          />
+
+          {/* Biểu tượng phóng to nhỏ ở góc trên trái */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              left: '6px',
+              zIndex: 4,
+              width: '24px',
+              height: '24px',
+              borderRadius: '6px',
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(4px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#ffffff',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              pointerEvents: 'none',
+            }}
+            title="Nhấn để phóng to ảnh"
+          >
+            <Maximize2 size={12} />
+          </div>
+
+          {/* Nút mở link ngoài nếu banner có linkUrl */}
+          {currentBanner?.linkUrl && (
             <a
               href={currentBanner.linkUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'block', width: '100%', height: '100%' }}
-            >
-              <img
-                src={currentBanner.imageUrl}
-                alt={currentBanner.title}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
-              />
-            </a>
-          ) : (
-            <img
-              src={currentBanner?.imageUrl}
-              alt={currentBanner?.title || 'Banner'}
+              onClick={(e) => e.stopPropagation()}
               style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
+                position: 'absolute',
+                top: '6px',
+                left: '34px',
+                zIndex: 4,
+                width: '24px',
+                height: '24px',
+                borderRadius: '6px',
+                background: 'rgba(37, 99, 235, 0.85)',
+                backdropFilter: 'blur(4px)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                color: '#ffffff',
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
               }}
-            />
+              title="Mở liên kết đính kèm"
+            >
+              <ExternalLink size={12} />
+            </a>
           )}
 
           {/* Tiêu đề mờ ở đáy banner nếu có */}
@@ -212,6 +286,7 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
                 bottom: 0,
                 left: 0,
                 right: 0,
+                zIndex: 2,
                 padding: '16px 8px 6px',
                 background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
                 color: '#ffffff',
@@ -220,6 +295,7 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                pointerEvents: 'none',
               }}
             >
               {currentBanner.title}
@@ -305,6 +381,13 @@ export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
           )}
         </div>
       )}
+
+      {/* Lightbox xem ảnh phóng to toàn màn hình */}
+      <ImageLightboxModal
+        isOpen={Boolean(previewImage)}
+        image={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
 
       {/* Modal Quản lý - Chỉ Admin */}
       {isAdmin && isModalOpen && bannerConfig && (
