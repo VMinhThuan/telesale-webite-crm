@@ -97,7 +97,7 @@ export const FaceAttendancePage: React.FC = () => {
 
   // 3. Khởi động Camera Webcam
   const startCamera = useCallback(
-    async (deviceId?: string) => {
+    async (deviceId?: string, isMountedCheck?: () => boolean) => {
       stopCamera()
       setCameraState('initializing')
       setErrorMessage('')
@@ -116,12 +116,29 @@ export const FaceAttendancePage: React.FC = () => {
         }
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+        // Nếu component đã unmount trước khi getUserMedia hoàn tất -> đóng ngay luồng
+        if (isMountedCheck && !isMountedCheck()) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+
         streamRef.current = stream
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream
-          await videoRef.current.play()
+          try {
+            await videoRef.current.play()
+          } catch (playErr: any) {
+            if (playErr.name === 'AbortError') {
+              // Yêu cầu play() bị ngắt do tải lại luồng mới hoặc unmount, an toàn bỏ qua
+              return
+            }
+            throw playErr
+          }
         }
+
+        if (isMountedCheck && !isMountedCheck()) return
 
         // Lấy danh sách thiết bị camera khả dụng
         try {
@@ -134,6 +151,11 @@ export const FaceAttendancePage: React.FC = () => {
 
         setCameraState('ready')
       } catch (err: any) {
+        if (err.name === 'AbortError') {
+          return
+        }
+        if (isMountedCheck && !isMountedCheck()) return
+
         console.error('Lỗi khi mở Camera:', err)
         setCameraState('error')
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -155,8 +177,10 @@ export const FaceAttendancePage: React.FC = () => {
   )
 
   useEffect(() => {
-    startCamera(selectedDeviceId)
+    let isMounted = true
+    startCamera(selectedDeviceId, () => isMounted)
     return () => {
+      isMounted = false
       stopCamera()
     }
   }, [startCamera, selectedDeviceId, stopCamera])
@@ -803,4 +827,3 @@ export const FaceAttendancePage: React.FC = () => {
 }
 
 export default FaceAttendancePage
-
