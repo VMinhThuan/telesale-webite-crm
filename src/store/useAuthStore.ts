@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
+import dayjs from '../lib/dayjs'
 import {
   clearStoredAuth,
   getStoredToken,
@@ -57,10 +58,17 @@ interface AuthState {
   user: UserProfile | null
   isAuthenticated: boolean
 
+  // Quản lý trạng thái chấm công / quét khuôn mặt trong ngày
+  attendanceDate: string | null
+  attendanceTime: string | null
+  isAttendanceCheckedIn: boolean
+
   // Actions
   login: (token: string, user: UserProfile) => void
   logout: () => void
   updateUser: (partial: Partial<UserProfile>) => void
+  setAttendanceCheckedIn: (date: string, time: string) => void
+  resetAttendanceCheckedIn: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -71,10 +79,14 @@ export const useAuthStore = create<AuthState>()(
         user: getStoredUser(),
         isAuthenticated: Boolean(getStoredToken()),
 
+        attendanceDate: null,
+        attendanceTime: null,
+        isAttendanceCheckedIn: false,
+
         login: (token, user) => {
           if (!token) {
             clearStoredAuth()
-            set({ token: null, user: null, isAuthenticated: false }, false, 'auth/login-failed')
+            set({ token: null, user: null, isAuthenticated: false, attendanceDate: null, attendanceTime: null, isAttendanceCheckedIn: false }, false, 'auth/login-failed')
             return
           }
           setStoredToken(token)
@@ -100,7 +112,18 @@ export const useAuthStore = create<AuthState>()(
 
           // 3. Xóa token và auth storage
           clearStoredAuth()
-          set({ token: null, user: null, isAuthenticated: false }, false, 'auth/logout')
+          set(
+            {
+              token: null,
+              user: null,
+              isAuthenticated: false,
+              attendanceDate: null,
+              attendanceTime: null,
+              isAttendanceCheckedIn: false,
+            },
+            false,
+            'auth/logout',
+          )
         },
 
         updateUser: (partial) =>
@@ -113,13 +136,42 @@ export const useAuthStore = create<AuthState>()(
             false,
             'auth/updateUser',
           ),
+
+        setAttendanceCheckedIn: (date, time) =>
+          set(
+            {
+              attendanceDate: date,
+              attendanceTime: time,
+              isAttendanceCheckedIn: true,
+            },
+            false,
+            'auth/setAttendanceCheckedIn',
+          ),
+
+        resetAttendanceCheckedIn: () =>
+          set(
+            {
+              attendanceDate: null,
+              attendanceTime: null,
+              isAttendanceCheckedIn: false,
+            },
+            false,
+            'auth/resetAttendanceCheckedIn',
+          ),
       }),
       {
         name: 'salesflow_auth_storage',
-        // Chỉ lưu token và user an toàn (loại bỏ mật khẩu SIP plain text) vào persistent storage
+        // Chỉ lưu token, user và cờ chấm công an toàn vào persistent storage
         partialize: (state) => {
           if (!state.user) {
-            return { token: state.token, user: null, isAuthenticated: state.isAuthenticated }
+            return {
+              token: state.token,
+              user: null,
+              isAuthenticated: state.isAuthenticated,
+              attendanceDate: null,
+              attendanceTime: null,
+              isAttendanceCheckedIn: false,
+            }
           }
           const safeUser = { ...state.user }
           if (safeUser.sipConfig) {
@@ -130,6 +182,9 @@ export const useAuthStore = create<AuthState>()(
             token: state.token,
             user: safeUser,
             isAuthenticated: state.isAuthenticated,
+            attendanceDate: state.attendanceDate,
+            attendanceTime: state.attendanceTime,
+            isAttendanceCheckedIn: state.isAttendanceCheckedIn,
           }
         },
       },
@@ -138,9 +193,21 @@ export const useAuthStore = create<AuthState>()(
   ),
 )
 
+// Helper kiểm tra xem người dùng đã chấm công hợp lệ hôm nay chưa
+export const isAttendanceValidToday = (state: {
+  attendanceDate?: string | null
+  isAttendanceCheckedIn?: boolean
+}): boolean => {
+  if (!state.isAttendanceCheckedIn || !state.attendanceDate) return false
+  const today = dayjs().format('YYYY-MM-DD')
+  return state.attendanceDate === today
+}
+
 // Atomic Selectors giúp tối ưu hiệu năng render khi chỉ cần lấy một trường cụ thể
 export const useAuthUser = () => useAuthStore((s) => s.user)
 export const useIsAuthenticated = () => useAuthStore((s) => s.isAuthenticated)
 export const useAuthToken = () => useAuthStore((s) => s.token)
+export const useIsAttendanceCheckedIn = () =>
+  useAuthStore((s) => isAttendanceValidToday(s))
 
 export default useAuthStore

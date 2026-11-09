@@ -25,10 +25,14 @@ import { DialogState, PageType } from '@/types'
 import { notify } from '@/utils/notify'
 import { getEffectiveSipConfig } from '@/utils/sip'
 import { parseSipTermination } from '@/utils/sipCallParser'
+import { useMidnightAutoLogout } from '@/hooks/useMidnightAutoLogout'
 
 // Code-splitting các trang qua React.lazy giúp tối ưu dung lượng tải ban đầu
 const LoginPage = lazy(() =>
   import('@/pages/Login').then((m) => ({ default: m.LoginPage })),
+)
+const FaceAttendancePage = lazy(() =>
+  import('@/pages/FaceAttendance').then((m) => ({ default: m.FaceAttendancePage })),
 )
 const Dashboard = lazy(() =>
   import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })),
@@ -63,6 +67,9 @@ const AppShell: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   const [toast, setToast] = useState('')
   const [dialog, setDialog] = useState<DialogState | null>(null)
+
+  // Tự động đăng xuất sau 23:59 mỗi ngày theo quy định chấm công
+  useMidnightAutoLogout()
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
   useEnums()
@@ -377,6 +384,9 @@ export const App: React.FC = () => {
           <Routes>
             {/* Tuyến đường công khai: Trang đăng nhập toàn màn hình */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Màn hình Quét khuôn mặt / Điểm danh bắt buộc toàn màn hình */}
+            <Route path="/face-attendance" element={<FaceAttendancePage />} />
 
             {/* Toàn bộ tuyến đường nghiệp vụ nội bộ: Bảo vệ bởi Route Guard */}
             <Route

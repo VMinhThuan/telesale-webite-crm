@@ -421,6 +421,15 @@ export const Topbar: React.FC<TopbarProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  navigate('/face-attendance')
+                  setProfileOpen(false)
+                }}
+              >
+                Chấm công khuôn mặt
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   if (setPage) setPage('settings')
                   navigate('/settings')
                   setProfileOpen(false)

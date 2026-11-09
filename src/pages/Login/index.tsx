@@ -14,6 +14,8 @@ import {
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { SalesFlowLogo } from '../../components/common/SalesFlowLogo'
+import { isAttendanceValidToday, useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -37,9 +39,12 @@ export const LoginPage: React.FC = () => {
   const redirectTarget =
     searchParams.get('redirect') || (location.state as any)?.from?.pathname || '/'
 
-  // Nếu đã đăng nhập hợp lệ, tự động chuyển hướng về trang đích
+  // Nếu đã đăng nhập hợp lệ, kiểm tra xem đã quét mặt chấm công hôm nay chưa
   if (isAuthenticated) {
-    return <Navigate to={redirectTarget} replace />
+    const isCheckedInToday = isAttendanceValidToday(useAuthStore.getState())
+    const isAdmin = determinePhanQuyen(useAuthStore.getState().user) === 'admin'
+    const target = isCheckedInToday || isAdmin ? redirectTarget : '/face-attendance'
+    return <Navigate to={target} replace state={{ from: redirectTarget }} />
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,7 +70,10 @@ export const LoginPage: React.FC = () => {
         setErrorMessage('Đăng nhập thất bại: Không nhận được access_token từ máy chủ.')
         return
       }
-      navigate(redirectTarget, { replace: true })
+      const isCheckedInToday = isAttendanceValidToday(useAuthStore.getState())
+      const isAdmin = determinePhanQuyen(res.user) === 'admin'
+      const destination = isCheckedInToday || isAdmin ? redirectTarget : '/face-attendance'
+      navigate(destination, { replace: true, state: { from: redirectTarget } })
     } catch (err: any) {
       setErrorMessage(
         err.message || 'Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.',

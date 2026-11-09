@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   ENUMS: '/api/telesale/enums',
   SYSTEM_STATUS: '/api/telesale/system/status',
   ATTENDANCE: '/api/telesale/attendance',
+  ATTENDANCE_CHECKIN: '/api/telesale/attendance/check-in',
 
   // 3. Telesale & Cuộc gọi
   CALL_LOGS: '/api/telesale/call-logs',
