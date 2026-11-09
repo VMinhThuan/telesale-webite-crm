@@ -39,7 +39,7 @@ export const careOutcomes: {
 }[] = [
     { key: 'consulting', label: 'Đang tư vấn', icon: Phone, tone: 'blue' },
     { key: 'scheduled', label: 'Đã hẹn lịch', icon: CalendarCheck, tone: 'green' },
-    { key: 'closed', label: 'Đã chốt', icon: ShoppingCart, tone: 'rose' },
+    { key: 'closed', label: 'Đã chốt', icon: ShoppingCart, tone: 'green' },
     { key: 'no_need', label: 'Chưa có nhu cầu', icon: Voicemail, tone: 'gray' },
     { key: 'unreachable', label: 'Không liên lạc được', icon: CircleX, tone: 'purple' },
   ]

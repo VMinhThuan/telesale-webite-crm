@@ -12,6 +12,7 @@ import { useTelesaleConfig } from '../../hooks/useTelesaleConfig'
 import { SidebarBannerModal } from './SidebarBannerModal'
 import { ImageLightboxModal, LightboxImage } from './ImageLightboxModal'
 import { useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 
 interface SidebarBannerProps {
   collapsed?: boolean
@@ -20,7 +21,7 @@ interface SidebarBannerProps {
 export const SidebarBanner: React.FC<SidebarBannerProps> = ({ collapsed }) => {
   const { data: config } = useTelesaleConfig()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.phan_quyen === 'admin'
+  const isAdmin = determinePhanQuyen(user) === 'admin'
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)

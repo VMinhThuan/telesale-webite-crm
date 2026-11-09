@@ -39,9 +39,9 @@ export const resultOptions: {
 }[] = [
   { key: 'callback', label: 'Gọi chốt', icon: PhoneCall, tone: 'amber' },
   { key: 'potential', label: 'Khách tiềm năng', icon: Users, tone: 'green' },
-  { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'blue' },
-  { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'rose' },
-  { key: 'no_filter_machine', label: 'Không dùng máy lọc nước', icon: Droplets, tone: 'rose' },
+  { key: 'closed', label: 'Đã chốt đơn', icon: ShoppingCart, tone: 'green' },
+  { key: 'not_interested', label: 'Không nhu cầu', icon: CircleX, tone: 'gray' },
+  { key: 'no_filter_machine', label: 'Không dùng máy lọc nước', icon: Droplets, tone: 'gray' },
   { key: 'wrong_number', label: 'Sai số', icon: CircleX, tone: 'gray' },
 ]
 
@@ -835,11 +835,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             style={{
               margin: '0 16px 12px',
               padding: '10px 12px',
-              background: '#fff1f2',
+              background: '#f1f5f9',
               borderRadius: '7px',
-              border: '1px solid #fecdd3',
+              border: '1px solid #e2e8f0',
               fontSize: '11px',
-              color: '#be123c',
+              color: '#475569',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',

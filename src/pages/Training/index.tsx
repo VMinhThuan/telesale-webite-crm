@@ -28,6 +28,7 @@ import {
 import { notify } from '../../utils/notify'
 import { formatDate } from '../../utils/formatters'
 import { useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 import { TrainingUploadModal } from './components/TrainingUploadModal'
 import { TrainingViewerModal } from './components/TrainingViewerModal'
 import { TrainingEditModal } from './components/TrainingEditModal'
@@ -49,7 +50,7 @@ const getMaterialIcon = (type: string, tone?: string) => {
 export const Training: React.FC<TrainingProps> = ({ setPage: _setPage }) => {
   // Phân quyền: Chỉ admin mới có quyền tải lên, sửa, xóa, quản lý tab/danh mục. Trưởng nhóm và nhân viên chỉ được xem
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.phan_quyen === 'admin'
+  const isAdmin = determinePhanQuyen(user) === 'admin'
 
   const [category, setCategory] = useState('Tất cả')
   const [query, setQuery] = useState('')

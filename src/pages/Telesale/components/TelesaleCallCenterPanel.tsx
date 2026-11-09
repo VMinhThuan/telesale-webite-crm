@@ -25,6 +25,7 @@ import { defaultTelesaleConfig } from '../../../services/telesaleConfig.service'
 import { ParsedCallTermination } from '../../../utils/sipCallParser'
 import { TelesaleScriptEditModal } from './TelesaleScriptEditModal'
 import { useAuthStore } from '../../../store/useAuthStore'
+import { determinePhanQuyen } from '../../../services/auth.service'
 
 export interface TelesaleCallTab {
   id: number
@@ -88,7 +89,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
 
   // Phân quyền: Chỉ admin mới có quyền chỉnh sửa kịch bản tư vấn
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.phan_quyen === 'admin'
+  const isAdmin = determinePhanQuyen(user) === 'admin'
 
   // Hook nạp kịch bản từ Cloudflare R2
   const { data: config } = useTelesaleConfig()

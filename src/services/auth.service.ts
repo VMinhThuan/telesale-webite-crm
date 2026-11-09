@@ -14,11 +14,12 @@ export interface LoginResponse {
 }
 
 // Xác định phân quyền người dùng theo đặc tả API 03 (admin, truong_nhom, nhan_vien)
-function determinePhanQuyen(raw: any): 'admin' | 'truong_nhom' | 'nhan_vien' {
+export function determinePhanQuyen(raw: any): 'admin' | 'truong_nhom' | 'nhan_vien' {
+  if (!raw) return 'nhan_vien'
   if (raw.phan_quyen === 'admin' || raw.phan_quyen === 'truong_nhom' || raw.phan_quyen === 'nhan_vien') {
     return raw.phan_quyen
   }
-  const roleStr = String(raw.chuc_vu || raw.role_name || raw.role || raw.loai_nv || '').toLowerCase()
+  const roleStr = String(raw.chuc_vu || raw.role_name || raw.role || raw.loai_nv || raw.chucVu || '').toLowerCase()
   if (raw.is_admin === true || raw.is_admin === 1 || roleStr.includes('admin') || roleStr.includes('giám đốc')) {
     return 'admin'
   }
@@ -75,18 +76,18 @@ export const authService = {
 
     const userRaw = response.user || response.result?.user || response.result || {}
     const phanQuyen = determinePhanQuyen(userRaw)
-    const user: UserProfile =
-      response.user ||
-      response.result?.user || {
-        id: response.result?.user_id || response.user_id || 1,
-        name: response.result?.name || response.name || credentials.username,
-        username: credentials.username,
-        role: response.result?.role || 'Telesale',
-        phan_quyen: phanQuyen,
-        phanQuyen: phanQuyen,
-        department: response.result?.department || 'Phòng Telesale',
-        branchId: response.result?.branch_id || 3,
-      }
+    const baseUser = response.user || response.result?.user || {}
+    const user: UserProfile = {
+      id: baseUser.id || response.result?.user_id || response.user_id || 1,
+      name: baseUser.name || response.result?.name || response.name || credentials.username,
+      username: baseUser.username || credentials.username,
+      role: baseUser.role || response.result?.role || 'Nhân viên',
+      department: baseUser.department || response.result?.department || 'Phòng Telesale',
+      branchId: baseUser.branchId || response.result?.branch_id || 3,
+      ...baseUser,
+      phan_quyen: phanQuyen,
+      phanQuyen: phanQuyen,
+    }
 
     setStoredToken(token)
 

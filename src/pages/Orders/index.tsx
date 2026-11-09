@@ -44,6 +44,7 @@ import {
 } from '../../hooks/useOrders'
 import { useCampaigns } from '../../hooks/useTelesale'
 import { useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 import { DialogState } from '../../types'
 import { CallActionControl } from '../../components/common/CallActionControl'
 import dayjs from '../../lib/dayjs'
@@ -141,7 +142,8 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   const user = useAuthStore((s) => s.user)
   const userBranchId = user?.branchId
   // Phân quyền: Chỉ trưởng nhóm và admin mới được thao tác điều chỉnh lịch hẹn đơn hàng, sale thì ẩn
-  const canAdjustAppointment = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
+  const pq = determinePhanQuyen(user)
+  const canAdjustAppointment = pq === 'admin' || pq === 'truong_nhom'
 
   const availableBranches = useMemo(() => {
     const map = new Map<number, string>()

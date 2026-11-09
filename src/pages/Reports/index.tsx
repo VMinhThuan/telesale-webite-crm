@@ -27,13 +27,15 @@ import { useOrdersList } from '../../hooks/useOrders'
 import { formatVND } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 import { useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 
 type DatePreset = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom'
 
 export const Reports: React.FC = () => {
   // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo, nhân viên thì chuyển hướng
   const user = useAuthStore((s) => s.user)
-  const canViewReports = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
+  const pq = determinePhanQuyen(user)
+  const canViewReports = pq === 'admin' || pq === 'truong_nhom'
 
   if (!canViewReports) {
     return <Navigate to="/" replace />

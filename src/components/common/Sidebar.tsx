@@ -18,6 +18,7 @@ import { PageType } from '../../types'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useChatThreads } from '../../hooks/useChat'
 import { SidebarBanner } from './SidebarBanner'
+import { determinePhanQuyen } from '../../services/auth.service'
 import { SalesFlowLogo } from './SalesFlowLogo'
 
 interface NavItemDef {
@@ -72,7 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { data: threadsData } = useChatThreads(1, 20, Boolean(isAuthenticated))
 
   // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo, nhân viên thì ẩn
-  const canViewReports = user?.phan_quyen === 'admin' || user?.phan_quyen === 'truong_nhom'
+  const pq = determinePhanQuyen(user)
+  const canViewReports = pq === 'admin' || pq === 'truong_nhom'
 
   const visibleNavItems = useMemo(() => {
     return navItems.filter((item) => {

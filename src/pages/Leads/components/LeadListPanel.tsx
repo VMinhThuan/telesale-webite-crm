@@ -38,7 +38,7 @@ export const CARE_STATUS_OPTIONS: {
   { value: 'all', label: 'Tất cả trạng thái', icon: Users },
   { value: 'consulting', label: 'Đang tư vấn', tone: 'blue', icon: Phone },
   { value: 'scheduled', label: 'Đã hẹn lịch', tone: 'green', icon: CalendarCheck },
-  { value: 'closed', label: 'Đã chốt đơn', tone: 'rose', icon: ShoppingCart },
+  { value: 'closed', label: 'Đã chốt đơn', tone: 'green', icon: ShoppingCart },
   { value: 'unreachable', label: 'Không nghe máy', tone: 'purple', icon: CircleX },
   { value: 'no_need', label: 'Chưa có nhu cầu', tone: 'gray', icon: Voicemail },
 ]
@@ -179,7 +179,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   const getStatusLabel = (item: CustomerDto): { text: string; tone: string } => {
     if (item.care_status === 'scheduled') return { text: 'Đã hẹn lịch', tone: 'green' }
     if (item.care_status === 'consulting' || item.care_status === 'callback') return { text: 'Đang tư vấn', tone: 'blue' }
-    if (item.care_status === 'closed') return { text: 'Đã chốt', tone: 'rose' }
+    if (item.care_status === 'closed') return { text: 'Đã chốt', tone: 'green' }
     if (item.care_status === 'unreachable') return { text: 'Không nghe máy', tone: 'purple' }
     if (item.care_status === 'no_need') return { text: 'Chưa có nhu cầu', tone: 'gray' }
     return { text: 'Chưa phân loại', tone: 'gray' }
@@ -726,7 +726,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                     <td>{formatDateTime(lead.next_care_at)}</td>
                     <td>
                       <span className={clsx('lead-status', tone)}>
-                        {tone === 'rose' ? (
+                        {lead.care_status === 'closed' ? (
                           <ShoppingCart size={14} />
                         ) : tone === 'green' ? (
                           <CalendarCheck size={14} />

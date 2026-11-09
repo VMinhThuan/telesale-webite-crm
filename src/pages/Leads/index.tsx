@@ -102,7 +102,7 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
           <BarChart3 size={15} />
         </article>
 
-        <article className="call-stat rose">
+        <article className="call-stat green">
           <div className="card-icon">
             <ShoppingCart size={21} />
           </div>
