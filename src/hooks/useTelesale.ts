@@ -3,7 +3,7 @@ import telesaleService, {
   DialCallPayload,
   GetNextCustomerPayload,
 } from '../services/telesale.service'
-import { AttendanceDto, SaveCallResultPayload } from '../types/api'
+import { AttendanceDto, ErpSource, SaveCallResultPayload } from '../types/api'
 import { queryKeys } from '../constants/queryKeys'
 import { notify } from '../utils/notify'
 import dayjs from '../lib/dayjs'
@@ -29,7 +29,10 @@ export function useCampaigns() {
 /**
  * Hook truy vấn kết quả hiệu suất telesale trong ngày hoặc khoảng ngày
  */
-export function useDailyResults(date?: string | { from_date?: string; to_date?: string }) {
+export function useDailyResults(
+  date?: string | { from_date?: string; to_date?: string },
+  source_erp: ErpSource | 'all' = 'all',
+) {
   const dateKey =
     typeof date === 'string'
       ? date
@@ -38,8 +41,8 @@ export function useDailyResults(date?: string | { from_date?: string; to_date?: 
         : undefined
 
   return useQuery({
-    queryKey: queryKeys.telesale.dailyResults(dateKey),
-    queryFn: () => telesaleService.getDailyResults(date),
+    queryKey: queryKeys.telesale.dailyResults(dateKey, source_erp),
+    queryFn: () => telesaleService.getDailyResults(date, source_erp),
     staleTime: 1000 * 60 * 2, // 2 phút
   })
 }
@@ -47,16 +50,19 @@ export function useDailyResults(date?: string | { from_date?: string; to_date?: 
 /**
  * Hook truy vấn danh sách hiệu suất telesale theo khoảng thời gian
  */
-export function useDailyResultsList(payload?: {
-  from_date?: string
-  to_date?: string
-  user_id?: number
-  start?: number
-  length?: number
-}) {
+export function useDailyResultsList(
+  payload?: {
+    from_date?: string
+    to_date?: string
+    user_id?: number
+    start?: number
+    length?: number
+  },
+  source_erp: ErpSource | 'all' = 'all',
+) {
   return useQuery({
-    queryKey: queryKeys.telesale.dailyResultsList(payload),
-    queryFn: () => telesaleService.getDailyResultsList(payload),
+    queryKey: queryKeys.telesale.dailyResultsList(payload, source_erp),
+    queryFn: () => telesaleService.getDailyResultsList(payload, source_erp),
     staleTime: 1000 * 60 * 2,
   })
 }
@@ -158,11 +164,13 @@ export function useCallLogs(
   options?: {
     enabled?: boolean
     refetchInterval?: number | false
+    source_erp?: ErpSource | 'all'
   },
 ) {
+  const source_erp = options?.source_erp || 'all'
   return useQuery({
-    queryKey: queryKeys.reports.callLogs(payload),
-    queryFn: () => telesaleService.getCallLogs(payload),
+    queryKey: [...queryKeys.reports.callLogs(payload), source_erp],
+    queryFn: () => telesaleService.getCallLogs(payload, source_erp),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 30, // 30s
     enabled: options?.enabled,
@@ -174,21 +182,30 @@ export function useCallLogs(
  * Hook truy vấn lịch sử cuộc gọi telesale theo cơ chế phân trang vô tận (Infinite Scroll)
  * Tự động tính offset start/length tiếp theo dựa trên số lượng bản ghi đã nạp từ ERP
  */
-export function useInfiniteCallLogs(payload?: {
-  from_date?: string
-  to_date?: string
-  length?: number
-  user_id?: number
-}) {
+export function useInfiniteCallLogs(
+  payload?: {
+    from_date?: string
+    to_date?: string
+    length?: number
+    user_id?: number
+  },
+  options?: {
+    source_erp?: ErpSource | 'all'
+  },
+) {
   const pageSize = payload?.length || 50
+  const source_erp = options?.source_erp || 'all'
   return useInfiniteQuery({
-    queryKey: [...queryKeys.reports.callLogs(payload), 'infinite'],
+    queryKey: [...queryKeys.reports.callLogs(payload), 'infinite', source_erp],
     queryFn: ({ pageParam = 0 }) =>
-      telesaleService.getCallLogs({
-        ...payload,
-        start: pageParam,
-        length: pageSize,
-      }),
+      telesaleService.getCallLogs(
+        {
+          ...payload,
+          start: pageParam,
+          length: pageSize,
+        },
+        source_erp,
+      ),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       const loadedCount = allPages.reduce((acc, page) => acc + (page.items?.length || 0), 0)
@@ -276,8 +293,10 @@ export function formatWorkingTime(totalMinutes: number): string {
  */
 export function useNextCustomerMutation() {
   return useMutation({
-    mutationFn: (payload: GetNextCustomerPayload) =>
-      telesaleService.getNextCustomer(payload),
+    mutationFn: (payload: GetNextCustomerPayload & { source_erp?: ErpSource }) => {
+      const { source_erp, ...bodyPayload } = payload
+      return telesaleService.getNextCustomer(bodyPayload, source_erp)
+    },
     onError: (err: any) => {
       notify(err.message || 'Không thể lấy thông tin khách hàng tiếp theo.')
     },
@@ -289,7 +308,10 @@ export function useNextCustomerMutation() {
  */
 export function useDialCallMutation() {
   return useMutation({
-    mutationFn: (payload: DialCallPayload) => telesaleService.dialCall(payload),
+    mutationFn: (payload: DialCallPayload & { source_erp?: ErpSource }) => {
+      const { source_erp, ...bodyPayload } = payload
+      return telesaleService.dialCall(bodyPayload, source_erp)
+    },
     onError: (err: any) => {
       notify(err.message || 'Không thể kết nối đường truyền cuộc gọi.')
     },
@@ -307,11 +329,13 @@ export function useSaveCallResultMutation() {
       customerId,
       payload,
       idempotencyKey,
+      source_erp,
     }: {
       customerId: number
       payload: SaveCallResultPayload
       idempotencyKey?: string
-    }) => telesaleService.saveCallResult(customerId, payload, idempotencyKey),
+      source_erp?: ErpSource
+    }) => telesaleService.saveCallResult(customerId, payload, idempotencyKey, source_erp),
 
     onSuccess: (data, variables) => {
       // Invalidate toàn bộ dailyResults theo cấu trúc hierarchical của queryKeys

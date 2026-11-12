@@ -11,7 +11,7 @@ import {
   User,
   X,
 } from 'lucide-react'
-import { CustomerMemberDto, NextCustomerDto, UpdateCustomerPayload } from '../../../types/api'
+import { CustomerMemberDto, ErpSource, NextCustomerDto, UpdateCustomerPayload } from '../../../types/api'
 import {
   useAddCustomerMemberMutation,
   useUpdateCustomerMemberMutation,
@@ -25,6 +25,7 @@ export interface CustomerEditModalProps {
   onClose: () => void
   customer: NextCustomerDto | null
   onSave: (updatedCustomer: NextCustomerDto) => void
+  source_erp?: ErpSource
 }
 
 const DEFAULT_RELATIONSHIPS = [
@@ -43,7 +44,10 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   onClose,
   customer,
   onSave,
+  source_erp,
 }) => {
+  const effectiveSourceErp: ErpSource = customer?.source_erp || source_erp || 'locnuoc365'
+
   // 1. Tải danh mục quan hệ từ ERP
   const { relationships } = useEnums(['relationship'])
   const relationshipOptions =
@@ -126,6 +130,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           phone_number: cleanPhone,
           relationship: newMemberRelationship,
         },
+        source_erp: effectiveSourceErp,
       })
 
       // Backend trả về danh sách members cập nhật
@@ -160,6 +165,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         landmark: address.trim(),
         custom_field1: machineModel.trim(),
         members: updatedMembers,
+        source_erp: effectiveSourceErp,
       })
     } catch {
       // Lỗi đã được xử lý và hiển thị thông báo qua onError của useAddCustomerMemberMutation
@@ -199,6 +205,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         customerId: customer.customer_id,
         memberId,
         payload,
+        source_erp: effectiveSourceErp,
       })
 
       let updatedMembers: CustomerMemberDto[] = []
@@ -227,6 +234,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
       onSave({
         ...customer,
         members: updatedMembers,
+        source_erp: effectiveSourceErp,
       })
     } catch {
       // Đã notify trong hook
@@ -273,6 +281,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         landmark: newAddr,
         custom_field1: newMachine,
         members,
+        source_erp: effectiveSourceErp,
       }
       onSave(updatedCustomer)
       onClose()
@@ -283,6 +292,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
       await updateCustomerMutation.mutateAsync({
         customerId: customer.customer_id,
         payload,
+        source_erp: effectiveSourceErp,
       })
 
       const updatedCustomer: NextCustomerDto = {
@@ -292,6 +302,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         landmark: newAddr,
         custom_field1: newMachine,
         members,
+        source_erp: effectiveSourceErp,
       }
 
       onSave(updatedCustomer)

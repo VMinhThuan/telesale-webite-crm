@@ -48,7 +48,7 @@ import { determinePhanQuyen } from '../../services/auth.service'
 import { DialogState } from '../../types'
 import { CallActionControl } from '../../components/common/CallActionControl'
 import dayjs from '../../lib/dayjs'
-import { BranchSlotDto, OrderDto } from '../../types/api'
+import { BranchSlotDto, ErpSource, OrderDto } from '../../types/api'
 import { useEnums } from '../../hooks/useEnums'
 import {
   formatDate,
@@ -165,10 +165,14 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   // Bộ lọc tìm kiếm
   const [activeDateTab, setActiveDateTab] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [erpSourceFilter, setErpSourceFilter] = useState<'all' | 'locnuoc365' | 'zomzem'>('all')
   const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined)
   const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const branchMenuRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
+
+  // Helper sinh key duy nhất cho đơn hàng tránh trùng order_id giữa 2 hệ thống ERP
+  const getOrderKey = (o: OrderDto) => `${o.source_erp || 'locnuoc365'}_${o.order_id}`
 
   // Đóng dropdown lọc chi nhánh khi click ra ngoài
   useEffect(() => {
@@ -198,11 +202,12 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     paginationProps,
   } = usePagination({
     initialPageSize: 10,
-    resetDeps: [debouncedQuery, activeDateTab, statusFilter, selectedBranchId],
+    resetDeps: [debouncedQuery, activeDateTab, statusFilter, erpSourceFilter, selectedBranchId],
   })
 
   // Đơn hàng đang được chọn xem chi tiết
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
+  const [selectedOrderKey, setSelectedOrderKey] = useState<string | null>(null)
 
   // State form điều chỉnh lịch hẹn
   const [adjDate, setAdjDate] = useState<string>(() => dayjs().format('YYYY-MM-DD'))
@@ -241,6 +246,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   const orderQueryParams = useMemo(() => {
     const params: Record<string, any> = {
       ...toPagePageSize(),
+      source_erp: erpSourceFilter,
     }
     if (debouncedQuery.trim()) {
       params.search = debouncedQuery.trim()
@@ -256,7 +262,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
       params.branch_id = selectedBranchId
     }
     return params
-  }, [toPagePageSize, debouncedQuery, activeDateTab, statusFilter, selectedBranchId])
+  }, [toPagePageSize, erpSourceFilter, debouncedQuery, activeDateTab, statusFilter, selectedBranchId])
 
   // Khởi tạo Query Client phục vụ chiến lược Prefetching tức thì
   const queryClient = useQueryClient()
@@ -301,15 +307,19 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     return rawList
   }, [ordersResponse, selectedBranchId, availableBranches])
 
-  // Đơn hàng đang hiển thị ở cột chi tiết
+  // Đơn hàng đang hiển thị ở cột chi tiết (tìm theo compound key hoặc order_id)
   const activeOrder: OrderDto | null = useMemo(() => {
     if (ordersList.length === 0) return null
+    if (selectedOrderKey) {
+      const match = ordersList.find((o) => getOrderKey(o) === selectedOrderKey)
+      if (match) return match
+    }
     if (selectedOrderId) {
       const match = ordersList.find((o) => o.order_id === selectedOrderId)
       if (match) return match
     }
     return ordersList[0]
-  }, [ordersList, selectedOrderId])
+  }, [ordersList, selectedOrderKey, selectedOrderId])
 
   // Khi chọn một đơn hàng khác, cập nhật giá trị vào form điều chỉnh
   useEffect(() => {
@@ -321,12 +331,13 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     }
   }, [activeOrder])
 
-  // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh (ưu tiên chi nhánh đang lọc hoặc chi nhánh của đơn hàng)
+  // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh và nguồn ERP của đơn hàng
   const targetBranchId = selectedBranchId || activeOrder?.branch_id || availableBranches[0]?.id || 3
   const { data: rawBranchSlots = [] } = useBranchSlots(
     targetBranchId,
     adjDate,
     adjDate,
+    { source_erp: activeOrder?.source_erp || 'locnuoc365' },
   )
 
   const branchSlots: BranchSlotDto[] = useMemo(() => {
@@ -421,6 +432,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
           slot_id: adjSlotId,
           branch_id: activeOrder.branch_id || 3,
         },
+        source_erp: activeOrder.source_erp,
       })
     }
 
@@ -430,6 +442,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
         payload: {
           content: note.trim(),
         },
+        source_erp: activeOrder.source_erp,
       })
     }
   }
@@ -471,6 +484,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
       {
         orderId: activeOrder.order_id,
         payload,
+        source_erp: activeOrder.source_erp,
       },
       {
         onSuccess: () => {
@@ -735,6 +749,34 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   ))}
                 </select>
               </div>
+
+              {/* Bộ lọc Nguồn dữ liệu ERP: Tất cả | Lọc Nước 365 | Zomzem */}
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={erpSourceFilter}
+                  onChange={(e) => {
+                    setErpSourceFilter(e.target.value as any)
+                    setPage(1)
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    border: '1px solid #dfe8f2',
+                    borderRadius: '7px',
+                    padding: '0 12px',
+                    background: '#fff',
+                    color: '#58708f',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="all">Tất cả nguồn (LN365 + Zomzem)</option>
+                  <option value="locnuoc365">Nguồn: Lọc Nước 365</option>
+                  <option value="zomzem">Nguồn: Zomzem</option>
+                </select>
+              </div>
             </div>
 
             {/* Các tab chọn ngày hẹn */}
@@ -779,16 +821,31 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                     ) : ordersList.length > 0 ? (
                       ordersList.map((order) => {
                         const tone = getStatusBadgeTone(order.trang_thai)
-                        const isSelected = activeOrder?.order_id === order.order_id
+                        const orderKey = getOrderKey(order)
+                        const isSelected = activeOrder ? getOrderKey(activeOrder) === orderKey : false
                         return (
                           <tr
-                            key={order.order_id}
-                            onClick={() => setSelectedOrderId(order.order_id)}
+                            key={orderKey}
+                            onClick={() => {
+                              setSelectedOrderId(order.order_id)
+                              setSelectedOrderKey(orderKey)
+                            }}
                             className={clsx({ 'selected-row': isSelected })}
                             style={{ cursor: 'pointer' }}
                           >
                             <td>
-                              <b className="order-code">{order.ord_code}</b>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <b className="order-code">{order.ord_code}</b>
+                                {order.source_erp === 'zomzem' ? (
+                                  <span className="erp-badge erp-badge-zomzem" style={{ alignSelf: 'flex-start' }}>
+                                    Zomzem
+                                  </span>
+                                ) : (
+                                  <span className="erp-badge erp-badge-ln365" style={{ alignSelf: 'flex-start' }}>
+                                    LN365
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td>
                               <div className="lead-name">
@@ -898,7 +955,14 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   </span>
                 </div>
 
-                <div className="order-id">{activeOrder.ord_code}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px 10px', flexWrap: 'wrap' }}>
+                  <div className="order-id" style={{ padding: 0 }}>{activeOrder.ord_code}</div>
+                  {activeOrder.source_erp === 'zomzem' ? (
+                    <span className="erp-badge erp-badge-zomzem">Zomzem</span>
+                  ) : (
+                    <span className="erp-badge erp-badge-ln365">Lọc Nước 365</span>
+                  )}
+                </div>
 
                 <div className="customer-brief lead-brief">
                   <div className="customer-avatar small">
@@ -965,7 +1029,12 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                     <button
                       type="button"
                       className="confirm-appointment-button"
-                      onClick={() => confirmOrderMutation.mutate(activeOrder.order_id)}
+                      onClick={() =>
+                        confirmOrderMutation.mutate({
+                          orderId: activeOrder.order_id,
+                          source_erp: activeOrder.source_erp,
+                        })
+                      }
                       disabled={confirmOrderMutation.isPending}
                     >
                       <CheckCircle2 size={16} />
@@ -994,7 +1063,10 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       !isConfirmedOrderStatus(activeOrder) &&
                       !isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
                     ) {
-                      confirmOrderMutation.mutate(activeOrder.order_id)
+                      confirmOrderMutation.mutate({
+                        orderId: activeOrder.order_id,
+                        source_erp: activeOrder.source_erp,
+                      })
                     }
                   }}
                   disabled={confirmOrderMutation.isPending}

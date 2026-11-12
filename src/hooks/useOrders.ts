@@ -5,7 +5,7 @@ import orderService, {
   OrderQueryParams,
   RescheduleOrderPayload,
 } from '../services/order.service'
-import { ApiPaginatedResult, OrderDto } from '../types/api'
+import { ApiPaginatedResult, ErpSource, OrderDto } from '../types/api'
 import { queryKeys } from '../constants/queryKeys'
 import { notify } from '../utils/notify'
 
@@ -49,17 +49,17 @@ export function useOrdersTotalRevenue(params?: OrderQueryParams) {
 }
 
 /**
- * Hook truy vấn danh sách slot hẹn theo chi nhánh
+ * Hook truy vấn danh sách slot hẹn theo chi nhánh và nguồn ERP
  */
 export function useBranchSlots(
   branchId = 3,
   fromDate?: string,
   toDate?: string,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; source_erp?: ErpSource },
 ) {
   return useQuery({
-    queryKey: queryKeys.orders.slots(branchId, fromDate, toDate),
-    queryFn: () => orderService.getBranchSlots(branchId, fromDate, toDate),
+    queryKey: queryKeys.orders.slots(branchId, fromDate, toDate, options?.source_erp),
+    queryFn: () => orderService.getBranchSlots(branchId, fromDate, toDate, options?.source_erp),
     staleTime: 1000 * 60 * 5, // 5 phút
     enabled: options?.enabled ?? true,
   })
@@ -75,10 +75,12 @@ export function useRescheduleOrderMutation() {
     mutationFn: ({
       orderId,
       payload,
+      source_erp,
     }: {
       orderId: number
       payload: RescheduleOrderPayload
-    }) => orderService.rescheduleOrder(orderId, payload),
+      source_erp?: ErpSource
+    }) => orderService.rescheduleOrder(orderId, payload, source_erp),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.lists() })
@@ -103,12 +105,14 @@ export function useLuiHuyOrderMutation() {
     mutationFn: ({
       orderId,
       payload,
+      source_erp,
     }: {
       orderId: number
       payload: LuiHuyOrderPayload
-    }) => orderService.luiHuyOrder(orderId, payload),
+      source_erp?: ErpSource
+    }) => orderService.luiHuyOrder(orderId, payload, source_erp),
 
-    onMutate: async ({ orderId, payload }) => {
+    onMutate: async ({ orderId, payload, source_erp }) => {
       // 1. Hủy các query đang fetch dở cho orders để tránh ghi đè dữ liệu lạc quan
       await queryClient.cancelQueries({ queryKey: queryKeys.orders.lists() })
 
@@ -134,7 +138,7 @@ export function useLuiHuyOrderMutation() {
           return {
             ...old,
             items: old.items.map((ord) =>
-              ord.order_id === orderId
+              ord.order_id === orderId && (!source_erp || ord.source_erp === source_erp)
                 ? {
                   ...ord,
                   status: statusText,
@@ -184,9 +188,16 @@ export function useConfirmOrderMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (orderId: number) => orderService.confirmOrder(orderId),
+    mutationFn: (param: number | { orderId: number; source_erp?: ErpSource }) => {
+      const orderId = typeof param === 'number' ? param : param.orderId
+      const source_erp = typeof param === 'number' ? undefined : param.source_erp
+      return orderService.confirmOrder(orderId, source_erp)
+    },
 
-    onMutate: async (orderId: number) => {
+    onMutate: async (param: number | { orderId: number; source_erp?: ErpSource }) => {
+      const targetId = typeof param === 'number' ? param : param.orderId
+      const targetSource = typeof param === 'number' ? undefined : param.source_erp
+
       // 1. Hủy các query đang fetch dở cho orders để không ghi đè dữ liệu lạc quan
       await queryClient.cancelQueries({ queryKey: queryKeys.orders.lists() })
 
@@ -203,7 +214,7 @@ export function useConfirmOrderMutation() {
           return {
             ...old,
             items: old.items.map((ord) =>
-              ord.order_id === orderId
+              ord.order_id === targetId && (!targetSource || ord.source_erp === targetSource)
                 ? {
                   ...ord,
                   sale_checked: true,
@@ -219,7 +230,7 @@ export function useConfirmOrderMutation() {
       return { previousQueries }
     },
 
-    onError: (err: any, _orderId, context) => {
+    onError: (err: any, _param, context) => {
       // Rollback về trạng thái cũ nếu lỗi
       if (context?.previousQueries) {
         context.previousQueries.forEach(([key, data]) => {
@@ -249,10 +260,12 @@ export function useAddOrderCommentMutation() {
     mutationFn: ({
       orderId,
       payload,
+      source_erp,
     }: {
       orderId: number
       payload: AddOrderCommentPayload
-    }) => orderService.addComment(orderId, payload),
+      source_erp?: ErpSource
+    }) => orderService.addComment(orderId, payload, source_erp),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.lists() })

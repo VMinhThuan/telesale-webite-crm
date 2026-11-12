@@ -28,6 +28,7 @@ import { formatVND } from '../../utils/formatters'
 import { notify } from '../../utils/notify'
 import { useAuthStore } from '../../store/useAuthStore'
 import { determinePhanQuyen } from '../../services/auth.service'
+import { ErpSource } from '../../types/api'
 
 type DatePreset = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom'
 
@@ -46,7 +47,8 @@ export const Reports: React.FC = () => {
   const [fromDate, setFromDate] = useState(() => dayjs().subtract(6, 'day').format('YYYY-MM-DD'))
   const [toDate, setToDate] = useState(() => dayjs().format('YYYY-MM-DD'))
 
-  // 2. Quản lý bộ lọc Chi nhánh, Cấp bậc và Nhân viên
+  // 2. Quản lý bộ lọc Chi nhánh, Cấp bậc, Nhân viên và Nguồn ERP
+  const [erpSource, setErpSource] = useState<ErpSource | 'all'>('all')
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all')
   const [selectedRole, setSelectedRole] = useState<'all' | 'leader' | 'agent'>('all')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
@@ -141,14 +143,17 @@ export const Reports: React.FC = () => {
   // Xác định user_id khi chọn 1 nhân viên cụ thể
   const queryUserId = selectedEmployeeId !== 'all' ? Number(selectedEmployeeId) : undefined
 
-  // 3. Tải dữ liệu hiệu suất đàm thoại (API 10b: POST /api/telesale/daily-results)
-  const { data: dailyResults = [], isLoading: isLoadingDaily } = useDailyResultsList({
-    from_date: fromDate,
-    to_date: toDate,
-    user_id: queryUserId,
-  })
+  // 3. Tải dữ liệu hiệu suất đàm thoại (API 10b: POST /api/telesale/daily-results) theo nguồn ERP chỉ định
+  const { data: dailyResults = [], isLoading: isLoadingDaily } = useDailyResultsList(
+    {
+      from_date: fromDate,
+      to_date: toDate,
+      user_id: queryUserId,
+    },
+    erpSource,
+  )
 
-  // 4. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn (API 11b: POST /api/telesale/orders)
+  // 4. Tải đơn hàng 3 ngày tới để thống kê lịch hẹn (API 11b: POST /api/telesale/orders) theo nguồn ERP chỉ định
   const upcomingStartDate = dayjs().format('YYYY-MM-DD')
   const upcomingEndDate = dayjs().add(2, 'day').format('YYYY-MM-DD')
   const { data: upcomingOrdersData } = useOrdersList({
@@ -156,6 +161,7 @@ export const Reports: React.FC = () => {
     to_date: upcomingEndDate,
     page_size: 100,
     user_id: queryUserId,
+    source_erp: erpSource,
   })
 
   // Lọc dữ liệu theo Nhân viên, Chi nhánh và Cấp bậc đã chọn
@@ -279,7 +285,7 @@ export const Reports: React.FC = () => {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `bao-cao-hieu-suat-${fromDate}-den-${toDate}.csv`
+    link.download = `bao-cao-hieu-suat-${erpSource}-${fromDate}-den-${toDate}.csv`
     link.click()
     URL.revokeObjectURL(url)
     notify('Đã tải xuống file báo cáo CSV')
@@ -336,8 +342,56 @@ export const Reports: React.FC = () => {
 
         {/* Cụm bộ lọc 2 hàng: Hàng 1 (Thời gian), Hàng 2 (Chi nhánh, Cấp bậc, Nhân viên) */}
         <div className="report-filters-container">
-          {/* Hàng 1: Bộ lọc Từ ngày ... đến ngày & Nút chọn nhanh */}
+          {/* Hàng 1: Nguồn ERP, Bộ lọc Từ ngày ... đến ngày & Nút chọn nhanh */}
           <div className="report-filters-row">
+            {/* Bộ lọc Nguồn dữ liệu ERP: Tất cả | Lọc Nước 365 | Zomzem */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                background: '#fff',
+                border: '1px solid #dce6f0',
+                borderRadius: '7px',
+                padding: '2px',
+                height: '38px',
+              }}
+            >
+              {(
+                [
+                  { id: 'all', label: 'Tất cả nguồn' },
+                  { id: 'locnuoc365', label: 'Lọc Nước 365' },
+                  { id: 'zomzem', label: 'Zomzem' },
+                ] as const
+              ).map((src) => (
+                <button
+                  key={src.id}
+                  type="button"
+                  onClick={() => setErpSource(src.id)}
+                  style={{
+                    height: '32px',
+                    padding: '0 10px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
+                    fontWeight: erpSource === src.id ? 700 : 500,
+                    background:
+                      erpSource === src.id
+                        ? src.id === 'zomzem'
+                          ? '#d97706'
+                          : '#2575df'
+                        : 'transparent',
+                    color: erpSource === src.id ? '#fff' : '#475569',
+                    border: 'none',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {src.label}
+                </button>
+              ))}
+            </div>
+
             <div
               style={{
                 display: 'flex',

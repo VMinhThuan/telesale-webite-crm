@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from '../constants/apiEndpoints'
 import { EnumsCatalog } from '../types/api'
-import apiClient from './apiClient'
+import apiClient, { apiClientZomzem } from './apiClient'
 
 // Cấu trúc danh mục mặc định ban đầu tránh lỗi null/undefined
 const emptyEnumsCatalog: EnumsCatalog = {
@@ -21,20 +21,46 @@ const emptyEnumsCatalog: EnumsCatalog = {
 
 export const enumsService = {
   /**
-   * Lấy danh mục mã và trạng thái từ máy chủ ERP
-   * @param types Danh sách loại danh mục cần lấy (phân cách dấu phẩy). Bỏ trống = lấy tất cả
+   * Lấy danh mục mã và trạng thái từ cả 2 máy chủ ERP (LocNuoc365 & Zomzem)
+   * Tự động hợp nhất danh mục và loại bỏ trùng lặp mã code
    */
   async getEnums(types?: string[]): Promise<EnumsCatalog> {
-    try {
-      const queryParam = types && types.length > 0 ? `?types=${types.join(',')}` : ''
-      const response = await apiClient.get<any, { result: EnumsCatalog }>(
-        `${API_ENDPOINTS.ENUMS}${queryParam}`,
-      )
-      return response.result || response || emptyEnumsCatalog
-    } catch (err) {
-      console.error('Lỗi khi gọi API danh mục Enums từ ERP:', err)
+    const queryParam = types && types.length > 0 ? `?types=${types.join(',')}` : ''
+
+    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+      apiClient.get<any, { result: EnumsCatalog }>(`${API_ENDPOINTS.ENUMS}${queryParam}`),
+      apiClientZomzem.get<any, { result: EnumsCatalog }>(`${API_ENDPOINTS.ENUMS}${queryParam}`),
+    ])
+
+    const ln365Res = ln365Settled.status === 'fulfilled' ? ln365Settled.value?.result || ln365Settled.value : null
+    const zomzemRes = zomzemSettled.status === 'fulfilled' ? zomzemSettled.value?.result || zomzemSettled.value : null
+
+    if (!ln365Res && !zomzemRes) {
       return emptyEnumsCatalog
     }
+
+    const mergeCatalog = (base: EnumsCatalog, incoming: any): EnumsCatalog => {
+      if (!incoming || typeof incoming !== 'object') return base
+      const result: EnumsCatalog = { ...base }
+      for (const key of Object.keys(incoming)) {
+        const arrIncoming = incoming[key]
+        if (Array.isArray(arrIncoming)) {
+          const existingArr = (result as any)[key] || []
+          const existingCodes = new Set(
+            existingArr.map((item: any) => String(item.code ?? item.id ?? item.label ?? '')),
+          )
+          const newItems = arrIncoming.filter(
+            (item: any) => !existingCodes.has(String(item.code ?? item.id ?? item.label ?? '')),
+          )
+          ;(result as any)[key] = [...existingArr, ...newItems]
+        }
+      }
+      return result
+    }
+
+    let combined = mergeCatalog(emptyEnumsCatalog, ln365Res)
+    combined = mergeCatalog(combined, zomzemRes)
+    return combined
   },
 }
 

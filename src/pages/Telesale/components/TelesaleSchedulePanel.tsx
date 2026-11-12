@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import dayjs from '../../../lib/dayjs'
 import { useBranchSlots } from '../../../hooks/useOrders'
-import { BranchSlotDto } from '../../../types/api'
+import { BranchSlotDto, ErpSource } from '../../../types/api'
 
 export interface TelesaleSchedulePanelProps {
   branchName?: string
@@ -14,6 +14,7 @@ export interface TelesaleSchedulePanelProps {
   onDateChange: (date: string) => void
   selectedSlotId?: number
   onSelectSlot: (slotId: number, slotTime: string, date?: string) => void
+  source_erp?: ErpSource
 }
 
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
@@ -23,6 +24,7 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   onDateChange,
   selectedSlotId,
   onSelectSlot,
+  source_erp,
 }) => {
   // Quản lý ngày bắt đầu của cửa sổ 3 ngày (mặc định từ hôm nay)
   const [startDateStr, setStartDateStr] = useState<string>(() => {
@@ -47,10 +49,12 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   // Khoảng ngày hiển thị (VD: 31/10 - 02/11)
   const rangeLabel = `${dates[0].displayDate} - ${dates[2].displayDate}`
 
-  // Gọi API lấy toàn bộ slot của cả 3 ngày liên tiếp
+  // Gọi API lấy toàn bộ slot của cả 3 ngày liên tiếp theo đúng nguồn ERP của chiến dịch
   const fromDate = dates[0].dateStr
   const toDate = dates[2].dateStr
-  const { data: rawSlots = [], isLoading } = useBranchSlots(branchId, fromDate, toDate)
+  const { data: rawSlots = [], isLoading } = useBranchSlots(branchId, fromDate, toDate, {
+    source_erp,
+  })
 
   // Chuẩn hóa dữ liệu slot luôn là mảng
   const branchSlots: BranchSlotDto[] = useMemo(() => {

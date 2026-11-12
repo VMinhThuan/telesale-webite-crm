@@ -171,6 +171,7 @@ export function useMakeCall() {
           lock_info: false,
           cus_campaign_id: (customer as any)?.cus_campaign_id || 0,
           members: customer?.members || [],
+          source_erp: customer?.source_erp || existingTab?.customer?.source_erp || 'locnuoc365',
         }
 
         useTelesaleCallStore.getState().updateTab(targetTabId, {
@@ -212,10 +213,15 @@ export function useMakeCall() {
 
       try {
         // 1. Gọi API 16: POST /api/telesale/calls với customer_id và member_id để lấy chuỗi quay số thật
-        const dialInfo = await telesaleService.dialCall({
-          customer_id: customerId,
-          member_id: memberId,
-        })
+        const existingTab = currentTabs.find((t) => t.id === targetTabId)
+        const targetSourceErp = customer?.source_erp || existingTab?.customer?.source_erp
+        const dialInfo = await telesaleService.dialCall(
+          {
+            customer_id: customerId,
+            member_id: memberId,
+          },
+          targetSourceErp,
+        )
 
         // KIỂM TRA HỦY: Sau khi gọi API 16 xong, kiểm tra xem nhân viên có bấm gác máy không
         if (!sipService.isCallAttemptValid(targetTabId, currentAttemptId)) {

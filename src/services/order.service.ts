@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from '../constants/apiEndpoints'
-import { ApiPaginatedResult, BranchSlotDto, OrderDto } from '../types/api'
-import apiClient from './apiClient'
+import { ApiPaginatedResult, BranchSlotDto, ErpSource, OrderDto } from '../types/api'
+import apiClient, { apiClientZomzem, getApiClient } from './apiClient'
 
 export interface OrderQueryParams {
   from_date?: string
@@ -11,6 +11,7 @@ export interface OrderQueryParams {
   page_size?: number
   user_id?: number
   branch_id?: number
+  source_erp?: ErpSource | 'all'
 }
 
 export interface RescheduleOrderPayload {
@@ -35,7 +36,35 @@ export interface AddOrderCommentPayload {
 
 export const orderService = {
   /**
-   * Lấy danh sách đơn hàng theo ngày hẹn từ ERP
+   * Helper tải đơn hàng từ 1 instance ERP cụ thể và gắn nhãn source_erp
+   */
+  async _fetchOrdersSingle(
+    client: typeof apiClient,
+    payload: Record<string, any>,
+    source_erp: ErpSource,
+  ): Promise<ApiPaginatedResult<OrderDto>> {
+    try {
+      const response = await client.post<any, { result: ApiPaginatedResult<OrderDto> }>(
+        API_ENDPOINTS.ORDERS,
+        payload,
+      )
+      const res = response?.result || response || { items: [], total: 0 }
+      const items: OrderDto[] = (res.items || []).map((o: any) => ({
+        ...o,
+        source_erp,
+      }))
+      return {
+        items,
+        total: typeof res.total === 'number' ? res.total : items.length,
+      }
+    } catch (err) {
+      console.warn(`[Multi-ERP] Lỗi tải đơn hàng từ ${source_erp}:`, err)
+      return { items: [], total: 0 }
+    }
+  },
+
+  /**
+   * Lấy danh sách đơn hàng theo ngày hẹn từ ERP (Hỗ trợ lọc theo nguồn: 'locnuoc365' | 'zomzem' | 'all')
    */
   async getOrders(params?: OrderQueryParams): Promise<ApiPaginatedResult<OrderDto>> {
     const payload: Record<string, any> = {
@@ -49,63 +78,115 @@ export const orderService = {
     if (params?.search) payload.search = params.search
     if (params?.branch_id !== undefined) payload.branch_id = params.branch_id
 
-    const response = await apiClient.post<any, { result: ApiPaginatedResult<OrderDto> }>(
-      API_ENDPOINTS.ORDERS,
-      payload,
-    )
+    const sourceFilter = params?.source_erp || 'all'
 
-    return response.result || { items: [], total: 0 }
+    if (sourceFilter === 'locnuoc365') {
+      return this._fetchOrdersSingle(apiClient, payload, 'locnuoc365')
+    }
+
+    if (sourceFilter === 'zomzem') {
+      return this._fetchOrdersSingle(apiClientZomzem, payload, 'zomzem')
+    }
+
+    // Mặc định 'all': Gọi song song cả 2 và kết hợp danh sách
+    const [ln365Res, zomzemRes] = await Promise.allSettled([
+      this._fetchOrdersSingle(apiClient, payload, 'locnuoc365'),
+      this._fetchOrdersSingle(apiClientZomzem, payload, 'zomzem'),
+    ])
+
+    const ln365 = ln365Res.status === 'fulfilled' ? ln365Res.value : { items: [], total: 0 }
+    const zomzem = zomzemRes.status === 'fulfilled' ? zomzemRes.value : { items: [], total: 0 }
+
+    const combinedItems = [...ln365.items, ...zomzem.items]
+    // Sắp xếp đơn mới nhất theo order_id
+    combinedItems.sort((a, b) => (Number(b.order_id) || 0) - (Number(a.order_id) || 0))
+
+    return {
+      items: combinedItems,
+      total: ln365.total + zomzem.total,
+    }
   },
 
   /**
-   * Lấy danh sách slot hẹn theo chi nhánh và khoảng ngày từ ERP
+   * Lấy danh sách slot hẹn theo chi nhánh và khoảng ngày từ ERP tương ứng
    */
-  async getBranchSlots(branchId = 3, fromDate?: string, toDate?: string): Promise<BranchSlotDto[]> {
+  async getBranchSlots(
+    branchId = 3,
+    fromDate?: string,
+    toDate?: string,
+    source_erp?: ErpSource,
+  ): Promise<BranchSlotDto[]> {
     const query = new URLSearchParams()
     query.set('branch_id', String(branchId))
     if (fromDate) query.set('date_from', fromDate)
     if (toDate) query.set('date_to', toDate)
 
-    const response = await apiClient.get<any, { result: any }>(
-      `${API_ENDPOINTS.BRANCH_SLOTS}?${query.toString()}`,
-    )
+    const client = getApiClient(source_erp)
+    try {
+      const response = await client.get<any, { result: any }>(
+        `${API_ENDPOINTS.BRANCH_SLOTS}?${query.toString()}`,
+      )
 
-    const result = response.result
-    if (Array.isArray(result)) {
-      return result
+      const result = response.result
+      let items: BranchSlotDto[] = []
+      if (Array.isArray(result)) {
+        items = result
+      } else if (Array.isArray(result?.items)) {
+        items = result.items
+      }
+
+      return items.map((slot) => ({
+        ...slot,
+        source_erp: source_erp || 'locnuoc365',
+      }))
+    } catch (err) {
+      console.warn(`[Multi-ERP] Lỗi lấy slots từ chi nhánh #${branchId} (${source_erp || 'locnuoc365'}):`, err)
+      return []
     }
-    if (Array.isArray(result?.items)) {
-      return result.items
-    }
-    return []
   },
 
   /**
-   * Đổi lịch hẹn đơn hàng trên ERP
+   * Đổi lịch hẹn đơn hàng trên đúng hệ thống ERP
    */
-  async rescheduleOrder(orderId: number, payload: RescheduleOrderPayload): Promise<any> {
-    return apiClient.post(API_ENDPOINTS.ORDER_RESCHEDULE(orderId), payload)
+  async rescheduleOrder(
+    orderId: number,
+    payload: RescheduleOrderPayload,
+    source_erp?: ErpSource,
+  ): Promise<any> {
+    const client = getApiClient(source_erp)
+    return client.post(API_ENDPOINTS.ORDER_RESCHEDULE(orderId), payload)
   },
 
   /**
-   * Thêm bình luận / ghi chú vào đơn hàng trên ERP
+   * Thêm bình luận / ghi chú vào đơn hàng trên đúng hệ thống ERP
    */
-  async addComment(orderId: number, payload: AddOrderCommentPayload): Promise<any> {
-    return apiClient.post(API_ENDPOINTS.ORDER_COMMENTS(orderId), payload)
+  async addComment(
+    orderId: number,
+    payload: AddOrderCommentPayload,
+    source_erp?: ErpSource,
+  ): Promise<any> {
+    const client = getApiClient(source_erp)
+    return client.post(API_ENDPOINTS.ORDER_COMMENTS(orderId), payload)
   },
 
   /**
-   * Trả về, lùi, hoặc hủy đơn hàng trên ERP
+   * Trả về, lùi, hoặc hủy đơn hàng trên đúng hệ thống ERP
    */
-  async luiHuyOrder(orderId: number, payload: LuiHuyOrderPayload): Promise<any> {
-    return apiClient.post(API_ENDPOINTS.ORDER_LUI_HUY(orderId), payload)
+  async luiHuyOrder(
+    orderId: number,
+    payload: LuiHuyOrderPayload,
+    source_erp?: ErpSource,
+  ): Promise<any> {
+    const client = getApiClient(source_erp)
+    return client.post(API_ENDPOINTS.ORDER_LUI_HUY(orderId), payload)
   },
 
   /**
-   * Xác nhận lịch hẹn với khách hàng trên ERP
+   * Xác nhận lịch hẹn với khách hàng trên đúng hệ thống ERP
    */
-  async confirmOrder(orderId: number): Promise<any> {
-    return apiClient.post(API_ENDPOINTS.ORDER_UPDATE_CHECKED, {
+  async confirmOrder(orderId: number, source_erp?: ErpSource): Promise<any> {
+    const client = getApiClient(source_erp)
+    return client.post(API_ENDPOINTS.ORDER_UPDATE_CHECKED, {
       order_id: orderId,
       sale_checked: 1,
     })

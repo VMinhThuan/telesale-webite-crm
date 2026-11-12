@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import customerService, { CustomerQueryParams, SaveCareLogPayload } from '../services/customer.service'
 import {
   AddCustomerMemberPayload,
+  ErpSource,
   UpdateCustomerMemberPayload,
   UpdateCustomerPayload,
 } from '../types/api'
@@ -102,10 +103,12 @@ export function useUpdateCustomerMutation() {
     mutationFn: ({
       customerId,
       payload,
+      source_erp,
     }: {
       customerId: number
       payload: UpdateCustomerPayload
-    }) => customerService.updateCustomer(customerId, payload),
+      source_erp?: ErpSource
+    }) => customerService.updateCustomer(customerId, payload, source_erp),
 
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.lists() })
@@ -139,10 +142,12 @@ export function useAddCustomerMemberMutation() {
     mutationFn: ({
       customerId,
       payload,
+      source_erp,
     }: {
       customerId: number
       payload: AddCustomerMemberPayload
-    }) => customerService.addCustomerMember(customerId, payload),
+      source_erp?: ErpSource
+    }) => customerService.addCustomerMember(customerId, payload, source_erp),
 
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
@@ -173,11 +178,13 @@ export function useUpdateCustomerMemberMutation() {
       customerId,
       memberId,
       payload,
+      source_erp,
     }: {
       customerId: number
       memberId: number
       payload: UpdateCustomerMemberPayload
-    }) => customerService.updateCustomerMember(customerId, memberId, payload),
+      source_erp?: ErpSource
+    }) => customerService.updateCustomerMember(customerId, memberId, payload, source_erp),
 
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({

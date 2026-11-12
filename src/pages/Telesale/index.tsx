@@ -62,15 +62,20 @@ export const Telesale: React.FC = () => {
     effectiveSipConfig,
   } = useMakeCall()
 
-  // 1. Quản lý danh sách chiến dịch đàm thoại
+  // 1. Quản lý danh sách chiến dịch đàm thoại từ cả 2 hệ thống ERP
   const { data: campaignsData, isLoading: isLoadingCampaigns } = useCampaigns()
   const campaignsList = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
   const selectedCampaignId = useTelesaleCallStore((s) => s.selectedCampaignId)
   const setSelectedCampaignId = useTelesaleCallStore((s) => s.setSelectedCampaignId)
+  const selectedCampaignKey = useTelesaleCallStore((s) => s.selectedCampaignKey)
+  const setSelectedCampaignKey = useTelesaleCallStore((s) => s.setSelectedCampaignKey)
+
+  const getCampaignKey = (c: { campaign_id: number; source_erp?: string }) =>
+    `${c.source_erp || 'locnuoc365'}_${c.campaign_id}`
 
   // Ưu tiên chọn chiến dịch Hà Nội làm mặc định khi danh sách tải xong nếu chưa có chiến dịch nào được chọn
   useEffect(() => {
-    if (campaignsList.length > 0 && !selectedCampaignId) {
+    if (campaignsList.length > 0 && !selectedCampaignKey && !selectedCampaignId) {
       const hanoiCampaign = campaignsList.find((c) => {
         const name = (c.name || '').toLowerCase()
         const branchName = (c.branch_name || '').toLowerCase()
@@ -84,17 +89,23 @@ export const Telesale: React.FC = () => {
         )
       })
 
-      if (hanoiCampaign) {
-        setSelectedCampaignId(hanoiCampaign.campaign_id)
-      } else {
-        setSelectedCampaignId(campaignsList[0].campaign_id)
-      }
+      const targetCamp = hanoiCampaign || campaignsList[0]
+      setSelectedCampaignKey(getCampaignKey(targetCamp))
+      setSelectedCampaignId(targetCamp.campaign_id)
     }
-  }, [campaignsList, selectedCampaignId, setSelectedCampaignId])
+  }, [campaignsList, selectedCampaignKey, selectedCampaignId, setSelectedCampaignKey, setSelectedCampaignId])
 
   const selectedCampaign = useMemo(() => {
-    return campaignsList.find((c) => c.campaign_id === selectedCampaignId) || campaignsList[0]
-  }, [campaignsList, selectedCampaignId])
+    if (selectedCampaignKey) {
+      const match = campaignsList.find((c) => getCampaignKey(c) === selectedCampaignKey)
+      if (match) return match
+    }
+    if (selectedCampaignId) {
+      const match = campaignsList.find((c) => c.campaign_id === selectedCampaignId)
+      if (match) return match
+    }
+    return campaignsList[0]
+  }, [campaignsList, selectedCampaignKey, selectedCampaignId])
 
   // Trích xuất danh sách tất cả các chi nhánh khả dụng từ danh sách chiến dịch mà nhân viên có quyền
   const availableBranches = useMemo(() => {
@@ -188,8 +199,15 @@ export const Telesale: React.FC = () => {
 
   // Hàm nạp khách hàng từ chiến dịch vào một Tab cụ thể
   const handleFetchCustomerForTab = React.useCallback(
-    async (targetTabId: number, campaignIdOverride?: number) => {
-      const activeCampId = campaignIdOverride || selectedCampaign?.campaign_id
+    async (targetTabId: number, campaignOverride?: any) => {
+      let activeCamp: any = selectedCampaign
+      if (campaignOverride && typeof campaignOverride === 'object') {
+        activeCamp = campaignOverride
+      } else if (typeof campaignOverride === 'number') {
+        activeCamp = campaignsList.find((c) => c.campaign_id === campaignOverride) || selectedCampaign
+      }
+
+      const activeCampId = activeCamp?.campaign_id
       if (!activeCampId) {
         notify('Vui lòng chọn chiến dịch trước khi lấy khách')
         return
@@ -214,6 +232,7 @@ export const Telesale: React.FC = () => {
         const nextCust = await nextCustomerMutation.mutateAsync({
           campaign_id: activeCampId,
           call_mode: 'chien_dich',
+          source_erp: activeCamp?.source_erp || 'locnuoc365',
         })
 
         // KIỂM TRA LẠI SAU KHI API TRẢ VỀ:
@@ -263,7 +282,7 @@ export const Telesale: React.FC = () => {
         // Lỗi đã được xử lý trong hook mutation
       }
     },
-    [nextCustomerMutation, selectedCampaign?.campaign_id, setTabs, orderDate],
+    [nextCustomerMutation, selectedCampaign, campaignsList, setTabs, orderDate],
   )
 
   // Khởi tạo nạp khách hàng ban đầu cho Tab 1 DUY NHẤT 1 LẦN khi hệ thống chưa có khách trên bất kỳ tab nào
@@ -279,15 +298,15 @@ export const Telesale: React.FC = () => {
 
     if (!hasAnyCustomerOrCall) {
       hasCheckedInitialFetchRef.current = true
-      handleFetchCustomerForTab(1, selectedCampaign.campaign_id)
+      handleFetchCustomerForTab(1, selectedCampaign)
     } else {
       hasCheckedInitialFetchRef.current = true
     }
   }, [handleFetchCustomerForTab, selectedCampaign])
 
   // Xử lý chuyển chiến dịch chủ động từ người dùng (kèm Guard bảo vệ cuộc gọi)
-  const handleCampaignChange = (newCampId: number) => {
-    if (newCampId === selectedCampaignId) return
+  const handleCampaignChange = (newCampKey: string) => {
+    if (newCampKey === selectedCampaignKey) return
 
     if (hasActiveCalls) {
       notify(
@@ -296,10 +315,14 @@ export const Telesale: React.FC = () => {
       return
     }
 
-    setSelectedCampaignId(newCampId)
-    // Chỉ reset tabs khi người dùng chủ động chuyển chiến dịch mới và không có cuộc gọi nào
-    useTelesaleCallStore.getState().resetTabs()
-    handleFetchCustomerForTab(1, newCampId)
+    const found = campaignsList.find((c) => getCampaignKey(c) === newCampKey)
+    if (found) {
+      setSelectedCampaignKey(newCampKey)
+      setSelectedCampaignId(found.campaign_id)
+      notify(`Đã chuyển sang chiến dịch: ${found.name}`)
+      useTelesaleCallStore.getState().resetTabs()
+      handleFetchCustomerForTab(1, found)
+    }
   }
 
   // Chuyển đổi giữa 3 tab cuộc gọi
@@ -668,8 +691,8 @@ export const Telesale: React.FC = () => {
               Chiến dịch:
             </span>
             <select
-              value={selectedCampaignId || ''}
-              onChange={(e) => handleCampaignChange(Number(e.target.value))}
+              value={selectedCampaign ? getCampaignKey(selectedCampaign) : ''}
+              onChange={(e) => handleCampaignChange(e.target.value)}
               disabled={isLoadingCampaigns || hasActiveCalls}
               title={
                 hasActiveCalls
@@ -687,14 +710,17 @@ export const Telesale: React.FC = () => {
                 fontWeight: 600,
                 outline: 'none',
                 cursor: hasActiveCalls ? 'not-allowed' : 'pointer',
-                maxWidth: 'min(240px, calc(100vw - 120px))',
+                maxWidth: 'min(280px, calc(100vw - 120px))',
               }}
             >
-              {campaignsList.map((c) => (
-                <option key={c.campaign_id} value={c.campaign_id}>
-                  {c.name}
-                </option>
-              ))}
+              {campaignsList.map((c) => {
+                const campKey = getCampaignKey(c)
+                return (
+                  <option key={campKey} value={campKey}>
+                    {c.name}
+                  </option>
+                )
+              })}
             </select>
           </div>
 
@@ -846,6 +872,7 @@ export const Telesale: React.FC = () => {
           orderDate={orderDate}
           onDateChange={handleOrderDateChange}
           selectedSlotId={orderSlotId}
+          source_erp={selectedCampaign?.source_erp || 'locnuoc365'}
           onSelectSlot={(slotId, slotTime, date) => {
             setOrderSlotId(slotId)
             setOrderTime(slotTime)
@@ -901,6 +928,7 @@ export const Telesale: React.FC = () => {
           onOrderSlotIdChange={setOrderSlotId}
           onFetchNextCustomer={() => handleFetchCustomerForTab(activeTabId)}
           onSaveResultSuccess={handleSaveResultSuccess}
+          source_erp={currentCustomer?.source_erp || selectedCampaign?.source_erp || 'locnuoc365'}
         />
       </div>
 

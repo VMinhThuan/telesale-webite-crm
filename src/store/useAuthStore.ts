@@ -54,11 +54,12 @@ export interface UserProfile {
 
 interface AuthState {
   token: string | null
+  zomzemToken: string | null
   user: UserProfile | null
   isAuthenticated: boolean
 
   // Actions
-  login: (token: string, user: UserProfile) => void
+  login: (token: string, user: UserProfile, zomzemToken?: string | null) => void
   logout: () => void
   updateUser: (partial: Partial<UserProfile>) => void
 }
@@ -67,19 +68,32 @@ export const useAuthStore = create<AuthState>()(
   devtools(
     persist(
       (set) => ({
-        token: getStoredToken(),
+        token: getStoredToken('locnuoc365'),
+        zomzemToken: getStoredToken('zomzem'),
         user: getStoredUser(),
-        isAuthenticated: Boolean(getStoredToken()),
+        isAuthenticated: Boolean(getStoredToken('locnuoc365')),
 
-        login: (token, user) => {
+        login: (token, user, zomzemToken) => {
           if (!token) {
             clearStoredAuth()
-            set({ token: null, user: null, isAuthenticated: false }, false, 'auth/login-failed')
+            set({ token: null, zomzemToken: null, user: null, isAuthenticated: false }, false, 'auth/login-failed')
             return
           }
-          setStoredToken(token)
+          setStoredToken(token, 'locnuoc365')
+          if (zomzemToken !== undefined) {
+            setStoredToken(zomzemToken, 'zomzem')
+          }
           setStoredUser(user)
-          set({ token, user, isAuthenticated: true }, false, 'auth/login-success')
+          set(
+            {
+              token,
+              zomzemToken: zomzemToken ?? getStoredToken('zomzem'),
+              user,
+              isAuthenticated: true,
+            },
+            false,
+            'auth/login-success',
+          )
         },
 
         logout: () => {
@@ -100,7 +114,7 @@ export const useAuthStore = create<AuthState>()(
 
           // 3. Xóa token và auth storage
           clearStoredAuth()
-          set({ token: null, user: null, isAuthenticated: false }, false, 'auth/logout')
+          set({ token: null, zomzemToken: null, user: null, isAuthenticated: false }, false, 'auth/logout')
         },
 
         updateUser: (partial) =>
@@ -119,7 +133,12 @@ export const useAuthStore = create<AuthState>()(
         // Chỉ lưu token và user an toàn (loại bỏ mật khẩu SIP plain text) vào persistent storage
         partialize: (state) => {
           if (!state.user) {
-            return { token: state.token, user: null, isAuthenticated: state.isAuthenticated }
+            return {
+              token: state.token,
+              zomzemToken: state.zomzemToken,
+              user: null,
+              isAuthenticated: state.isAuthenticated,
+            }
           }
           const safeUser = { ...state.user }
           if (safeUser.sipConfig) {
@@ -128,6 +147,7 @@ export const useAuthStore = create<AuthState>()(
           }
           return {
             token: state.token,
+            zomzemToken: state.zomzemToken,
             user: safeUser,
             isAuthenticated: state.isAuthenticated,
           }
@@ -142,5 +162,6 @@ export const useAuthStore = create<AuthState>()(
 export const useAuthUser = () => useAuthStore((s) => s.user)
 export const useIsAuthenticated = () => useAuthStore((s) => s.isAuthenticated)
 export const useAuthToken = () => useAuthStore((s) => s.token)
+export const useZomzemToken = () => useAuthStore((s) => s.zomzemToken)
 
 export default useAuthStore

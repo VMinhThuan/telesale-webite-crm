@@ -94,11 +94,13 @@ interface TelesaleCallState {
   tabs: TelesaleCallTab[]
   activeTabId: number
   selectedCampaignId: number | null
+  selectedCampaignKey: string | null
   drafts: Record<number, TelesaleDraftResult>
 
   // Actions
   setActiveTabId: (id: number) => void
   setSelectedCampaignId: (campaignId: number | null) => void
+  setSelectedCampaignKey: (key: string | null) => void
   setTabs: (
     tabsOrUpdater:
       | TelesaleCallTab[]
@@ -116,6 +118,7 @@ export const useTelesaleCallStore = create<TelesaleCallState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: 1,
   selectedCampaignId: null,
+  selectedCampaignKey: null,
   drafts: {
     1: createDefaultDraftResult(),
     2: createDefaultDraftResult(),
@@ -124,6 +127,7 @@ export const useTelesaleCallStore = create<TelesaleCallState>((set, get) => ({
 
   setActiveTabId: (id: number) => set({ activeTabId: id }),
   setSelectedCampaignId: (id: number | null) => set({ selectedCampaignId: id }),
+  setSelectedCampaignKey: (key: string | null) => set({ selectedCampaignKey: key }),
 
   setTabs: (tabsOrUpdater) =>
     set((state) => ({

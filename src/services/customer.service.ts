@@ -10,8 +10,9 @@ import {
   UpdateCustomerPayload,
   AddCustomerMemberPayload,
   UpdateCustomerMemberPayload,
+  ErpSource,
 } from '../types/api'
-import apiClient, { generateIdempotencyKey } from './apiClient'
+import apiClient, { generateIdempotencyKey, getApiClient } from './apiClient'
 
 export interface CustomerQueryParams {
   customer_status?: CustomerStatusType
@@ -112,13 +113,15 @@ export const customerService = {
   },
 
   /**
-   * Sửa thông tin / địa chỉ khách hàng trên ERP
+   * Sửa thông tin / địa chỉ khách hàng trên ERP tương ứng
    */
   async updateCustomer(
     customerId: number,
     payload: UpdateCustomerPayload,
+    source_erp?: ErpSource,
   ): Promise<CustomerDetailDto & { msg?: string }> {
-    const response = await apiClient.post<any, any>(
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, any>(
       API_ENDPOINTS.CUSTOMER_UPDATE(customerId),
       payload,
     )
@@ -126,13 +129,15 @@ export const customerService = {
   },
 
   /**
-   * Thêm số điện thoại / người liên hệ mới cho khách hàng
+   * Thêm số điện thoại / người liên hệ mới cho khách hàng trên ERP tương ứng
    */
   async addCustomerMember(
     customerId: number,
     payload: AddCustomerMemberPayload,
+    source_erp?: ErpSource,
   ): Promise<CustomerMemberMutationResponse> {
-    const response = await apiClient.post<any, any>(
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, any>(
       API_ENDPOINTS.CUSTOMER_MEMBERS(customerId),
       payload,
     )
@@ -140,14 +145,16 @@ export const customerService = {
   },
 
   /**
-   * Sửa số điện thoại / tên / quan hệ của một thành viên
+   * Sửa số điện thoại / tên / quan hệ của một thành viên trên ERP tương ứng
    */
   async updateCustomerMember(
     customerId: number,
     memberId: number,
     payload: UpdateCustomerMemberPayload,
+    source_erp?: ErpSource,
   ): Promise<CustomerMemberMutationResponse> {
-    const response = await apiClient.post<any, any>(
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, any>(
       API_ENDPOINTS.CUSTOMER_MEMBER_UPDATE(customerId, memberId),
       payload,
     )

@@ -2,6 +2,9 @@
  * Định nghĩa Entity và DTO Types chuẩn xác theo tài liệu API_TELESALE_APP.md
  */
 
+// Định danh 2 hệ thống ERP hoạt động song song
+export type ErpSource = 'locnuoc365' | 'zomzem'
+
 // 1. Phản hồi chuẩn từ API ERP
 export interface ApiResponse<T = any> {
   result: T | null
@@ -176,6 +179,7 @@ export interface OrderDto {
   branch_id?: number
   chi_nhanh?: string
   ten_ktv?: string
+  source_erp?: ErpSource
 }
 
 export interface BranchSlotDto {
@@ -190,6 +194,7 @@ export interface BranchSlotDto {
   con_trong: number
   is_expired: boolean
   is_inactive: boolean
+  source_erp?: ErpSource
 }
 
 export interface OrderLuiHuyLogDto {
@@ -212,6 +217,7 @@ export interface CampaignDto {
   name: string
   branch_id: number
   branch_name: string
+  source_erp?: ErpSource
 }
 
 export interface CampaignsResponse {
@@ -231,6 +237,7 @@ export interface NextCustomerDto {
   members: CustomerMemberDto[]
   custom_field1?: string
   landmark?: string
+  source_erp?: ErpSource
 }
 
 export interface DialCallResponse {
@@ -321,6 +328,7 @@ export interface CallLogDto {
   call_status: 'answer' | 'no_answer'
   direction: 'outgoing' | 'incoming'
   description?: string
+  source_erp?: ErpSource
 }
 
 export interface DailyResultDto {
@@ -342,6 +350,10 @@ export interface DailyResultDto {
   thoi_gian_lam_viec?: number
   ti_le_chot_kh_lanh?: number
   ti_le_chot_kh_tiem_nang?: number
+  tong_k_nhu_cau?: number
+  tong_sai_so?: number
+  tong_k_dung_may?: number
+  source_erp?: ErpSource
 }
 
 // 7. Thông báo hệ thống (API 06 & 07)

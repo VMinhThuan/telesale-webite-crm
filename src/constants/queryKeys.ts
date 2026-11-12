@@ -33,16 +33,18 @@ export const queryKeys = {
     all: ['orders'] as const,
     lists: () => [...queryKeys.orders.all, 'list'] as const,
     list: (params?: any) => [...queryKeys.orders.lists(), params] as const,
-    slots: (branchId?: number, fromDate?: string, toDate?: string) =>
-      [...queryKeys.orders.all, 'slots', branchId, fromDate, toDate] as const,
+    slots: (branchId?: number, fromDate?: string, toDate?: string, source?: string) =>
+      [...queryKeys.orders.all, 'slots', branchId, fromDate, toDate, source] as const,
   },
 
   // 5. Telesale & Cuộc gọi
   telesale: {
     all: ['telesale'] as const,
     campaigns: () => [...queryKeys.telesale.all, 'campaigns'] as const,
-    dailyResults: (date?: string) => [...queryKeys.telesale.all, 'dailyResults', date] as const,
-    dailyResultsList: (params?: any) => [...queryKeys.telesale.all, 'dailyResultsList', params] as const,
+    dailyResults: (date?: string, source?: string) =>
+      [...queryKeys.telesale.all, 'dailyResults', date, source] as const,
+    dailyResultsList: (params?: any, source?: string) =>
+      [...queryKeys.telesale.all, 'dailyResultsList', params, source] as const,
     last7DaysCommission: () => [...queryKeys.telesale.all, 'last7DaysCommission'] as const,
   },
 

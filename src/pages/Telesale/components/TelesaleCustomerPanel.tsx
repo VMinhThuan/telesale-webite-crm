@@ -23,6 +23,7 @@ import { useSaveCallResultMutation } from '../../../hooks/useTelesale'
 import { useTelesaleCallStore } from '../../../store/useTelesaleCallStore'
 import {
   CallResultOutcome,
+  ErpSource,
   NextCustomerDto,
   SaveCallResultPayload,
 } from '../../../types/api'
@@ -64,6 +65,7 @@ export interface TelesaleCustomerPanelProps {
   onFetchNextCustomer?: () => void
   onCustomerUpdate?: (updatedCustomer: NextCustomerDto) => void
   onSaveResultSuccess: () => void
+  source_erp?: ErpSource
 }
 
 export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
@@ -83,6 +85,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   activeTabStatus,
   onCustomerUpdate,
   onSaveResultSuccess,
+  source_erp,
 }) => {
   // Modal chỉnh sửa thông tin khách hàng (sửa địa chỉ, thêm số điện thoại)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -287,6 +290,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
               note: `Hệ thống tự động ghi nhận: ${label}`,
             },
             idempotencyKey: currentOrderKeyRef.current,
+            source_erp: currentCustomer.source_erp || source_erp,
           })
 
           currentOrderKeyRef.current = generateIdempotencyKey()
@@ -564,6 +568,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
         customerId: currentCustomer.customer_id,
         payload,
         idempotencyKey: currentOrderKeyRef.current,
+        source_erp: currentCustomer.source_erp || source_erp,
       })
 
       // Làm mới key sau khi lưu thành công
@@ -1530,6 +1535,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         customer={currentCustomer}
+        source_erp={currentCustomer?.source_erp || source_erp}
         onSave={handleSaveCustomerInfo}
       />
     </aside>

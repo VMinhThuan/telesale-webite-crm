@@ -46,13 +46,17 @@ export function useAuth() {
       const loginRes = await authService.login(credentials)
       try {
         const fullProfile = await authService.getUserInfo()
-        return { access_token: loginRes.access_token, user: fullProfile }
+        return {
+          access_token: loginRes.access_token,
+          zomzem_token: loginRes.zomzem_token,
+          user: fullProfile,
+        }
       } catch {
         return loginRes
       }
     },
     onSuccess: (data) => {
-      login(data.access_token, data.user)
+      login(data.access_token, data.user, data.zomzem_token)
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
       notify(`Đăng nhập thành công! Xin chào ${data.user.name}`)
     },

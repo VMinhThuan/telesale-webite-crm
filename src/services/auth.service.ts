@@ -1,6 +1,11 @@
 import { API_ENDPOINTS } from '../constants/apiEndpoints'
 import { UserProfile } from '../store/useAuthStore'
-import apiClient, { clearStoredAuth, setStoredToken, setStoredUser } from './apiClient'
+import apiClient, {
+  apiClientZomzem,
+  clearStoredAuth,
+  setStoredToken,
+  setStoredUser,
+} from './apiClient'
 
 export interface LoginCredentials {
   username: string
@@ -9,6 +14,7 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   access_token: string
+  zomzem_token?: string
   token_type?: string
   user: UserProfile
 }
@@ -37,15 +43,27 @@ export function determinePhanQuyen(raw: any): 'admin' | 'truong_nhom' | 'nhan_vi
 
 export const authService = {
   /**
-   * Đăng nhập lấy access_token từ hệ thống ERP
+   * Đăng nhập lấy access_token từ hệ thống ERP (gọi song song cả LocNuoc365 và Zomzem)
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await apiClient.post<any, any>(API_ENDPOINTS.AUTH_LOGIN, {
-      username: credentials.username,
-      password: credentials.password,
-    })
+    // Đăng nhập song song 2 hệ thống với cùng thông tin tài khoản
+    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+      apiClient.post<any, any>(API_ENDPOINTS.AUTH_LOGIN, {
+        username: credentials.username,
+        password: credentials.password,
+      }),
+      apiClientZomzem.post<any, any>(API_ENDPOINTS.AUTH_LOGIN, {
+        username: credentials.username,
+        password: credentials.password,
+      }),
+    ])
 
-    // 1. Kiểm tra cờ thất bại từ ERP (backend trả HTTP 200 nhưng success: false hoặc có trường error)
+    // 1. Kiểm tra kết quả từ hệ thống chính LocNuoc365
+    if (ln365Settled.status === 'rejected') {
+      throw ln365Settled.reason
+    }
+    const response = ln365Settled.value
+
     if (!response || response.success === false || response.error) {
       const errorMsg =
         response?.error ||
@@ -55,7 +73,7 @@ export const authService = {
       throw new Error(errorMsg)
     }
 
-    // 2. Trích xuất access_token
+    // 2. Trích xuất access_token chính thức từ LocNuoc365
     const token =
       response.access_token ||
       response.token ||
@@ -74,6 +92,30 @@ export const authService = {
       throw new Error(errorMsg)
     }
 
+    setStoredToken(token, 'locnuoc365')
+
+    // 3. Trích xuất và lưu access_token phụ từ Zomzem (nếu đăng nhập Zomzem thành công)
+    let zomzemToken: string | null = null
+    if (zomzemSettled.status === 'fulfilled') {
+      const zzResponse = zomzemSettled.value
+      if (zzResponse && zzResponse.success !== false && !zzResponse.error) {
+        const zzToken =
+          zzResponse.access_token ||
+          zzResponse.token ||
+          zzResponse.result?.access_token ||
+          zzResponse.result?.token ||
+          zzResponse.data?.access_token ||
+          zzResponse.data?.token
+        if (zzToken && typeof zzToken === 'string') {
+          zomzemToken = zzToken
+          setStoredToken(zzToken, 'zomzem')
+          console.log('[Multi-ERP] Đăng nhập Zomzem thành công song song!')
+        }
+      }
+    } else {
+      console.warn('[Multi-ERP] Đăng nhập Zomzem tạm thời chưa khả dụng:', zomzemSettled.reason)
+    }
+
     const userRaw = response.user || response.result?.user || response.result || {}
     const phanQuyen = determinePhanQuyen(userRaw)
     const baseUser = response.user || response.result?.user || {}
@@ -89,20 +131,22 @@ export const authService = {
       phanQuyen: phanQuyen,
     }
 
-    setStoredToken(token)
-
     return {
       access_token: token,
+      zomzem_token: zomzemToken || undefined,
       user,
     }
   },
 
   /**
-   * Đăng xuất hủy phiên làm việc trên hệ thống ERP
+   * Đăng xuất hủy phiên làm việc trên cả 2 hệ thống ERP
    */
   async logout(): Promise<void> {
     try {
-      await apiClient.post(API_ENDPOINTS.AUTH_LOGOUT)
+      await Promise.allSettled([
+        apiClient.post(API_ENDPOINTS.AUTH_LOGOUT),
+        apiClientZomzem.post(API_ENDPOINTS.AUTH_LOGOUT),
+      ])
     } catch (err) {
       console.warn('Lỗi khi gọi API đăng xuất:', err)
     } finally {

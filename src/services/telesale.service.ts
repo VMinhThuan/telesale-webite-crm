@@ -3,14 +3,16 @@ import {
   ApiPaginatedResult,
   AttendanceDto,
   CallLogDto,
+  CampaignDto,
   CampaignsResponse,
   DailyResultDto,
   DialCallResponse,
+  ErpSource,
   NextCustomerDto,
   SaveCallResultPayload,
   SaveCallResultResponse,
 } from '../types/api'
-import apiClient, { generateIdempotencyKey } from './apiClient'
+import apiClient, { apiClientZomzem, generateIdempotencyKey, getApiClient } from './apiClient'
 
 export interface GetNextCustomerPayload {
   campaign_id: number
@@ -42,31 +44,105 @@ export interface AttendancePayload {
 
 export const telesaleService = {
   /**
-   * Lấy danh sách chiến dịch đang hoạt động mà nhân viên được phân quyền
+   * Helper trích xuất 1 DailyResultDto từ response
    */
-  async getCampaigns(): Promise<CampaignsResponse> {
-    const response = await apiClient.get<any, { result: CampaignsResponse }>(
-      API_ENDPOINTS.CAMPAIGNS,
-    )
-    return response.result || response || { items: [], total: 0 }
+  _extractDailyResult(result: any, source_erp?: ErpSource): DailyResultDto | null {
+    if (!result) return null
+    let item: any = null
+    if (Array.isArray(result.items)) {
+      item = result.items[0] || null
+    } else if (Array.isArray(result)) {
+      item = result[0] || null
+    } else if (typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
+      item = result
+    }
+    if (item && source_erp) {
+      return { ...item, source_erp }
+    }
+    return item
   },
 
   /**
-   * Lấy thông tin khách hàng tiếp theo để quay số gọi
+   * Helper trích xuất mảng DailyResultDto từ response
    */
-  async getNextCustomer(payload: GetNextCustomerPayload): Promise<NextCustomerDto> {
-    const response = await apiClient.post<any, { result: NextCustomerDto }>(
+  _extractDailyResultsList(result: any, source_erp?: ErpSource): DailyResultDto[] {
+    if (!result) return []
+    let list: any[] = []
+    if (Array.isArray(result.items)) {
+      list = result.items
+    } else if (Array.isArray(result)) {
+      list = result
+    } else if (typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
+      list = [result]
+    }
+    if (source_erp) {
+      return list.map((i) => ({ ...i, source_erp }))
+    }
+    return list
+  },
+
+  /**
+   * Lấy danh sách chiến dịch đang hoạt động từ cả 2 hệ thống ERP (LocNuoc365 & Zomzem)
+   */
+  async getCampaigns(): Promise<CampaignsResponse> {
+    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+      apiClient.get<any, { result: CampaignsResponse }>(API_ENDPOINTS.CAMPAIGNS),
+      apiClientZomzem.get<any, { result: CampaignsResponse }>(API_ENDPOINTS.CAMPAIGNS),
+    ])
+
+    let ln365Items: CampaignDto[] = []
+    if (ln365Settled.status === 'fulfilled') {
+      const raw = ln365Settled.value?.result || ln365Settled.value
+      const list = Array.isArray(raw) ? raw : raw?.items || []
+      ln365Items = list.map((c: any) => ({
+        ...c,
+        source_erp: 'locnuoc365' as ErpSource,
+      }))
+    } else {
+      console.warn('[LN365] Lỗi lấy danh sách chiến dịch:', ln365Settled.reason)
+    }
+
+    let zomzemItems: CampaignDto[] = []
+    if (zomzemSettled.status === 'fulfilled') {
+      const raw = zomzemSettled.value?.result || zomzemSettled.value
+      const list = Array.isArray(raw) ? raw : raw?.items || []
+      zomzemItems = list.map((c: any) => ({
+        ...c,
+        source_erp: 'zomzem' as ErpSource,
+      }))
+    } else {
+      console.warn('[Zomzem] Chưa có chiến dịch hoặc lỗi kết nối Zomzem:', zomzemSettled.reason)
+    }
+
+    const combinedItems = [...ln365Items, ...zomzemItems]
+    return {
+      items: combinedItems,
+      total: combinedItems.length,
+    }
+  },
+
+  /**
+   * Lấy thông tin khách hàng tiếp theo để quay số gọi từ hệ thống ERP tương ứng
+   */
+  async getNextCustomer(payload: GetNextCustomerPayload, source_erp?: ErpSource): Promise<NextCustomerDto> {
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, { result: NextCustomerDto }>(
       API_ENDPOINTS.CUSTOMER_NEXT,
       payload,
     )
-    return response.result || response
+    const res = response.result || response
+    if (res && typeof res === 'object') {
+      res.source_erp = source_erp || 'locnuoc365'
+    }
+    return res
   },
 
   /**
    * Lấy đầu số kỹ thuật và kích hoạt cuộc gọi tới khách hàng
    */
-  async dialCall(payload: DialCallPayload): Promise<DialCallResponse> {
-    const response = await apiClient.post<any, { result: DialCallResponse }>(
+  async dialCall(payload: DialCallPayload, source_erp?: ErpSource): Promise<DialCallResponse> {
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, { result: DialCallResponse }>(
       API_ENDPOINTS.CALLS_DIAL,
       payload,
     )
@@ -74,12 +150,13 @@ export const telesaleService = {
   },
 
   /**
-   * Ghi nhận kết quả cuộc gọi và tự động lên đơn nếu chốt thành công
+   * Ghi nhận kết quả cuộc gọi và tự động lên đơn nếu chốt thành công lên đúng hệ thống ERP
    */
   async saveCallResult(
     customerId: number,
     payload: SaveCallResultPayload,
     customIdempotencyKey?: string,
+    source_erp?: ErpSource,
   ): Promise<SaveCallResultResponse> {
     const { idempotencyKey: payloadKey, ...bodyPayload } = payload
     const key = customIdempotencyKey || payloadKey || generateIdempotencyKey()
@@ -89,7 +166,8 @@ export const telesaleService = {
       headers['Idempotency-Key'] = key
     }
 
-    const response = await apiClient.post<any, { result: SaveCallResultResponse }>(
+    const client = getApiClient(source_erp)
+    const response = await client.post<any, { result: SaveCallResultResponse }>(
       API_ENDPOINTS.SAVE_CALL_RESULT(customerId),
       bodyPayload,
       { headers },
@@ -99,9 +177,11 @@ export const telesaleService = {
 
   /**
    * Lấy thống kê hiệu suất đàm thoại trong ngày hoặc khoảng ngày của nhân viên
+   * Hỗ trợ lọc theo nguồn: 'locnuoc365' | 'zomzem' | 'all' (tổng hợp)
    */
   async getDailyResults(
     date?: string | { from_date?: string; to_date?: string },
+    source_erp: ErpSource | 'all' = 'all',
   ): Promise<DailyResultDto | null> {
     const payload: Record<string, any> = {}
     if (typeof date === 'string') {
@@ -112,74 +192,188 @@ export const telesaleService = {
       if (date.to_date) payload.to_date = date.to_date
     }
 
-    const response = await apiClient.post<any, any>(
-      API_ENDPOINTS.DAILY_RESULTS,
-      payload,
-    )
+    if (source_erp === 'locnuoc365') {
+      const response = await apiClient.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload)
+      return this._extractDailyResult(response.result || response, 'locnuoc365')
+    }
 
-    const result = response.result || response
-    if (result && Array.isArray(result.items)) {
-      return result.items[0] || null
+    if (source_erp === 'zomzem') {
+      const response = await apiClientZomzem.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload)
+      return this._extractDailyResult(response.result || response, 'zomzem')
     }
-    if (Array.isArray(result)) {
-      return result[0] || null
+
+    // 'all': Gọi song song cả 2 và cộng dồn số liệu
+    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+      apiClient.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload),
+      apiClientZomzem.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload),
+    ])
+
+    const ln365Res = ln365Settled.status === 'fulfilled' ? ln365Settled.value?.result || ln365Settled.value : null
+    const zomzemRes = zomzemSettled.status === 'fulfilled' ? zomzemSettled.value?.result || zomzemSettled.value : null
+
+    const ln365 = this._extractDailyResult(ln365Res)
+    const zomzem = this._extractDailyResult(zomzemRes)
+
+    if (!ln365 && !zomzem) return null
+    if (!ln365) return zomzem
+    if (!zomzem) return ln365
+
+    return {
+      ...ln365,
+      source_erp: undefined,
+      tong_total_call: (ln365.tong_total_call || 0) + (zomzem.tong_total_call || 0),
+      tong_call_answer: (ln365.tong_call_answer || 0) + (zomzem.tong_call_answer || 0),
+      tong_tg_dam_thoai: (ln365.tong_tg_dam_thoai || 0) + (zomzem.tong_tg_dam_thoai || 0),
+      tong_da_chot: (ln365.tong_da_chot || 0) + (zomzem.tong_da_chot || 0),
+      don_phat_sinh: ((ln365.don_phat_sinh ?? ln365.tong_da_chot ?? 0) + (zomzem.don_phat_sinh ?? zomzem.tong_da_chot ?? 0)),
+      tong_don_da_xac_nhan: (ln365.tong_don_da_xac_nhan || 0) + (zomzem.tong_don_da_xac_nhan || 0),
+      tong_don_tra_ve: (ln365.tong_don_tra_ve || 0) + (zomzem.tong_don_tra_ve || 0),
+      tong_hen_goi_lai: (ln365.tong_hen_goi_lai || 0) + (zomzem.tong_hen_goi_lai || 0),
+      tong_giu_lai_cs: (ln365.tong_giu_lai_cs || 0) + (zomzem.tong_giu_lai_cs || 0),
+      tong_k_nhu_cau: (ln365.tong_k_nhu_cau || 0) + (zomzem.tong_k_nhu_cau || 0),
+      tong_sai_so: (ln365.tong_sai_so || 0) + (zomzem.tong_sai_so || 0),
+      tong_k_dung_may: (ln365.tong_k_dung_may || 0) + (zomzem.tong_k_dung_may || 0),
     }
-    if (result && typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
-      return result
-    }
-    return null
   },
 
   /**
    * Lấy danh sách hiệu suất theo khoảng thời gian hoặc theo danh sách nhân viên (API 10b: POST /api/telesale/daily-results)
    * Quản lý / Admin có thể gửi kèm user_id để lấy riêng 1 nhân viên
+   * Hỗ trợ lọc theo nguồn ERP: 'locnuoc365' | 'zomzem' | 'all' (tổng hợp gộp theo user)
    */
-  async getDailyResultsList(payload?: {
-    from_date?: string
-    to_date?: string
-    user_id?: number
-    start?: number
-    length?: number
-  }): Promise<DailyResultDto[]> {
-    const response = await apiClient.post<any, any>(
-      API_ENDPOINTS.DAILY_RESULTS,
-      payload || {},
-    )
+  async getDailyResultsList(
+    payload?: {
+      from_date?: string
+      to_date?: string
+      user_id?: number
+      start?: number
+      length?: number
+    },
+    source_erp: ErpSource | 'all' = 'all',
+  ): Promise<DailyResultDto[]> {
+    if (source_erp === 'locnuoc365') {
+      const response = await apiClient.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload || {})
+      return this._extractDailyResultsList(response.result || response, 'locnuoc365')
+    }
 
-    const result = response.result || response
-    if (result && Array.isArray(result.items)) {
-      return result.items
+    if (source_erp === 'zomzem') {
+      const response = await apiClientZomzem.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload || {})
+      return this._extractDailyResultsList(response.result || response, 'zomzem')
     }
-    if (Array.isArray(result)) {
-      return result
+
+    // 'all': Gọi song song 2 server và gộp theo user_id
+    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+      apiClient.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload || {}),
+      apiClientZomzem.post<any, any>(API_ENDPOINTS.DAILY_RESULTS, payload || {}),
+    ])
+
+    const ln365Res = ln365Settled.status === 'fulfilled' ? ln365Settled.value?.result || ln365Settled.value : null
+    const zomzemRes = zomzemSettled.status === 'fulfilled' ? zomzemSettled.value?.result || zomzemSettled.value : null
+
+    const ln365List = this._extractDailyResultsList(ln365Res, 'locnuoc365')
+    const zomzemList = this._extractDailyResultsList(zomzemRes, 'zomzem')
+
+    const map = new Map<string, DailyResultDto>()
+
+    const mergeItem = (item: DailyResultDto) => {
+      const key = String(item.user_id || item.user_name)
+      if (!map.has(key)) {
+        map.set(key, { ...item, source_erp: undefined })
+      } else {
+        const existing = map.get(key)!
+        existing.tong_total_call = (existing.tong_total_call || 0) + (item.tong_total_call || 0)
+        existing.tong_call_answer = (existing.tong_call_answer || 0) + (item.tong_call_answer || 0)
+        existing.tong_tg_dam_thoai = (existing.tong_tg_dam_thoai || 0) + (item.tong_tg_dam_thoai || 0)
+        existing.tong_da_chot = (existing.tong_da_chot || 0) + (item.tong_da_chot || 0)
+        existing.don_phat_sinh = ((existing.don_phat_sinh ?? existing.tong_da_chot ?? 0) + (item.don_phat_sinh ?? item.tong_da_chot ?? 0))
+        existing.tong_don_da_xac_nhan = (existing.tong_don_da_xac_nhan || 0) + (item.tong_don_da_xac_nhan || 0)
+        existing.tong_don_tra_ve = (existing.tong_don_tra_ve || 0) + (item.tong_don_tra_ve || 0)
+        existing.tong_hen_goi_lai = (existing.tong_hen_goi_lai || 0) + (item.tong_hen_goi_lai || 0)
+        existing.tong_giu_lai_cs = (existing.tong_giu_lai_cs || 0) + (item.tong_giu_lai_cs || 0)
+        existing.tong_k_nhu_cau = (existing.tong_k_nhu_cau || 0) + (item.tong_k_nhu_cau || 0)
+        existing.tong_sai_so = (existing.tong_sai_so || 0) + (item.tong_sai_so || 0)
+        existing.tong_k_dung_may = (existing.tong_k_dung_may || 0) + (item.tong_k_dung_may || 0)
+      }
     }
-    if (result && typeof result === 'object' && ('tong_total_call' in result || 'user_id' in result)) {
-      return [result]
+
+    ln365List.forEach(mergeItem)
+    zomzemList.forEach(mergeItem)
+
+    return Array.from(map.values())
+  },
+
+  /**
+   * Helper nạp lịch sử cuộc gọi từ 1 server đơn lẻ
+   */
+  async _fetchCallLogsSingle(
+    client: any,
+    payload?: CallLogsPayload,
+    source_erp?: ErpSource,
+  ): Promise<ApiPaginatedResult<CallLogDto>> {
+    try {
+      const response: any = await (client as any).post(
+        API_ENDPOINTS.CALL_LOGS,
+        payload || { start: 0, length: 50 },
+      )
+      const result = response?.result !== undefined ? response.result : response
+      let items: CallLogDto[] = []
+      let total = 0
+      if (Array.isArray(result)) {
+        items = result
+        total = result.length
+      } else {
+        const rawItems = result?.items || result?.data || []
+        items = Array.isArray(rawItems) ? rawItems : []
+        total =
+          result?.total ??
+          result?.recordsTotal ??
+          result?.count ??
+          items.length
+      }
+      return {
+        items: items.map((item) => ({ ...item, source_erp })),
+        total: typeof total === 'number' ? total : 0,
+      }
+    } catch (err) {
+      console.warn(`[getCallLogs] Lỗi lấy lịch sử cuộc gọi từ ${source_erp}:`, err)
+      return { items: [], total: 0 }
     }
-    return []
   },
 
   /**
    * Lấy lịch sử cuộc gọi telesale (API 10a: POST /api/telesale/call-logs)
+   * Mặc định 'all': Gọi song song cả 2 hệ thống ERP (LocNuoc365 & Zomzem), gộp và sắp xếp mới nhất
    */
-  async getCallLogs(payload?: CallLogsPayload): Promise<ApiPaginatedResult<CallLogDto>> {
-    const response = await apiClient.post<any, any>(
-      API_ENDPOINTS.CALL_LOGS,
-      payload || { start: 0, length: 50 },
-    )
-    const result = response?.result !== undefined ? response.result : response
-    if (Array.isArray(result)) {
-      return { items: result, total: result.length }
+  async getCallLogs(
+    payload?: CallLogsPayload,
+    source_erp: ErpSource | 'all' = 'all',
+  ): Promise<ApiPaginatedResult<CallLogDto>> {
+    if (source_erp === 'locnuoc365') {
+      return this._fetchCallLogsSingle(apiClient, payload, 'locnuoc365')
     }
-    const items = result?.items || result?.data || []
-    const total =
-      result?.total ??
-      result?.recordsTotal ??
-      result?.count ??
-      (Array.isArray(items) ? items.length : 0)
+    if (source_erp === 'zomzem') {
+      return this._fetchCallLogsSingle(apiClientZomzem, payload, 'zomzem')
+    }
+
+    const [ln365Res, zomzemRes] = await Promise.allSettled([
+      this._fetchCallLogsSingle(apiClient, payload, 'locnuoc365'),
+      this._fetchCallLogsSingle(apiClientZomzem, payload, 'zomzem'),
+    ])
+
+    const ln365 = ln365Res.status === 'fulfilled' ? ln365Res.value : { items: [], total: 0 }
+    const zomzem = zomzemRes.status === 'fulfilled' ? zomzemRes.value : { items: [], total: 0 }
+
+    const combined = [...ln365.items, ...zomzem.items]
+    combined.sort((a, b) => {
+      const timeA = new Date(a.call_date_time_start || 0).getTime()
+      const timeB = new Date(b.call_date_time_start || 0).getTime()
+      if (timeA && timeB && timeA !== timeB) return timeB - timeA
+      return (Number(b.call_id) || 0) - (Number(a.call_id) || 0)
+    })
+
     return {
-      items: Array.isArray(items) ? items : [],
-      total: typeof total === 'number' ? total : 0,
+      items: combined,
+      total: ln365.total + zomzem.total,
     }
   },
 

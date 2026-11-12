@@ -1,6 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { ErpSource } from '../types/api'
 
 const TOKEN_KEY = 'salesflow_access_token'
+const TOKEN_KEY_ZOMZEM = 'salesflow_access_token_zomzem'
 const USER_KEY = 'salesflow_user_info'
 
 export interface ApiResponse<T = any> {
@@ -25,11 +27,26 @@ export class AppApiError extends Error {
     this.rawResponse = rawResponse
   }
 }
+
+/**
+ * Cấu hình danh sách hệ thống ERP chạy song song
+ */
+export const ERP_INSTANCES: Record<ErpSource, { name: string; url: string }> = {
+  locnuoc365: {
+    name: 'Lọc Nước 365',
+    url: import.meta.env.VITE_API_BASE_URL || 'https://locnuoc365.xyz',
+  },
+  zomzem: {
+    name: 'Zomzem',
+    url: import.meta.env.VITE_ZOMZEM_API_BASE_URL || 'https://zomzem.xyz',
+  },
+}
+
 /**
  * Địa chỉ máy chủ ERP chính thức: https://locnuoc365.xyz
  */
-export const API_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL || 'https://locnuoc365.xyz'
+export const API_BASE_URL: string = ERP_INSTANCES.locnuoc365.url
+export const ZOMZEM_API_BASE_URL: string = ERP_INSTANCES.zomzem.url
 
 // Tự động dọn dẹp key lưu instance cũ trong localStorage nếu có
 try {
@@ -41,7 +58,8 @@ try {
 /**
  * Lấy URL hệ thống ERP đang hoạt động
  */
-export const getCurrentInstanceUrl = (): string => API_BASE_URL
+export const getCurrentInstanceUrl = (source: ErpSource = 'locnuoc365'): string =>
+  ERP_INSTANCES[source]?.url || API_BASE_URL
 
 /**
  * Đặt URL Backend ERP
@@ -51,11 +69,12 @@ export const setApiBaseUrl = (_url: string): void => {
 }
 
 /**
- * Lấy token đã lưu
+ * Lấy token đã lưu theo hệ thống ERP
  */
-export const getStoredToken = (): string | null => {
+export const getStoredToken = (source?: ErpSource): string | null => {
   try {
-    return localStorage.getItem(TOKEN_KEY)
+    const key = source === 'zomzem' ? TOKEN_KEY_ZOMZEM : TOKEN_KEY
+    return localStorage.getItem(key)
   } catch (err) {
     console.error('Không thể đọc token từ localStorage:', err)
     return null
@@ -63,14 +82,15 @@ export const getStoredToken = (): string | null => {
 }
 
 /**
- * Lưu token mới
+ * Lưu token mới theo hệ thống ERP
  */
-export const setStoredToken = (token: string | null): void => {
+export const setStoredToken = (token: string | null, source?: ErpSource): void => {
   try {
+    const key = source === 'zomzem' ? TOKEN_KEY_ZOMZEM : TOKEN_KEY
     if (token) {
-      localStorage.setItem(TOKEN_KEY, token)
+      localStorage.setItem(key, token)
     } else {
-      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(key)
     }
   } catch (err) {
     console.error('Không thể lưu token vào localStorage:', err)
@@ -112,11 +132,12 @@ export const setStoredUser = (user: any | null): void => {
 }
 
 /**
- * Xóa token và phiên làm việc
+ * Xóa toàn bộ token và phiên làm việc của cả 2 hệ thống ERP
  */
 export const clearStoredAuth = (): void => {
   try {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(TOKEN_KEY_ZOMZEM)
     localStorage.removeItem(USER_KEY)
   } catch (err) {
     console.error('Không thể xóa auth:', err)
@@ -139,8 +160,9 @@ export const generateIdempotencyKey = (): string => {
  */
 const timeout = Number(import.meta.env.VITE_API_TIMEOUT) || 15000
 
+// 1. Instance chính thức kết nối LocNuoc365
 export const apiClient = axios.create({
-  baseURL: getCurrentInstanceUrl(),
+  baseURL: ERP_INSTANCES.locnuoc365.url,
   timeout,
   headers: {
     Accept: 'application/json',
@@ -148,11 +170,11 @@ export const apiClient = axios.create({
   },
 })
 
-// Request Interceptor: Luôn tự động gắn Bearer Token và cập nhật baseURL hiện tại
+// Request Interceptor cho LocNuoc365: Gắn token locnuoc365
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    config.baseURL = getCurrentInstanceUrl()
-    const token = getStoredToken()
+    config.baseURL = ERP_INSTANCES.locnuoc365.url
+    const token = getStoredToken('locnuoc365')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -161,7 +183,7 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// Response Interceptor: Chuẩn hóa dữ liệu trả về và bắt lỗi 401
+// Response Interceptor cho LocNuoc365: Chuẩn hóa dữ liệu trả về và bắt lỗi 401
 apiClient.interceptors.response.use(
   (response) => {
     return response.data
@@ -194,5 +216,63 @@ apiClient.interceptors.response.use(
     return Promise.reject(new AppApiError(errorMessage, status, error.response?.data))
   },
 )
+
+// 2. Instance kết nối máy chủ Zomzem (hệ thống chạy song song)
+export const apiClientZomzem = axios.create({
+  baseURL: ERP_INSTANCES.zomzem.url,
+  timeout,
+  headers: {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  },
+})
+
+// Request Interceptor cho Zomzem: Gắn token zomzem
+apiClientZomzem.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    config.baseURL = ERP_INSTANCES.zomzem.url
+    const token = getStoredToken('zomzem')
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error),
+)
+
+// Response Interceptor cho Zomzem: Chuẩn hóa dữ liệu trả về, không bắn event 401 văng app chính nếu LocNuoc365 vẫn sống
+apiClientZomzem.interceptors.response.use(
+  (response) => {
+    return response.data
+  },
+  (error: AxiosError<any>) => {
+    const status = error.response ? error.response.status : null
+
+    if (status === 401) {
+      setStoredToken(null, 'zomzem')
+      console.warn('[Zomzem] Phiên xác thực Zomzem hết hạn.')
+    }
+
+    let errorMessage = 'Lỗi kết nối máy chủ Zomzem, vui lòng thử lại sau.'
+    if (error.response?.data?.error) {
+      errorMessage = error.response.data.error
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (status === 409) {
+      errorMessage = 'Yêu cầu chốt đơn đang được hệ thống xử lý hoặc khách hàng đang có đơn chưa hoàn tất.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
+    return Promise.reject(new AppApiError(errorMessage, status, error.response?.data))
+  },
+)
+
+/**
+ * Trả về Axios client tương ứng theo nguồn ERP chỉ định
+ */
+export const getApiClient = (source?: ErpSource) => {
+  return source === 'zomzem' ? apiClientZomzem : apiClient
+}
 
 export default apiClient
