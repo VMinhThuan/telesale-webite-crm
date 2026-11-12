@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { SalesFlowLogo } from '../../components/common/SalesFlowLogo'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
@@ -115,31 +114,21 @@ export const LoginPage: React.FC = () => {
         {/* Logo & Header thương hiệu */}
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <SalesFlowLogo
-              size={40}
+            <div
               style={{
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
+                background: '#ffffff',
+                padding: '6px 14px',
                 borderRadius: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
               }}
-            />
-            <div>
-              <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>
-                SalesFlow
-              </span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  marginLeft: '8px',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}
-              >
-                CRM v2.4
-              </span>
+            >
+              <img
+                src="/logo-thayloitainha.webp"
+                alt="Thay Lõi Tại Nhà"
+                style={{ height: '30px', width: 'auto', objectFit: 'contain', display: 'block' }}
+              />
             </div>
           </div>
           <p style={{ color: '#93c5fd', fontSize: '13px', margin: 0 }}>
@@ -291,7 +280,7 @@ export const LoginPage: React.FC = () => {
                 letterSpacing: '-0.3px',
               }}
             >
-              Đăng nhập SalesFlow
+              Đăng nhập Thay Lõi Tại Nhà
             </h2>
           </div>
 

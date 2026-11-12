@@ -19,7 +19,6 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { useChatThreads } from '../../hooks/useChat'
 import { SidebarBanner } from './SidebarBanner'
 import { determinePhanQuyen } from '../../services/auth.service'
-import { SalesFlowLogo } from './SalesFlowLogo'
 
 interface NavItemDef {
   label: string
@@ -104,11 +103,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-top">
         <div
           className="brand brand-text"
-          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
+          style={{
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            background: '#ffffff',
+            padding: '5px 10px',
+            borderRadius: '8px',
+            maxWidth: '180px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
           onClick={() => navigate('/')}
         >
-          <SalesFlowLogo size={30} />
-          <span>SalesFlow</span>
+          <img
+            src="/logo-thayloitainha.webp"
+            alt="Thay Lõi Tại Nhà"
+            style={{
+              height: '24px',
+              width: '100%',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
         </div>
         <button
           title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
