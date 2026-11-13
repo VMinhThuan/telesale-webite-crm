@@ -23,9 +23,9 @@ export const queryKeys = {
     lists: () => [...queryKeys.customers.all, 'list'] as const,
     list: (params?: any) => [...queryKeys.customers.lists(), params] as const,
     details: () => [...queryKeys.customers.all, 'detail'] as const,
-    detail: (id?: number) => [...queryKeys.customers.details(), id] as const,
+    detail: (id?: number, source?: string) => [...queryKeys.customers.details(), id, source] as const,
     histories: () => [...queryKeys.customers.all, 'history'] as const,
-    history: (id?: number, type?: string) => [...queryKeys.customers.histories(), id, type] as const,
+    history: (id?: number, type?: string, source?: string) => [...queryKeys.customers.histories(), id, type, source] as const,
   },
 
   // 4. Đơn hàng & Slot hẹn

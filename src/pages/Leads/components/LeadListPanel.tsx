@@ -24,7 +24,7 @@ import { Pagination } from '../../../components/ui/Pagination'
 import { TableSkeleton } from '../../../components/ui/TableSkeleton'
 import { useCustomersList } from '../../../hooks/useCustomers'
 import { useDebounce } from '../../../hooks/useDebounce'
-import { CareStatusType, CustomerDto } from '../../../types/api'
+import { CareStatusType, CustomerDto, ErpSource } from '../../../types/api'
 import { formatDateTime } from '../../../utils/formatters'
 import customerService from '../../../services/customer.service'
 import dayjs from '../../../lib/dayjs'
@@ -54,14 +54,16 @@ const PAGE_SIZE = 10
 
 export interface LeadListPanelProps {
   selectedCustomerId: number | null
-  onSelectCustomer: (id: number) => void
+  selectedCustomerSource?: ErpSource
+  onSelectCustomer: (id: number, source_erp?: ErpSource) => void
   selectedBranchId?: number
   onBranchChange?: (branchId?: number) => void
-  availableBranches?: { id: number; name: string }[]
+  availableBranches?: { id: number; name: string; source_erp?: ErpSource }[]
 }
 
 export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   selectedCustomerId,
+  selectedCustomerSource: _selectedCustomerSource,
   onSelectCustomer,
   selectedBranchId,
   onBranchChange,
@@ -71,6 +73,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   const currentBranchId = selectedBranchId !== undefined ? selectedBranchId : internalBranchId
 
   const [careStatusFilter, setCareStatusFilter] = useState<'all' | CareStatusType>('all')
+  const [erpSourceFilter, setErpSourceFilter] = useState<'all' | 'locnuoc365' | 'zomzem'>('all')
   const [fromDate, setFromDate] = useState<string>('')
   const [toDate, setToDate] = useState<string>('')
   const [datePreset, setDatePreset] = useState<'all' | 'today' | '7days' | 'month' | 'custom'>('all')
@@ -113,6 +116,14 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   const handleBranchSelect = (bId: number | undefined) => {
     setInternalBranchId(bId)
     onBranchChange?.(bId)
+    if (bId) {
+      const selectedBranch = availableBranches.find((b) => b.id === bId)
+      if (selectedBranch?.source_erp) {
+        setErpSourceFilter(selectedBranch.source_erp)
+      }
+    } else {
+      setErpSourceFilter('all')
+    }
     setPage(1)
   }
 
@@ -134,6 +145,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
         search: debouncedQuery || undefined,
         page: targetPage,
         page_size: PAGE_SIZE,
+        source_erp: erpSourceFilter,
       }),
       queryFn: () =>
         customerService.getCustomers({
@@ -145,6 +157,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
           search: debouncedQuery || undefined,
           page: targetPage,
           page_size: PAGE_SIZE,
+          source_erp: erpSourceFilter,
         }),
       staleTime: 1000 * 60 * 2,
     })
@@ -164,6 +177,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
     search: debouncedQuery || undefined,
     page,
     page_size: PAGE_SIZE,
+    source_erp: erpSourceFilter,
   })
 
   const items = useMemo(() => customersData?.items || [], [customersData?.items])
@@ -172,7 +186,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
   // Tự động chọn khách hàng đầu tiên khi nạp danh sách
   useEffect(() => {
     if (items.length > 0 && (!selectedCustomerId || !items.some((c) => c.customer_id === selectedCustomerId))) {
-      onSelectCustomer(items[0].customer_id)
+      onSelectCustomer(items[0].customer_id, items[0].source_erp)
     }
   }, [items, selectedCustomerId, onSelectCustomer])
 
@@ -337,6 +351,35 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
               })}
             </div>
           )}
+        </div>
+
+        {/* Bộ lọc Nguồn dữ liệu ERP: Tất cả | Lọc Nước 365 | Zomzem */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={erpSourceFilter}
+            onChange={(e) => {
+              setErpSourceFilter(e.target.value as any)
+              setPage(1)
+            }}
+            style={{
+              width: '100%',
+              minWidth: '125px',
+              height: '38px',
+              border: '1px solid #dfe8f2',
+              borderRadius: '7px',
+              padding: '0 10px',
+              background: '#fff',
+              color: '#475569',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="all">Tất cả nguồn</option>
+            <option value="locnuoc365">Lọc Nước 365</option>
+            <option value="zomzem">Zomzem</option>
+          </select>
         </div>
 
         {/* Dropdown Lọc Theo Trạng Thái Chăm Sóc */}
@@ -691,21 +734,22 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
               items.map((lead) => {
                 const { text: statusText, tone } = getStatusLabel(lead)
                 const isSelected = selectedCustomerId === lead.customer_id
+                const rowKey = `${lead.source_erp || 'locnuoc365'}_${lead.customer_id}`
                 return (
                   <tr
-                    key={lead.customer_id}
+                    key={rowKey}
                     className={clsx({ 'selected-row': isSelected })}
-                    onClick={() => onSelectCustomer(lead.customer_id)}
+                    onClick={() => onSelectCustomer(lead.customer_id, lead.source_erp)}
                     onMouseEnter={() => {
                       // Tải trước chi tiết và lịch sử tương tác của khách hàng khi lướt chuột
                       queryClient.prefetchQuery({
-                        queryKey: queryKeys.customers.detail(lead.customer_id),
-                        queryFn: () => customerService.getCustomerDetail(lead.customer_id),
+                        queryKey: queryKeys.customers.detail(lead.customer_id, lead.source_erp),
+                        queryFn: () => customerService.getCustomerDetail(lead.customer_id, lead.source_erp),
                         staleTime: 1000 * 60 * 5,
                       })
                       queryClient.prefetchQuery({
-                        queryKey: queryKeys.customers.history(lead.customer_id),
-                        queryFn: () => customerService.getCustomerHistory(lead.customer_id),
+                        queryKey: queryKeys.customers.history(lead.customer_id, undefined, lead.source_erp),
+                        queryFn: () => customerService.getCustomerHistory(lead.customer_id, undefined, lead.source_erp),
                         staleTime: 1000 * 60 * 2,
                       })
                     }}

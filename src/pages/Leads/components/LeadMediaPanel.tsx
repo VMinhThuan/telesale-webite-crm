@@ -6,13 +6,15 @@ import customerService from '../../../services/customer.service'
 import { SecureAudioPlayer } from '../../../components/common/SecureAudioPlayer'
 import { SecureVideoPlayer } from '../../../components/common/SecureVideoPlayer'
 import { ImageLightboxModal, LightboxImage } from '../../../components/common/ImageLightboxModal'
+import { ErpSource } from '../../../types/api'
 
 export interface LeadMediaPanelProps {
   customerId: number | null
+  source_erp?: ErpSource
 }
 
-export const LeadMediaPanel: React.FC<LeadMediaPanelProps> = ({ customerId }) => {
-  const { data: customerDetail } = useCustomerDetail(customerId || undefined)
+export const LeadMediaPanel: React.FC<LeadMediaPanelProps> = ({ customerId, source_erp }) => {
+  const { data: customerDetail } = useCustomerDetail(customerId || undefined, source_erp)
 
   const [selectedLightboxImage, setSelectedLightboxImage] = useState<LightboxImage | null>(null)
   const [selectedFlow, setSelectedFlow] = useState<string>('all')

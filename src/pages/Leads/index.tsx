@@ -10,6 +10,7 @@ import { useCustomerDetail } from '../../hooks/useCustomers'
 import { useCampaigns } from '../../hooks/useTelesale'
 import { useAuthStore } from '../../store/useAuthStore'
 import { DialogState } from '../../types'
+import { ErpSource } from '../../types/api'
 import { LeadListPanel, CARE_STATUS_OPTIONS, DATE_PRESET_OPTIONS } from './components/LeadListPanel'
 import { LeadTimelinePanel, HISTORY_TYPE_OPTIONS } from './components/LeadTimelinePanel'
 import { LeadDetailAndCarePanel, careOutcomes } from './components/LeadDetailAndCarePanel'
@@ -25,37 +26,48 @@ export interface LeadsProps {
 
 export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null)
+  const [selectedCustomerSource, setSelectedCustomerSource] = useState<ErpSource>('locnuoc365')
   const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined)
+
+  const handleSelectCustomer = (id: number, source_erp?: ErpSource) => {
+    setSelectedCustomerId(id)
+    if (source_erp) {
+      setSelectedCustomerSource(source_erp)
+    }
+  }
 
   const { data: campaignsData } = useCampaigns()
   const userBranchId = useAuthStore((s) => s.user?.branchId)
 
   // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
   const availableBranches = useMemo(() => {
-    const map = new Map<number, string>()
+    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
     const list = campaignsData?.items || []
     list.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, c.branch_name)
+        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
       }
     })
-    if (userBranchId) {
-      if (!map.has(userBranchId)) {
-        map.set(userBranchId, `Chi nhánh #${userBranchId}`)
-      }
+    if (userBranchId && !map.has(userBranchId)) {
+      map.set(userBranchId, { id: userBranchId, name: `Chi nhánh #${userBranchId}` })
     }
     if (map.size === 0) {
-      map.set(3, 'Trụ sở Hà Nội')
+      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+    return Array.from(map.values())
   }, [campaignsData, userBranchId])
 
   // Chi nhánh cho thanh Slot Bar: ưu tiên chi nhánh đang chọn, hoặc chi nhánh đầu tiên có sẵn
   const activeSlotBranchId = selectedBranchId || availableBranches[0]?.id || 3
-  const activeSlotBranchName = availableBranches.find((b) => b.id === activeSlotBranchId)?.name
+  const activeSlotBranch = availableBranches.find((b) => b.id === activeSlotBranchId)
+  const activeSlotBranchName = activeSlotBranch?.name
+  const activeSlotBranchSource = activeSlotBranch?.source_erp || 'locnuoc365'
 
-  // Lấy chi tiết khách hàng đang chọn để cung cấp tên cho header của Timeline
-  const { data: customerDetail } = useCustomerDetail(selectedCustomerId || undefined)
+  // Lấy chi tiết khách hàng đang chọn từ đúng ERP để cung cấp tên cho header của Timeline
+  const { data: customerDetail } = useCustomerDetail(
+    selectedCustomerId || undefined,
+    selectedCustomerSource,
+  )
 
   return (
     <div className="content leads-content">
@@ -65,6 +77,7 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
         branchName={activeSlotBranchName}
         availableBranches={availableBranches}
         onBranchChange={setSelectedBranchId}
+        source_erp={activeSlotBranchSource}
       />
 
       {/* 2. Cụm 4 Thẻ chỉ số KPI */}
@@ -120,7 +133,8 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
         <div className="lead-list-column">
           <LeadListPanel
             selectedCustomerId={selectedCustomerId}
-            onSelectCustomer={setSelectedCustomerId}
+            selectedCustomerSource={selectedCustomerSource}
+            onSelectCustomer={handleSelectCustomer}
             selectedBranchId={selectedBranchId}
             onBranchChange={setSelectedBranchId}
             availableBranches={availableBranches}
@@ -128,6 +142,7 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
           <LeadTimelinePanel
             customerId={selectedCustomerId}
             customerName={customerDetail?.customer_name}
+            source_erp={selectedCustomerSource}
           />
         </div>
 
@@ -136,8 +151,12 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
           <LeadDetailAndCarePanel
             customerId={selectedCustomerId}
             onOpenDialog={onOpenDialog}
+            source_erp={selectedCustomerSource}
           />
-          <LeadMediaPanel customerId={selectedCustomerId} />
+          <LeadMediaPanel
+            customerId={selectedCustomerId}
+            source_erp={selectedCustomerSource}
+          />
         </aside>
       </div>
     </div>

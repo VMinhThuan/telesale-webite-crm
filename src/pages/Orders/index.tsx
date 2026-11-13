@@ -666,6 +666,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       type="button"
                       onClick={() => {
                         setSelectedBranchId(undefined)
+                        setErpSourceFilter('all')
                         setBranchMenuOpen(false)
                         setPage(1)
                       }}
@@ -696,6 +697,9 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                           type="button"
                           onClick={() => {
                             setSelectedBranchId(b.id)
+                            if (b.source_erp) {
+                              setErpSourceFilter(b.source_erp)
+                            }
                             setBranchMenuOpen(false)
                             setPage(1)
                           }}
@@ -899,6 +903,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                           setQuery('')
                           setActiveDateTab('all')
                           setStatusFilter('all')
+                          setErpSourceFilter('all')
                           setSelectedBranchId(undefined)
                           setPage(1)
                         }}

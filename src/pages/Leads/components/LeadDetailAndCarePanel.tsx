@@ -24,7 +24,7 @@ import { useMakeCall } from '../../../hooks/useMakeCall'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { CallActionControl } from '../../../components/common/CallActionControl'
 import { useEnums } from '../../../hooks/useEnums'
-import { BranchSlotDto } from '../../../types/api'
+import { BranchSlotDto, ErpSource } from '../../../types/api'
 import { DialogState } from '../../../types'
 import { formatDate, formatVND } from '../../../utils/formatters'
 import { notify } from '../../../utils/notify'
@@ -47,13 +47,15 @@ export const careOutcomes: {
 export interface LeadDetailAndCarePanelProps {
   customerId: number | null
   onOpenDialog?: (dialog: DialogState) => void
+  source_erp?: ErpSource
 }
 
 export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
   customerId,
   onOpenDialog: _onOpenDialog,
+  source_erp,
 }) => {
-  const { data: customerDetail } = useCustomerDetail(customerId || undefined)
+  const { data: customerDetail } = useCustomerDetail(customerId || undefined, source_erp)
   const saveCareLogMutation = useSaveCareLogMutation()
   const { data: campaignsData } = useCampaigns()
   const userBranchId = useAuthStore((s) => s.user?.branchId)
@@ -63,22 +65,22 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
 
   // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
   const availableBranches = useMemo(() => {
-    const map = new Map<number, string>()
+    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
     const list = campaignsData?.items || []
     list.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, c.branch_name)
+        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
       }
     })
     if (userBranchId) {
       if (!map.has(userBranchId)) {
-        map.set(userBranchId, `Chi nhánh #${userBranchId}`)
+        map.set(userBranchId, { id: userBranchId, name: `Chi nhánh #${userBranchId}` })
       }
     }
     if (map.size === 0) {
-      map.set(3, 'Trụ sở Hà Nội')
+      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+    return Array.from(map.values())
   }, [campaignsData, userBranchId])
 
   const [outcome, setOutcome] = useState<'consulting' | 'scheduled' | 'closed' | 'no_need' | 'unreachable'>('consulting')
@@ -93,12 +95,14 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
   const [serviceSearch, setServiceSearch] = useState('')
 
   // Tra cứu danh sách Slot ca hẹn KTV của Chi nhánh khi chốt đơn
+  const selectedBranchObj = availableBranches.find((b) => b.id === selectedBranchId)
+  const slotBranchSource = selectedBranchObj?.source_erp || source_erp || customerDetail?.source_erp || 'locnuoc365'
   const querySlotDate = outcome === 'closed' && nextCareDate ? nextCareDate : undefined
   const { data: rawSlots = [], isLoading: isLoadingSlots } = useBranchSlots(
     selectedBranchId,
     querySlotDate,
     querySlotDate,
-    { enabled: outcome === 'closed' && Boolean(nextCareDate) },
+    { enabled: outcome === 'closed' && Boolean(nextCareDate), source_erp: slotBranchSource },
   )
 
   const branchSlots: BranchSlotDto[] = useMemo(() => {
@@ -240,6 +244,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
           idempotencyKey: outcome === 'closed' ? currentCareKeyRef.current : undefined,
         },
         idempotencyKey: outcome === 'closed' ? currentCareKeyRef.current : undefined,
+        source_erp: source_erp || customerDetail?.source_erp,
       })
 
       if (outcome === 'closed') {
@@ -275,7 +280,10 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
       customerName: customerDetail.customer_name,
       memberId: targetMemberId,
       memberName: targetMember?.name,
-      customer: customerDetail,
+      customer: {
+        ...customerDetail,
+        source_erp: source_erp || customerDetail.source_erp,
+      },
     })
   }
 
@@ -461,7 +469,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
           customerName={customerDetail?.customer_name}
           memberId={selectedMemberId}
           memberName={customerDetail?.members?.find((m) => m.member_id === selectedMemberId)?.name}
-          customerData={customerDetail}
+          customerData={customerDetail ? { ...customerDetail, source_erp: source_erp || customerDetail.source_erp } : undefined}
           buttonText="Gọi khách hàng"
           disabled={!customerDetail}
         />

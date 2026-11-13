@@ -23,6 +23,7 @@ import { useTelesaleCallStore } from '../../store/useTelesaleCallStore'
 import sipService from '../../services/sipService'
 import { tabLeaderService } from '../../services/tabLeaderService'
 import { notify } from '../../utils/notify'
+import { ErpSource } from '../../types/api'
 
 // 3 Khối Panels lớn của module Telesale
 import { TelesaleSchedulePanel } from './components/TelesaleSchedulePanel'
@@ -109,16 +110,16 @@ export const Telesale: React.FC = () => {
 
   // Trích xuất danh sách tất cả các chi nhánh khả dụng từ danh sách chiến dịch mà nhân viên có quyền
   const availableBranches = useMemo(() => {
-    const map = new Map<number, string>()
+    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
     campaignsList.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, c.branch_name)
+        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
       }
     })
     if (map.size === 0) {
-      map.set(3, 'Trụ sở Hà Nội')
+      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+    return Array.from(map.values())
   }, [campaignsList])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
@@ -148,10 +149,12 @@ export const Telesale: React.FC = () => {
 
   // Chi nhánh ưu tiên trực tiếp theo chiến dịch đang chọn (mỗi chiến dịch đã ứng với 1 chi nhánh)
   const branchId = selectedCampaign?.branch_id || activeTab?.draftResult?.branchId || 3
+  const currentBranch = availableBranches.find((b) => b.id === branchId)
   const branchName =
     selectedCampaign?.branch_name ||
-    availableBranches.find((b) => b.id === branchId)?.name ||
+    currentBranch?.name ||
     'Trụ sở Hà Nội'
+  const scheduleSourceErp = currentBranch?.source_erp || selectedCampaign?.source_erp || 'locnuoc365'
 
   const handleBranchChange = React.useCallback(
     (newBranchId: number) => {
@@ -872,7 +875,7 @@ export const Telesale: React.FC = () => {
           orderDate={orderDate}
           onDateChange={handleOrderDateChange}
           selectedSlotId={orderSlotId}
-          source_erp={selectedCampaign?.source_erp || 'locnuoc365'}
+          source_erp={scheduleSourceErp}
           onSelectSlot={(slotId, slotTime, date) => {
             setOrderSlotId(slotId)
             setOrderTime(slotTime)

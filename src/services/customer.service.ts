@@ -12,7 +12,7 @@ import {
   UpdateCustomerMemberPayload,
   ErpSource,
 } from '../types/api'
-import apiClient, { generateIdempotencyKey, getApiClient } from './apiClient'
+import apiClient, { apiClientZomzem, generateIdempotencyKey, getApiClient } from './apiClient'
 
 export interface CustomerQueryParams {
   customer_status?: CustomerStatusType
@@ -24,6 +24,7 @@ export interface CustomerQueryParams {
   branch_id?: number
   page?: number
   page_size?: number
+  source_erp?: ErpSource | 'all'
 }
 
 export interface SaveCareLogPayload {
@@ -46,9 +47,15 @@ export interface SaveCareLogPayload {
 
 export const customerService = {
   /**
-   * Lấy danh sách khách hàng từ ERP kèm bộ lọc và phân trang
+   * Helper tải khách hàng từ 1 instance ERP cụ thể và gắn nhãn source_erp
    */
-  async getCustomers(params?: CustomerQueryParams): Promise<ApiPaginatedResult<CustomerDto>> {
+  async _fetchCustomersSingle(
+    client: typeof apiClient,
+    params: CustomerQueryParams | undefined,
+    source_erp: ErpSource,
+    customPage?: number,
+    customPageSize?: number,
+  ): Promise<ApiPaginatedResult<CustomerDto>> {
     const query = new URLSearchParams()
     if (params?.customer_status) query.set('customer_status', params.customer_status)
     if (params?.care_status) query.set('care_status', params.care_status)
@@ -57,49 +64,125 @@ export const customerService = {
     if (params?.from_date) query.set('from_date', params.from_date)
     if (params?.to_date) query.set('to_date', params.to_date)
     if (params?.branch_id) query.set('branch_id', String(params.branch_id))
-    query.set('page', String(params?.page || 1))
-    query.set('page_size', String(params?.page_size || 10))
+    query.set('page', String(customPage ?? params?.page ?? 1))
+    query.set('page_size', String(customPageSize ?? params?.page_size ?? 10))
 
-    const response = await apiClient.get<any, { result: ApiPaginatedResult<CustomerDto> }>(
-      `${API_ENDPOINTS.CUSTOMERS}?${query.toString()}`,
-    )
-
-    return response.result || { items: [], total: 0 }
+    try {
+      const response = await client.get<any, { result: ApiPaginatedResult<CustomerDto> }>(
+        `${API_ENDPOINTS.CUSTOMERS}?${query.toString()}`,
+      )
+      const res = response?.result || response || { items: [], total: 0 }
+      const items: CustomerDto[] = (res.items || []).map((c: any) => ({
+        ...c,
+        source_erp,
+      }))
+      return {
+        items,
+        total: typeof res.total === 'number' ? res.total : items.length,
+      }
+    } catch (err) {
+      console.warn(`[Multi-ERP] Lỗi tải khách hàng từ ${source_erp}:`, err)
+      return { items: [], total: 0 }
+    }
   },
 
   /**
-   * Lấy chi tiết thông tin khách hàng từ ERP
+   * Lấy danh sách khách hàng từ ERP kèm bộ lọc và phân trang (Hỗ trợ lọc theo nguồn: 'locnuoc365' | 'zomzem' | 'all')
+   * Phương án A: Gọi song song 2 server, gộp và sắp xếp theo lịch hẹn gọi lại gần nhất,
+   * sau đó cắt lát (Client-side slice) chuẩn theo pageSize của trang để phân trang chuẩn tuyệt đối.
    */
-  async getCustomerDetail(customerId: number): Promise<CustomerDetailDto> {
-    const response = await apiClient.get<any, { result: CustomerDetailDto }>(
+  async getCustomers(params?: CustomerQueryParams): Promise<ApiPaginatedResult<CustomerDto>> {
+    const page = params?.page || 1
+    const pageSize = params?.page_size || 10
+    const sourceFilter = params?.source_erp || 'all'
+
+    // 1. Nếu lọc đích danh 1 nguồn cụ thể: phân trang trực tiếp chuẩn xác theo server đó
+    if (sourceFilter === 'locnuoc365') {
+      return this._fetchCustomersSingle(apiClient, params, 'locnuoc365', page, pageSize)
+    }
+
+    if (sourceFilter === 'zomzem') {
+      return this._fetchCustomersSingle(apiClientZomzem, params, 'zomzem', page, pageSize)
+    }
+
+    // 2. Mặc định 'all' (Phương án A):
+    // Gọi song song cả 2 server để lấy dữ liệu.
+    // Tải với fetchLength bao phủ đầy đủ các trang tới trang hiện tại (tối thiểu 100 khách)
+    const fetchLength = Math.max(page * pageSize, 100)
+
+    const [ln365Res, zomzemRes] = await Promise.allSettled([
+      this._fetchCustomersSingle(apiClient, params, 'locnuoc365', 1, fetchLength),
+      this._fetchCustomersSingle(apiClientZomzem, params, 'zomzem', 1, fetchLength),
+    ])
+
+    const ln365 = ln365Res.status === 'fulfilled' ? ln365Res.value : { items: [], total: 0 }
+    const zomzem = zomzemRes.status === 'fulfilled' ? zomzemRes.value : { items: [], total: 0 }
+
+    const combinedItems = [...ln365.items, ...zomzem.items]
+    // Sắp xếp khách hàng: ưu tiên có lịch gọi lại gần nhất (next_care_at), hoặc lần liên hệ gần nhất, hoặc customer_id
+    combinedItems.sort((a, b) => {
+      if (a.next_care_at && b.next_care_at) {
+        return new Date(a.next_care_at).getTime() - new Date(b.next_care_at).getTime()
+      }
+      if (a.next_care_at) return -1
+      if (b.next_care_at) return 1
+      return (Number(b.customer_id) || 0) - (Number(a.customer_id) || 0)
+    })
+
+    const totalCount = ln365.total + zomzem.total
+
+    // Cắt lát đúng pageSize cho trang hiện tại theo Phương án A
+    const startIndex = (page - 1) * pageSize
+    const paginatedItems = combinedItems.slice(startIndex, startIndex + pageSize)
+
+    return {
+      items: paginatedItems,
+      total: totalCount,
+    }
+  },
+
+  /**
+   * Lấy chi tiết thông tin khách hàng từ đúng server ERP
+   */
+  async getCustomerDetail(customerId: number, source_erp?: ErpSource): Promise<CustomerDetailDto> {
+    const client = getApiClient(source_erp)
+    const response = await client.get<any, { result: CustomerDetailDto }>(
       API_ENDPOINTS.CUSTOMER_DETAIL(customerId),
     )
-    return response.result
+    const detail = response?.result || response
+    return {
+      ...detail,
+      source_erp: source_erp || detail?.source_erp || 'locnuoc365',
+    }
   },
 
   /**
-   * Lấy lịch sử tương tác và chăm sóc của khách hàng từ ERP
+   * Lấy lịch sử tương tác và chăm sóc của khách hàng từ đúng server ERP
    */
   async getCustomerHistory(
     customerId: number,
     type?: 'call' | 'care' | 'service',
+    source_erp?: ErpSource,
   ): Promise<CustomerHistoryDto[]> {
+    const client = getApiClient(source_erp)
     const params = new URLSearchParams()
     if (type) params.set('type', type)
     params.set('page_size', '100')
-    const response = await apiClient.get<any, { result: { items: CustomerHistoryDto[] } }>(
+    const response = await client.get<any, { result: { items: CustomerHistoryDto[] } }>(
       `${API_ENDPOINTS.CUSTOMER_HISTORY(customerId)}?${params.toString()}`,
     )
-    return response.result?.items || []
+    const res: any = response?.result || response
+    return res?.items || []
   },
 
   /**
-   * Ghi nhận kết quả chăm sóc khách hàng lên ERP
+   * Ghi nhận kết quả chăm sóc khách hàng lên đúng server ERP
    */
   async saveCareLog(
     customerId: number,
     payload: SaveCareLogPayload,
     customIdempotencyKey?: string,
+    source_erp?: ErpSource,
   ): Promise<any> {
     const { idempotencyKey: payloadKey, ...bodyPayload } = payload
     const key = customIdempotencyKey || payloadKey || generateIdempotencyKey()
@@ -109,7 +192,8 @@ export const customerService = {
       headers['Idempotency-Key'] = key
     }
 
-    return apiClient.post(API_ENDPOINTS.CUSTOMER_CARE_LOGS(customerId), bodyPayload, { headers })
+    const client = getApiClient(source_erp)
+    return client.post(API_ENDPOINTS.CUSTOMER_CARE_LOGS(customerId), bodyPayload, { headers })
   },
 
   /**

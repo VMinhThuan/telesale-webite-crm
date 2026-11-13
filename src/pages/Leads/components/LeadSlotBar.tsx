@@ -9,13 +9,14 @@ import {
 } from 'lucide-react'
 import dayjs from '../../../lib/dayjs'
 import { useBranchSlots } from '../../../hooks/useOrders'
-import { BranchSlotDto } from '../../../types/api'
+import { BranchSlotDto, ErpSource } from '../../../types/api'
 
 export interface LeadSlotBarProps {
   branchId: number
   branchName?: string
-  availableBranches?: { id: number; name: string }[]
+  availableBranches?: { id: number; name: string; source_erp?: ErpSource }[]
   onBranchChange?: (branchId: number) => void
+  source_erp?: ErpSource
 }
 
 export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
@@ -23,12 +24,18 @@ export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
   branchName,
   availableBranches = [],
   onBranchChange,
+  source_erp,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [selectedDate, setSelectedDate] = useState(() => dayjs().format('YYYY-MM-DD'))
 
-  // Tra cứu danh sách Slot ca hẹn của chi nhánh theo ngày đang chọn
-  const { data: rawSlots = [], isLoading } = useBranchSlots(branchId, selectedDate, selectedDate)
+  // Tra cứu danh sách Slot ca hẹn của chi nhánh theo ngày đang chọn và nguồn ERP
+  const { data: rawSlots = [], isLoading } = useBranchSlots(
+    branchId,
+    selectedDate,
+    selectedDate,
+    { source_erp },
+  )
 
   // Chuẩn hóa dữ liệu slot luôn là mảng
   const branchSlots: BranchSlotDto[] = useMemo(() => {

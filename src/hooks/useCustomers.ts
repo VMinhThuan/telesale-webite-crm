@@ -28,31 +28,35 @@ export function useCustomersList(params?: CustomerQueryParams) {
 }
 
 /**
- * Hook truy vấn thông tin chi tiết của một khách hàng
+ * Hook truy vấn thông tin chi tiết của một khách hàng từ đúng ERP
  */
-export function useCustomerDetail(customerId?: number) {
+export function useCustomerDetail(customerId?: number, source_erp?: ErpSource) {
   return useQuery({
-    queryKey: queryKeys.customers.detail(customerId),
-    queryFn: () => customerService.getCustomerDetail(customerId!),
+    queryKey: queryKeys.customers.detail(customerId, source_erp),
+    queryFn: () => customerService.getCustomerDetail(customerId!, source_erp),
     enabled: Boolean(customerId),
     staleTime: 1000 * 60 * 5,
   })
 }
 
 /**
- * Hook truy vấn lịch sử tương tác và chăm sóc của khách hàng
+ * Hook truy vấn lịch sử tương tác và chăm sóc của khách hàng từ đúng ERP
  */
-export function useCustomerHistory(customerId?: number, type?: 'call' | 'care' | 'service') {
+export function useCustomerHistory(
+  customerId?: number,
+  type?: 'call' | 'care' | 'service',
+  source_erp?: ErpSource,
+) {
   return useQuery({
-    queryKey: queryKeys.customers.history(customerId, type),
-    queryFn: () => customerService.getCustomerHistory(customerId!, type),
+    queryKey: queryKeys.customers.history(customerId, type, source_erp),
+    queryFn: () => customerService.getCustomerHistory(customerId!, type, source_erp),
     enabled: Boolean(customerId),
     staleTime: 1000 * 60 * 2,
   })
 }
 
 /**
- * Mutation lưu kết quả chăm sóc khách hàng tiềm năng
+ * Mutation lưu kết quả chăm sóc khách hàng tiềm năng lên đúng ERP
  */
 export function useSaveCareLogMutation() {
   const queryClient = useQueryClient()
@@ -62,20 +66,22 @@ export function useSaveCareLogMutation() {
       customerId,
       payload,
       idempotencyKey,
+      source_erp,
     }: {
       customerId: number
       payload: SaveCareLogPayload
       idempotencyKey?: string
-    }) => customerService.saveCareLog(customerId, payload, idempotencyKey),
+      source_erp?: ErpSource
+    }) => customerService.saveCareLog(customerId, payload, idempotencyKey, source_erp),
 
     onSuccess: (data, variables) => {
       // Làm mới danh sách và lịch sử tương tác của khách hàng theo phân cấp chính xác
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.lists() })
       queryClient.invalidateQueries({
-        queryKey: queryKeys.customers.history(variables.customerId),
+        queryKey: queryKeys.customers.histories(),
       })
       queryClient.invalidateQueries({
-        queryKey: queryKeys.customers.detail(variables.customerId),
+        queryKey: queryKeys.customers.details(),
       })
 
       // Nếu chốt đơn thành công, tự động làm mới danh sách đơn hàng

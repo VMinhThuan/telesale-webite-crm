@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useCustomerHistory } from '../../../hooks/useCustomers'
 import { formatDate } from '../../../utils/formatters'
+import { ErpSource } from '../../../types/api'
 
 export const HISTORY_TYPE_OPTIONS: {
   value: 'all' | 'call' | 'care' | 'service'
@@ -26,11 +27,13 @@ export const HISTORY_TYPE_OPTIONS: {
 export interface LeadTimelinePanelProps {
   customerId: number | null
   customerName?: string
+  source_erp?: ErpSource
 }
 
 export const LeadTimelinePanel: React.FC<LeadTimelinePanelProps> = ({
   customerId,
   customerName,
+  source_erp,
 }) => {
   const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'call' | 'care' | 'service'>('all')
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false)
@@ -51,6 +54,7 @@ export const LeadTimelinePanel: React.FC<LeadTimelinePanelProps> = ({
   const { data: customerHistory, isLoading: isLoadingHistory } = useCustomerHistory(
     customerId || undefined,
     historyTypeFilter === 'all' ? undefined : historyTypeFilter,
+    source_erp,
   )
 
   return (
