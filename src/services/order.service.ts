@@ -65,11 +65,48 @@ export const orderService = {
 
   /**
    * Lấy danh sách đơn hàng theo ngày hẹn từ ERP (Hỗ trợ lọc theo nguồn: 'locnuoc365' | 'zomzem' | 'all')
+   * Phương án A: Gọi song song 2 server, gộp và sắp xếp theo ngày/mã đơn mới nhất,
+   * sau đó cắt lát (Client-side slice) chuẩn theo pageSize của trang để phân trang chuẩn tuyệt đối.
    */
   async getOrders(params?: OrderQueryParams): Promise<ApiPaginatedResult<OrderDto>> {
+    const page = params?.page || 1
+    const pageSize = params?.page_size || 10
+    const sourceFilter = params?.source_erp || 'all'
+
+    // 1. Nếu lọc đích danh 1 nguồn cụ thể: phân trang trực tiếp chuẩn xác theo server đó
+    if (sourceFilter === 'locnuoc365') {
+      const payload: Record<string, any> = {
+        start: (page - 1) * pageSize,
+        length: pageSize,
+      }
+      if (params?.from_date) payload.from_date = params.from_date
+      if (params?.to_date) payload.to_date = params.to_date
+      if (params?.status && params.status !== 'all') payload.status = params.status
+      if (params?.search) payload.search = params.search
+      if (params?.branch_id !== undefined) payload.branch_id = params.branch_id
+      return this._fetchOrdersSingle(apiClient, payload, 'locnuoc365')
+    }
+
+    if (sourceFilter === 'zomzem') {
+      const payload: Record<string, any> = {
+        start: (page - 1) * pageSize,
+        length: pageSize,
+      }
+      if (params?.from_date) payload.from_date = params.from_date
+      if (params?.to_date) payload.to_date = params.to_date
+      if (params?.status && params.status !== 'all') payload.status = params.status
+      if (params?.search) payload.search = params.search
+      if (params?.branch_id !== undefined) payload.branch_id = params.branch_id
+      return this._fetchOrdersSingle(apiClientZomzem, payload, 'zomzem')
+    }
+
+    // 2. Mặc định 'all' (Phương án A):
+    // Gọi song song cả 2 server để lấy dữ liệu.
+    // Tải với fetchLength bao phủ đầy đủ các trang tới trang hiện tại (tối thiểu 100 đơn)
+    const fetchLength = Math.max(page * pageSize, 100)
     const payload: Record<string, any> = {
-      start: ((params?.page || 1) - 1) * (params?.page_size || 50),
-      length: params?.page_size || 50,
+      start: 0,
+      length: fetchLength,
     }
 
     if (params?.from_date) payload.from_date = params.from_date
@@ -78,17 +115,6 @@ export const orderService = {
     if (params?.search) payload.search = params.search
     if (params?.branch_id !== undefined) payload.branch_id = params.branch_id
 
-    const sourceFilter = params?.source_erp || 'all'
-
-    if (sourceFilter === 'locnuoc365') {
-      return this._fetchOrdersSingle(apiClient, payload, 'locnuoc365')
-    }
-
-    if (sourceFilter === 'zomzem') {
-      return this._fetchOrdersSingle(apiClientZomzem, payload, 'zomzem')
-    }
-
-    // Mặc định 'all': Gọi song song cả 2 và kết hợp danh sách
     const [ln365Res, zomzemRes] = await Promise.allSettled([
       this._fetchOrdersSingle(apiClient, payload, 'locnuoc365'),
       this._fetchOrdersSingle(apiClientZomzem, payload, 'zomzem'),
@@ -101,9 +127,15 @@ export const orderService = {
     // Sắp xếp đơn mới nhất theo order_id
     combinedItems.sort((a, b) => (Number(b.order_id) || 0) - (Number(a.order_id) || 0))
 
+    const totalCount = ln365.total + zomzem.total
+
+    // Cắt lát đúng pageSize cho trang hiện tại theo Phương án A
+    const startIndex = (page - 1) * pageSize
+    const paginatedItems = combinedItems.slice(startIndex, startIndex + pageSize)
+
     return {
-      items: combinedItems,
-      total: ln365.total + zomzem.total,
+      items: paginatedItems,
+      total: totalCount,
     }
   },
 

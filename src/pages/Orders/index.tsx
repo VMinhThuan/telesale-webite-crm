@@ -146,20 +146,20 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   const canAdjustAppointment = pq === 'admin' || pq === 'truong_nhom'
 
   const availableBranches = useMemo(() => {
-    const map = new Map<number, string>()
+    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
     const list = campaignsData?.items || []
     list.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, c.branch_name)
+        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
       }
     })
     if (userBranchId && !map.has(userBranchId)) {
-      map.set(userBranchId, `Chi nhánh #${userBranchId}`)
+      map.set(userBranchId, { id: userBranchId, name: `Chi nhánh #${userBranchId}` })
     }
     if (map.size === 0) {
-      map.set(3, 'Trụ sở Hà Nội')
+      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+    return Array.from(map.values())
   }, [campaignsData, userBranchId])
 
   // Bộ lọc tìm kiếm
@@ -333,11 +333,13 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
 
   // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh và nguồn ERP của đơn hàng
   const targetBranchId = selectedBranchId || activeOrder?.branch_id || availableBranches[0]?.id || 3
+  const targetBranch = availableBranches.find((b) => b.id === targetBranchId)
+  const targetBranchSource = targetBranch?.source_erp || activeOrder?.source_erp || 'locnuoc365'
   const { data: rawBranchSlots = [] } = useBranchSlots(
     targetBranchId,
     adjDate,
     adjDate,
-    { source_erp: activeOrder?.source_erp || 'locnuoc365' },
+    { source_erp: targetBranchSource },
   )
 
   const branchSlots: BranchSlotDto[] = useMemo(() => {
@@ -772,9 +774,9 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                     outline: 'none',
                   }}
                 >
-                  <option value="all">Tất cả nguồn (LN365 + Zomzem)</option>
-                  <option value="locnuoc365">Nguồn: Lọc Nước 365</option>
-                  <option value="zomzem">Nguồn: Zomzem</option>
+                  <option value="all">Tất cả nguồn</option>
+                  <option value="locnuoc365">Lọc Nước 365</option>
+                  <option value="zomzem">Zomzem</option>
                 </select>
               </div>
             </div>
@@ -834,18 +836,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                             style={{ cursor: 'pointer' }}
                           >
                             <td>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <b className="order-code">{order.ord_code}</b>
-                                {order.source_erp === 'zomzem' ? (
-                                  <span className="erp-badge erp-badge-zomzem" style={{ alignSelf: 'flex-start' }}>
-                                    Zomzem
-                                  </span>
-                                ) : (
-                                  <span className="erp-badge erp-badge-ln365" style={{ alignSelf: 'flex-start' }}>
-                                    LN365
-                                  </span>
-                                )}
-                              </div>
+                              <b className="order-code">{order.ord_code}</b>
                             </td>
                             <td>
                               <div className="lead-name">
@@ -955,14 +946,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px 10px', flexWrap: 'wrap' }}>
-                  <div className="order-id" style={{ padding: 0 }}>{activeOrder.ord_code}</div>
-                  {activeOrder.source_erp === 'zomzem' ? (
-                    <span className="erp-badge erp-badge-zomzem">Zomzem</span>
-                  ) : (
-                    <span className="erp-badge erp-badge-ln365">Lọc Nước 365</span>
-                  )}
-                </div>
+                <div className="order-id">{activeOrder.ord_code}</div>
 
                 <div className="customer-brief lead-brief">
                   <div className="customer-avatar small">
@@ -1045,6 +1029,10 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                 <CallActionControl
                   customerId={activeOrder.customer_id}
                   customerName={activeOrder.ten_khach_hang}
+                  customerData={{
+                    ...activeOrder,
+                    source_erp: activeOrder.source_erp,
+                  }}
                   style={
                     !isConfirmedOrderStatus(activeOrder) &&
                     !isTerminatedOrderStatus(activeOrder.status, activeOrder.trang_thai)
