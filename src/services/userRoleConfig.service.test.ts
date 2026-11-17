@@ -37,6 +37,18 @@ describe('UserRoleConfigService Unit Tests', () => {
     expect(result.users['0987111222'].role_type).toBe('sale_ctv')
   })
 
+  it('getConfig: trả về fallback ngay khi CDN phản hồi 404 mà không cần gọi S3 GetObject', async () => {
+    const s3Spy = vi.spyOn(userRoleConfigService as any, 'getLatestConfigFromStorage')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+    } as any)
+
+    const result = await userRoleConfigService.getConfig()
+    expect(result).toEqual(defaultUserRolesConfig)
+    expect(s3Spy).not.toHaveBeenCalled()
+  })
+
   it('getConfig: fallback về default khi CDN và S3 gặp sự cố', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'))
     vi.spyOn(userRoleConfigService as any, 'getLatestConfigFromStorage').mockResolvedValueOnce(defaultUserRolesConfig)

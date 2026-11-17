@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import {
   AlertCircle,
+  Briefcase,
   Building2,
   Check,
   Coins,
@@ -30,6 +31,16 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { determinePhanQuyen } from '../../services/auth.service'
 import { notify } from '../../utils/notify'
 
+// Bảng ánh xạ mã phân quyền sang tên chức danh nghiệp vụ
+const PHAN_QUYEN_LABEL_MAP: Record<string, string> = {
+  gd: 'Giám đốc',
+  tp: 'Trưởng phòng',
+  tl: 'Trưởng nhóm',
+  tt: 'Tổ trưởng',
+  nv: 'Nhân viên',
+  admin: 'Quản trị viên',
+}
+
 export const UserManagement: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user)
   const isAdmin = determinePhanQuyen(currentUser) === 'admin'
@@ -55,6 +66,7 @@ export const UserManagement: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState<'all' | 'sale_congty' | 'sale_ctv'>('all')
+  const [filterChucVu, setFilterChucVu] = useState<string>('all')
 
   // Đồng bộ cấu hình từ R2 vào local state khi tải xong
   useEffect(() => {
@@ -74,29 +86,93 @@ export const UserManagement: React.FC = () => {
   const normalizedUsers = useMemo(() => {
     if (!Array.isArray(rawUserLists)) return []
     return rawUserLists.map((u: any) => {
-      const username = String(u.username || u.contact_number || u.phone || u.id || '')
-      const name = u.full_name || u.name || 'Nhân viên'
-      const chucVu = u.chuc_vu || u.role_name || u.role || 'Nhân viên'
-      const department = u.department_name || u.department || 'Phòng Telesale'
+      // 1. Họ và tên: ERP trả về first_name và last_name
+      const fullName = (
+        [u.last_name, u.first_name].filter(Boolean).join(' ').trim() ||
+        u.first_name ||
+        u.full_name ||
+        u.name ||
+        (u.surname ? `NV ${u.surname}` : `Nhân viên #${u.id}`)
+      ).trim()
+
+      // 2. Chức vụ & Cấp bậc: Chuẩn hóa các mã phân quyền gd, tp, tl, tt, nv
+      let pqCode = String(u.phan_quyen || '').toLowerCase().trim()
+      if (pqCode === 'nhan_vien' || pqCode === 'nhanvien') pqCode = 'nv'
+      if (pqCode === 'giam_doc' || pqCode === 'giamdoc') pqCode = 'gd'
+      if (pqCode === 'truong_phong' || pqCode === 'truongphong') pqCode = 'tp'
+      if (pqCode === 'truong_nhom' || pqCode === 'truongnhom') pqCode = 'tl'
+      if (pqCode === 'to_truong' || pqCode === 'totruong') pqCode = 'tt'
+
+      const chucVu =
+        (pqCode && PHAN_QUYEN_LABEL_MAP[pqCode] ? PHAN_QUYEN_LABEL_MAP[pqCode] : '') ||
+        u.chuc_vu ||
+        u.role_name ||
+        u.role ||
+        'Nhân viên'
+
+      // 3. Phòng ban: TUYỆT ĐỐI KHÔNG TỰ Ý GÁN GHÉP - Chỉ lấy khi BE trả về tên phòng ban cụ thể
+      const department = (u.department_name || u.department || '').trim()
+
+      // 4. Số điện thoại & Tài khoản đăng nhập (Không hiển thị máy nhánh)
+      let phone = u.contact_number || u.phone || u.contactNumber || u.telephone || ''
+      if (!phone && u.email && /^0\d{9}@/.test(u.email)) {
+        phone = u.email.split('@')[0]
+      }
+      const username = String(phone || u.username || u.id || '')
+      const accountDisplay =
+        phone ||
+        u.username ||
+        (u.email && !u.email.includes('placeholder') ? u.email : '') ||
+        `#${u.id}`
+
       const surname = u.surname || ''
       const avatar = u.avatar || u.avatar_url || null
+
       return {
-        id: u.id || username,
+        id: u.id,
         username,
-        name,
+        accountDisplay,
+        name: fullName,
         chucVu,
+        phanQuyenCode: pqCode || 'nv',
         department,
         surname,
         avatar,
+        phone,
+        email: u.email,
+        operatingCode: u.operating_code,
         raw: u,
       }
     })
   }, [rawUserLists])
 
-  // Xử lý thay đổi role của 1 nhân viên
-  const handleRoleChange = (username: string, newRole: SaleRoleType) => {
+  // Thống kê số lượng nhân sự theo từng chức vụ
+  const roleCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      gd: 0,
+      tp: 0,
+      tl: 0,
+      tt: 0,
+      nv: 0,
+    }
+    normalizedUsers.forEach((u) => {
+      const code = u.phanQuyenCode
+      if (counts[code] !== undefined) {
+        counts[code]++
+      } else {
+        counts.nv++
+      }
+    })
+    return counts
+  }, [normalizedUsers])
+
+  // Xử lý thay đổi role của 1 nhân viên (lưu theo cả ID và username)
+  const handleRoleChange = (userId: string | number, newRole: SaleRoleType, username?: string) => {
     setLocalRoles((prev) => {
-      const next = { ...prev, [username]: newRole }
+      const next = { ...prev, [String(userId)]: newRole }
+      if (username) {
+        next[username] = newRole
+      }
       return next
     })
     setHasChanges(true)
@@ -115,16 +191,26 @@ export const UserManagement: React.FC = () => {
 
     // Cập nhật lại các role đã chọn
     normalizedUsers.forEach((u) => {
-      if (!u.username) return
-      const assignedRole = localRoles[u.username] || 'sale_congty'
-      updatedUsersMap[u.username] = {
-        username: u.username,
+      const assignedRole =
+        localRoles[String(u.id)] ||
+        (u.username ? localRoles[u.username] : undefined) ||
+        'sale_congty'
+
+      const item: UserRoleOverrideItem = {
+        username: u.username || String(u.id),
         name: u.name,
         role_type: assignedRole,
         department: u.department,
         chuc_vu: u.chucVu,
         updatedAt: new Date().toISOString(),
         updatedBy: currentUser?.username || 'admin',
+      }
+
+      if (u.username) {
+        updatedUsersMap[u.username] = item
+      }
+      if (u.id) {
+        updatedUsersMap[String(u.id)] = item
       }
     })
 
@@ -147,9 +233,16 @@ export const UserManagement: React.FC = () => {
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return normalizedUsers.filter((u) => {
-      const currentRole = localRoles[u.username] || 'sale_congty'
+      const currentRole =
+        localRoles[String(u.id)] ||
+        (u.username ? localRoles[u.username] : undefined) ||
+        'sale_congty'
 
       if (filterRole !== 'all' && currentRole !== filterRole) {
+        return false
+      }
+
+      if (filterChucVu !== 'all' && u.phanQuyenCode !== filterChucVu) {
         return false
       }
 
@@ -158,19 +251,24 @@ export const UserManagement: React.FC = () => {
       return (
         u.name.toLowerCase().includes(q) ||
         u.username.toLowerCase().includes(q) ||
-        u.surname.toLowerCase().includes(q) ||
+        (u.accountDisplay && u.accountDisplay.toLowerCase().includes(q)) ||
+        (u.surname && u.surname.toLowerCase().includes(q)) ||
+        (u.operatingCode && u.operatingCode.toLowerCase().includes(q)) ||
         u.chucVu.toLowerCase().includes(q) ||
-        u.department.toLowerCase().includes(q)
+        (u.department && u.department.toLowerCase().includes(q))
       )
     })
-  }, [normalizedUsers, localRoles, searchQuery, filterRole])
+  }, [normalizedUsers, localRoles, searchQuery, filterRole, filterChucVu])
 
   // Thống kê nhanh
   const stats = useMemo(() => {
     let congTyCount = 0
     let ctvCount = 0
     normalizedUsers.forEach((u) => {
-      const r = localRoles[u.username] || 'sale_congty'
+      const r =
+        localRoles[String(u.id)] ||
+        (u.username ? localRoles[u.username] : undefined) ||
+        'sale_congty'
       if (r === 'sale_ctv') ctvCount++
       else congTyCount++
     })
@@ -251,9 +349,6 @@ export const UserManagement: React.FC = () => {
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
             Quản lý Nhân viên & Phân quyền Sale
           </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>
-            Điều chỉnh hiển thị chỉ số Hoa hồng cho Sale Cộng tác viên (CTV) và ẩn chỉ số đối với Sale Công ty.
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -481,7 +576,7 @@ export const UserManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Thanh công cụ Tìm kiếm & Bộ lọc vai trò */}
+      {/* Thanh công cụ Tìm kiếm & Bộ lọc chức vụ, vai trò */}
       <div
         style={{
           background: '#ffffff',
@@ -496,9 +591,9 @@ export const UserManagement: React.FC = () => {
           gap: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 320px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 320px', flexWrap: 'wrap' }}>
           {/* Ô tìm kiếm */}
-          <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
             <Search
               size={16}
               style={{
@@ -526,7 +621,35 @@ export const UserManagement: React.FC = () => {
             />
           </div>
 
-          {/* Bộ lọc phân loại */}
+          {/* Bộ lọc Chức vụ */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Briefcase size={15} style={{ color: '#64748b' }} />
+            <select
+              value={filterChucVu}
+              onChange={(e) => setFilterChucVu(e.target.value)}
+              style={{
+                height: '38px',
+                padding: '0 10px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#1e293b',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">Tất cả chức vụ ({normalizedUsers.length})</option>
+              <option value="gd">Giám đốc ({roleCounts.gd || 0})</option>
+              <option value="tp">Trưởng phòng ({roleCounts.tp || 0})</option>
+              <option value="tl">Trưởng nhóm ({roleCounts.tl || 0})</option>
+              <option value="tt">Tổ trưởng ({roleCounts.tt || 0})</option>
+              <option value="nv">Nhân viên ({roleCounts.nv || 0})</option>
+            </select>
+          </div>
+
+          {/* Bộ lọc Vai trò Sale */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Filter size={15} style={{ color: '#64748b' }} />
             <select
@@ -584,19 +707,22 @@ export const UserManagement: React.FC = () => {
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px' }}>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>NHÂN VIÊN</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>TÀI KHOẢN (SĐT)</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>CHỨC VỤ / PHÒNG BAN</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>CHỨC VỤ</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>HIỂN THỊ HOA HỒNG</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>VAI TRÒ SALE</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((user) => {
-                const assignedRole = localRoles[user.username] || 'sale_congty'
+                const assignedRole =
+                  localRoles[String(user.id)] ||
+                  (user.username ? localRoles[user.username] : undefined) ||
+                  'sale_congty'
                 const isCTV = assignedRole === 'sale_ctv'
 
                 return (
                   <tr
-                    key={user.username || user.id}
+                    key={user.id || user.username}
                     style={{
                       borderBottom: '1px solid #f1f5f9',
                       transition: 'background 0.15s ease',
@@ -624,14 +750,15 @@ export const UserManagement: React.FC = () => {
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, color: '#0f172a' }}>{user.name}</div>
-                          {user.surname && (
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Mã: {user.surname}</div>
-                          )}
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                            {user.surname ? `Mã: ${user.surname}` : `#${user.id}`}
+                            {user.operatingCode ? ` · Vận hành: ${user.operatingCode}` : ''}
+                          </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Cột 2: Username / Số điện thoại đăng nhập */}
+                    {/* Cột 2: Username / Số điện thoại đăng nhập (đã bỏ máy nhánh) */}
                     <td style={{ padding: '14px 16px', color: '#334155', fontWeight: 500 }}>
                       <code
                         style={{
@@ -642,14 +769,50 @@ export const UserManagement: React.FC = () => {
                           color: '#0f172a',
                         }}
                       >
-                        {user.username}
+                        {user.accountDisplay || user.username}
                       </code>
                     </td>
 
-                    {/* Cột 3: Chức vụ / Phòng ban */}
+                    {/* Cột 3: Chức vụ (đã clear gán ghép phòng ban) */}
                     <td style={{ padding: '14px 16px' }}>
-                      <div style={{ color: '#0f172a', fontWeight: 500 }}>{user.chucVu}</div>
-                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>{user.department}</div>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '3px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background:
+                            user.phanQuyenCode === 'gd'
+                              ? '#fef3c7'
+                              : user.phanQuyenCode === 'tp'
+                              ? '#ede9fe'
+                              : user.phanQuyenCode === 'tl'
+                              ? '#e0e7ff'
+                              : user.phanQuyenCode === 'tt'
+                              ? '#f1f5f9'
+                              : '#f8fafc',
+                          color:
+                            user.phanQuyenCode === 'gd'
+                              ? '#b45309'
+                              : user.phanQuyenCode === 'tp'
+                              ? '#6d28d9'
+                              : user.phanQuyenCode === 'tl'
+                              ? '#3730a3'
+                              : user.phanQuyenCode === 'tt'
+                              ? '#334155'
+                              : '#475569',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {user.chucVu}
+                      </span>
+                      {user.department ? (
+                        <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px' }}>
+                          {user.department}
+                        </div>
+                      ) : null}
                     </td>
 
                     {/* Cột 4: Trạng thái hiển thị hoa hồng */}
@@ -705,7 +868,7 @@ export const UserManagement: React.FC = () => {
                       >
                         <button
                           type="button"
-                          onClick={() => handleRoleChange(user.username, 'sale_congty')}
+                          onClick={() => handleRoleChange(user.id, 'sale_congty', user.username)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -728,7 +891,7 @@ export const UserManagement: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => handleRoleChange(user.username, 'sale_ctv')}
+                          onClick={() => handleRoleChange(user.id, 'sale_ctv', user.username)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

@@ -70,13 +70,35 @@ class UserRoleConfigService {
           }
           return config
         }
+      } else if (response.status === 404) {
+        // Tệp chưa được khởi tạo trên R2 (Admin chưa lưu lần đầu) -> dùng ngay fallback, tránh gọi tiếp S3 gây thêm 1 lỗi 404
+        return this.getFallbackConfig()
       }
     } catch (err) {
       console.warn('[UserRoleConfig] Không thể tải từ CDN R2, thử đọc trực tiếp từ S3 Storage:', err)
     }
 
-    // Nếu CDN chưa có file hoặc fetch lỗi, thử đọc trực tiếp từ S3 Storage
+    // Nếu CDN gặp lỗi mạng, thử đọc trực tiếp từ S3 Storage
     return this.getLatestConfigFromStorage()
+  }
+
+  /**
+   * Lấy cấu hình dự phòng từ localStorage hoặc mặc định
+   */
+  getFallbackConfig(): UserRolesConfigFile {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && typeof parsed.users === 'object') {
+          return parsed
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return defaultUserRolesConfig
   }
 
   /**
@@ -115,19 +137,7 @@ class UserRoleConfigService {
     }
 
     // Đọc dự phòng từ localStorage nếu có
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (parsed && typeof parsed.users === 'object') {
-          return parsed
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    return defaultUserRolesConfig
+    return this.getFallbackConfig()
   }
 
   /**
