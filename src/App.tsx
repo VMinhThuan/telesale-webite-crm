@@ -54,6 +54,9 @@ const Chat = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })),
 )
+const UserManagement = lazy(() =>
+  import('@/pages/UserManagement').then((m) => ({ default: m.UserManagement })),
+)
 
 const AppShell: React.FC = () => {
   const location = useLocation()
@@ -286,6 +289,8 @@ const AppShell: React.FC = () => {
         return 'Chat nội bộ'
       case '/settings':
         return 'Cài đặt'
+      case '/users':
+        return 'Quản lý nhân viên'
       default:
         return 'Tổng quan'
     }
@@ -333,6 +338,7 @@ const AppShell: React.FC = () => {
               <Route path="/reports" element={<Reports />} />
               <Route path="/chat" element={<Chat />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/users" element={<UserManagement />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

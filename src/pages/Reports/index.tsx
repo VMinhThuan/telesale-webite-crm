@@ -12,6 +12,7 @@ import {
   Phone,
   ShieldCheck,
   ShoppingCart,
+  Target,
   Undo2,
   UserCheck,
   Users,
@@ -29,6 +30,7 @@ import { notify } from '../../utils/notify'
 import { useAuthStore } from '../../store/useAuthStore'
 import { determinePhanQuyen } from '../../services/auth.service'
 import { ErpSource } from '../../types/api'
+import { useCanViewCommission } from '../../hooks/useUserRoleConfig'
 
 type DatePreset = 'today' | 'yesterday' | '7days' | 'thisMonth' | 'custom'
 
@@ -237,15 +239,31 @@ export const Reports: React.FC = () => {
   // Số ngày trong khoảng thời gian đã chọn để tính trung bình
   const daysCount = Math.max(1, dayjs(toDate).diff(dayjs(fromDate), 'day') + 1)
 
+  // Quyền xem hoa hồng (Sale CTV = true, Sale Công ty = false) từ Cloudflare R2
+  const canViewCommission = useCanViewCommission()
+
   // Danh sách các thẻ chỉ số KPI trên cùng:
   // Hàng 1 (5 chỉ số: Tiếp cận, Hoa hồng & Khách tiềm năng)
-  const row1Metrics = [
-    { label: 'Tổng hoa hồng', value: formatVND(totals.commission), icon: Coins, tone: 'blue' },
-    { label: 'Thời gian đàm thoại', value: `${totals.hours} giờ`, icon: Clock3, tone: 'blue' },
-    { label: 'Tổng số cuộc gọi', value: String(totals.calls), icon: Phone, tone: 'green' },
-    { label: 'Kết nối', value: String(totals.connected), icon: Users, tone: 'blue' },
-    { label: 'Khách tiềm năng', value: String(totals.leads), icon: UserCheck, tone: 'amber' },
-  ]
+  const row1Metrics = useMemo(() => {
+    const list = []
+    if (canViewCommission) {
+      list.push({ label: 'Tổng hoa hồng', value: formatVND(totals.commission), icon: Coins, tone: 'blue' as const })
+    } else {
+      list.push({
+        label: 'Tỷ lệ chốt đơn',
+        value: totals.connected > 0 ? `${((totals.closed / totals.connected) * 100).toFixed(1)}%` : '0%',
+        icon: Target,
+        tone: 'blue' as const,
+      })
+    }
+    list.push(
+      { label: 'Thời gian đàm thoại', value: `${totals.hours} giờ`, icon: Clock3, tone: 'blue' as const },
+      { label: 'Tổng số cuộc gọi', value: String(totals.calls), icon: Phone, tone: 'green' as const },
+      { label: 'Kết nối', value: String(totals.connected), icon: Users, tone: 'blue' as const },
+      { label: 'Khách tiềm năng', value: String(totals.leads), icon: UserCheck, tone: 'amber' as const },
+    )
+    return list
+  }, [canViewCommission, totals])
 
   // Hàng 2 (4 chỉ số: Đơn hàng, Giao nhận & Tỷ lệ ngày)
   const row2Metrics = [
@@ -262,8 +280,23 @@ export const Reports: React.FC = () => {
 
   // Xử lý xuất file CSV báo cáo chi tiết
   const handleExportCSV = () => {
+    const headerCols = [
+      'Nhân viên',
+      'Vai trò',
+      'Đàm thoại',
+      'Cuộc gọi',
+      'Kết nối',
+      'Tiềm năng',
+      'Đơn phát sinh',
+      ...(canViewCommission ? ['Hoa hồng'] : []),
+      'Đã đi',
+      'Trả về',
+      'Tỷ lệ chốt',
+    ]
+
     const csvContent =
-      'Nhân viên,Vai trò,Đàm thoại,Cuộc gọi,Kết nối,Tiềm năng,Đơn phát sinh,Hoa hồng,Đã đi,Trả về,Tỷ lệ chốt\n' +
+      headerCols.join(',') +
+      '\n' +
       filteredResults
         .map((p) => {
           const emp = employeeMap.get(String(p.user_id))
@@ -277,7 +310,21 @@ export const Reports: React.FC = () => {
           const confirmed = p.tong_don_da_xac_nhan || 0
           const returned = p.tong_don_tra_ve || 0
           const rate = connected > 0 ? `${((closed / connected) * 100).toFixed(1)}%` : '0%'
-          return `"${p.user_name || 'Nhân viên'}","${role}",${hours},${calls},${connected},${leads},${closed},${commission},${confirmed},${returned},${rate}`
+
+          const rowValues = [
+            `"${p.user_name || 'Nhân viên'}"`,
+            `"${role}"`,
+            hours,
+            calls,
+            connected,
+            leads,
+            closed,
+            ...(canViewCommission ? [commission] : []),
+            confirmed,
+            returned,
+            rate,
+          ]
+          return rowValues.join(',')
         })
         .join('\n')
 
@@ -643,7 +690,7 @@ export const Reports: React.FC = () => {
                     'Kết nối',
                     'Tiềm năng',
                     'Đơn phát sinh',
-                    'Hoa hồng',
+                    ...(canViewCommission ? ['Hoa hồng'] : []),
                     'Đã đi',
                     'Trả về',
                     'Tỷ lệ chốt',
@@ -704,7 +751,9 @@ export const Reports: React.FC = () => {
                       <td>{connected}</td>
                       <td>{leads}</td>
                       <td>{closed}</td>
-                      <td style={{ color: '#16a34a', fontWeight: 700 }}>{formatVND(commission)}</td>
+                      {canViewCommission && (
+                        <td style={{ color: '#16a34a', fontWeight: 700 }}>{formatVND(commission)}</td>
+                      )}
                       <td style={{ color: '#0bad79', fontWeight: 700 }}>{confirmed}</td>
                       <td style={{ color: returned > 0 ? '#e11d48' : '#64748b' }}>{returned}</td>
                       <td>{rate}</td>
@@ -718,7 +767,9 @@ export const Reports: React.FC = () => {
                   <td>{totals.connected}</td>
                   <td>{totals.leads}</td>
                   <td>{totals.closed}</td>
-                  <td style={{ color: '#16a34a', fontWeight: 700 }}>{formatVND(totals.commission)}</td>
+                  {canViewCommission && (
+                    <td style={{ color: '#16a34a', fontWeight: 700 }}>{formatVND(totals.commission)}</td>
+                  )}
                   <td style={{ color: '#0bad79', fontWeight: 700 }}>{totals.confirmed}</td>
                   <td style={{ color: totals.returned > 0 ? '#e11d48' : '#64748b' }}>{totals.returned}</td>
                   <td>

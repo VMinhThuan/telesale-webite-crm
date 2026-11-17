@@ -77,6 +77,12 @@ export const queryKeys = {
     search: (threadId?: number | string, keyword?: string) =>
       [...queryKeys.chat.thread(threadId), 'search', keyword] as const,
   },
+
+  // 9. Cấu hình phân quyền nhân sự (Cloudflare R2)
+  userRoleConfig: {
+    all: ['userRoleConfig'] as const,
+    config: () => [...queryKeys.userRoleConfig.all, 'config'] as const,
+  },
 } as const
 
 export default queryKeys

@@ -10,6 +10,7 @@ import {
   Phone,
   Settings,
   ShoppingCart,
+  UserCheck,
   Users,
   X,
   LucideIcon,
@@ -34,6 +35,7 @@ const navItems: NavItemDef[] = [
   { label: 'Đơn hàng', page: 'orders', path: '/orders', icon: ShoppingCart },
   { label: 'Tài liệu đào tạo', page: 'training', path: '/training', icon: BookOpen },
   { label: 'Báo cáo', page: 'reports', path: '/reports', icon: BarChart3 },
+  { label: 'Quản lý nhân viên', page: 'users', path: '/users', icon: UserCheck },
 ]
 
 interface SidebarProps {
@@ -71,18 +73,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const user = useAuthStore((s) => s.user)
   const { data: threadsData } = useChatThreads(1, 20, Boolean(isAuthenticated))
 
-  // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo, nhân viên thì ẩn
+  // Phân quyền: Chỉ admin và trưởng nhóm mới được xem màn hình Báo cáo; chỉ Admin mới được xem Quản lý nhân viên
   const pq = determinePhanQuyen(user)
   const canViewReports = pq === 'admin' || pq === 'truong_nhom'
+  const isAdmin = pq === 'admin'
 
   const visibleNavItems = useMemo(() => {
     return navItems.filter((item) => {
       if (item.page === 'reports') {
         return canViewReports
       }
+      if (item.page === 'users') {
+        return isAdmin
+      }
       return true
     })
-  }, [canViewReports])
+  }, [canViewReports, isAdmin])
 
   const unreadCount = useMemo(() => {
     if (!isAuthenticated || !threadsData?.threads) return 0

@@ -140,7 +140,7 @@ export const DeleteCategoryConfirmModal: React.FC<DeleteCategoryConfirmModalProp
                   <span style={{ fontWeight: 700, color: '#e53e3e' }}>
                     toàn bộ {materialCount} tài liệu bên trong
                   </span>{' '}
-                  (kèm tệp lưu trữ trên Cloudflare R2) sẽ <strong>bị xóa vĩnh viễn</strong> và không thể khôi phục!
+                  (kèm các tệp tài liệu liên quan) sẽ <strong>bị xóa vĩnh viễn</strong> và không thể khôi phục!
                 </p>
               </div>
             </div>

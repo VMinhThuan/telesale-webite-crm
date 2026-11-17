@@ -31,6 +31,7 @@ import {
 } from '../../utils/formatters'
 import dayjs from '../../lib/dayjs'
 import { Commission7DaysChart } from './components/Commission7DaysChart'
+import { useCanViewCommission } from '../../hooks/useUserRoleConfig'
 
 interface DashboardProps {
   period?: PeriodType
@@ -536,44 +537,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
   const answerRateStr =
     totalCalls > 0 ? `${((connectedCalls / totalCalls) * 100).toFixed(1)}%` : '0%'
 
-  // 5 Thẻ KPI chính
-  const cards: SummaryCardItem[] = [
-    {
-      label: 'Tổng hoa hồng',
-      value: formatVND(totalCommission),
-      change: `${donPhatSinh} đơn (${dateRange.preset === 'today' ? 'Hôm nay' : 'Lũy kế'})`,
-      icon: Coins,
-      tone: 'blue',
-    },
-    {
-      label: 'Tổng cuộc gọi',
-      value: `${totalCalls} cuộc`,
-      change: `${connectedCalls} kết nối (${answerRateStr})`,
-      icon: Phone,
-      tone: 'teal',
-    },
-    {
-      label: 'Đơn phát sinh',
-      value: `${donPhatSinh} đơn`,
-      change: `${confirmedOrders} đơn đã xác nhận`,
-      icon: ShoppingCart,
-      tone: 'blue',
-    },
-    {
-      label: 'Khách tiềm năng',
-      value: `${leadsCount} khách`,
-      change: `${dailyResults?.tong_giu_lai_cs || 0} giữ lại · ${dailyResults?.tong_hen_goi_lai || 0} hẹn lại`,
-      icon: Target,
-      tone: 'rose',
-    },
-    {
-      label: 'Thời gian làm việc',
-      value: formatWorkingTime(totalWorkingMinutes),
-      change: 'Từ dữ liệu chấm công',
-      icon: Clock3,
-      tone: 'amber',
-    },
-  ]
+  // Quyền hiển thị hoa hồng (Sale CTV = true, Sale Công ty = false) từ Cloudflare R2
+  const canViewCommission = useCanViewCommission()
+
+  // 5 Thẻ KPI chính (tự động ẩn hoa hồng nếu là Sale công ty)
+  const cards: SummaryCardItem[] = useMemo(() => {
+    const list: SummaryCardItem[] = []
+
+    if (canViewCommission) {
+      list.push({
+        label: 'Tổng hoa hồng',
+        value: formatVND(totalCommission),
+        change: `${donPhatSinh} đơn (${dateRange.preset === 'today' ? 'Hôm nay' : 'Lũy kế'})`,
+        icon: Coins,
+        tone: 'blue',
+      })
+    } else {
+      list.push({
+        label: 'Đơn xác nhận',
+        value: `${confirmedOrders} đơn`,
+        change: `${donPhatSinh} đơn phát sinh (${donPhatSinh > 0 ? ((confirmedOrders / donPhatSinh) * 100).toFixed(0) : 0}%)`,
+        icon: ShoppingCart,
+        tone: 'blue',
+      })
+    }
+
+    list.push(
+      {
+        label: 'Tổng cuộc gọi',
+        value: `${totalCalls} cuộc`,
+        change: `${connectedCalls} kết nối (${answerRateStr})`,
+        icon: Phone,
+        tone: 'teal',
+      },
+      {
+        label: 'Đơn phát sinh',
+        value: `${donPhatSinh} đơn`,
+        change: `${confirmedOrders} đơn đã xác nhận`,
+        icon: ShoppingCart,
+        tone: 'blue',
+      },
+      {
+        label: 'Khách tiềm năng',
+        value: `${leadsCount} khách`,
+        change: `${dailyResults?.tong_giu_lai_cs || 0} giữ lại · ${dailyResults?.tong_hen_goi_lai || 0} hẹn lại`,
+        icon: Target,
+        tone: 'rose',
+      },
+      {
+        label: 'Thời gian làm việc',
+        value: formatWorkingTime(totalWorkingMinutes),
+        change: 'Từ dữ liệu chấm công',
+        icon: Clock3,
+        tone: 'amber',
+      },
+    )
+
+    return list
+  }, [
+    canViewCommission,
+    totalCommission,
+    donPhatSinh,
+    dateRange.preset,
+    confirmedOrders,
+    totalCalls,
+    connectedCalls,
+    answerRateStr,
+    leadsCount,
+    dailyResults,
+    totalWorkingMinutes,
+  ])
 
   return (
     <div className="content">
@@ -781,8 +814,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ period: _period }) => {
         </div>
       </section>
 
-      {/* Biểu đồ hoa hồng 7 ngày gần nhất (theo công thức 75.000đ / 100.000đ) */}
-      <Commission7DaysChart />
+      {/* Biểu đồ hoa hồng 7 ngày gần nhất (chỉ hiển thị với Sale CTV / Admin có quyền xem hoa hồng) */}
+      {canViewCommission && <Commission7DaysChart />}
 
       {/* Phễu chuyển đổi cuộc gọi (Call Conversion Funnel 4 tầng + 5 khối chỉ số) */}
       <CallConversionFunnel

@@ -7,6 +7,7 @@ export type PageType =
   | 'reports'
   | 'chat'
   | 'settings'
+  | 'users'
 
 export type PeriodType = 'Hôm nay' | '7 ngày gần nhất' | 'Tháng 09/2025' | 'Tháng 10/2025'
 
