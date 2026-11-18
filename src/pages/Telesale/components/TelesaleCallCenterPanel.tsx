@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
+  AlertCircle,
+  AlertTriangle,
   ChevronDown,
   Loader2,
   MapPin,
@@ -38,6 +40,7 @@ export interface TelesaleCallTab {
   isHeld: boolean
   callerNumber?: string
   terminationInfo?: ParsedCallTermination | null
+  fetchError?: string | null
 }
 
 export interface TelesaleCallCenterPanelProps {
@@ -65,6 +68,7 @@ export interface TelesaleCallCenterPanelProps {
   // Các props tương thích ngược và cache IDE
   currentCustomer?: NextCustomerDto | null
   onFetchNextCustomer?: () => void
+  selectedCampaignName?: string
 }
 
 export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = ({
@@ -82,6 +86,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   sipRegStatus = 'registered',
   sipExtension,
   onReconnectSip,
+  selectedCampaignName,
 }) => {
   // Lấy tab đang active
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
@@ -242,12 +247,26 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
             const isCalling = tab.status === 'calling'
 
             let statusText = 'Chờ gọi'
-            if (isConnected) statusText = 'Đang gọi'
-            else if (isPaused) statusText = 'Giữ máy'
-            else if (isCalling) statusText = 'Đang gọi...'
-            else if (tab.status === 'ended') {
+            let statusColor = '#64748b'
+            if (isConnected) {
+              statusText = 'Đang gọi'
+              statusColor = '#16a34a'
+            } else if (isPaused) {
+              statusText = 'Giữ máy'
+              statusColor = '#d97706'
+            } else if (isCalling) {
+              statusText = 'Đang gọi...'
+              statusColor = '#2563eb'
+            } else if (tab.status === 'ended') {
               statusText = tab.terminationInfo?.shortLabel || 'Đã kết thúc'
-            } else if (tab.customer) statusText = 'Đã nạp'
+              statusColor = '#64748b'
+            } else if (tab.customer) {
+              statusText = 'Đã nạp'
+              statusColor = '#2563eb'
+            } else if (tab.fetchError) {
+              statusText = 'Hết khách'
+              statusColor = '#ea580c'
+            }
 
             return (
               <button
@@ -259,7 +278,11 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                   cursor: 'pointer',
                   textAlign: 'left',
                   background: isCurrentActive ? '#f0f7ff' : '#fff',
-                  border: isCurrentActive ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                  border: isCurrentActive
+                    ? '1px solid #3b82f6'
+                    : tab.fetchError && !tab.customer
+                      ? '1px solid #fdba74'
+                      : '1px solid #e2e8f0',
                   borderRadius: '8px',
                   padding: '7px 10px',
                   display: 'flex',
@@ -272,7 +295,13 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                 <Phone
                   size={14}
                   style={{
-                    color: isConnected ? '#16a34a' : isCurrentActive ? '#2563eb' : '#64748b',
+                    color: isConnected
+                      ? '#16a34a'
+                      : isCurrentActive
+                        ? '#2563eb'
+                        : tab.fetchError && !tab.customer
+                          ? '#ea580c'
+                          : '#64748b',
                   }}
                 />
                 <span style={{ fontWeight: 600, fontSize: '11px', color: '#1e293b' }}>
@@ -283,7 +312,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                     marginLeft: 'auto',
                     fontSize: '9px',
                     fontWeight: 600,
-                    color: isConnected ? '#16a34a' : isPaused ? '#d97706' : '#64748b',
+                    color: statusColor,
                   }}
                 >
                   {statusText}
@@ -865,12 +894,125 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                           </span>
                         </button>
                       </div>
+
+                      {/* Thông báo nếu vừa bấm đổi khách nhưng hết data */}
+                      {activeTab.fetchError && (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            background: '#fff7ed',
+                            border: '1px solid #fed7aa',
+                            color: '#c2410c',
+                            fontSize: '11.5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          <AlertCircle size={15} style={{ color: '#ea580c', flexShrink: 0 }} />
+                          <span>
+                            <b>Hết khách:</b> {activeTab.fetchError}. Vui lòng chuyển sang chiến dịch khác.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
               )
             })()}
           </>
+        ) : activeTab.fetchError ? (
+          <div
+            style={{
+              padding: '28px 20px',
+              margin: '16px',
+              borderRadius: '12px',
+              background: '#fffbeb',
+              border: '1.5px solid #fde68a',
+              textAlign: 'center',
+              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.08)',
+            }}
+          >
+            <div
+              style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                background: '#fef3c7',
+                color: '#d97706',
+                display: 'grid',
+                placeItems: 'center',
+                margin: '0 auto 12px',
+                border: '1px solid #fde68a',
+              }}
+            >
+              <AlertTriangle size={26} />
+            </div>
+
+            <h4
+              style={{
+                margin: '0 0 8px 0',
+                fontSize: '15.5px',
+                fontWeight: 700,
+                color: '#92400e',
+              }}
+            >
+              {activeTab.fetchError}
+            </h4>
+
+            <p
+              style={{
+                margin: '0 auto 18px',
+                maxWidth: '420px',
+                fontSize: '12.5px',
+                color: '#b45309',
+                lineHeight: 1.55,
+              }}
+            >
+              Chiến dịch {selectedCampaignName ? <b>"{selectedCampaignName}"</b> : 'hiện tại'} tạm thời không còn khách hàng nào khả dụng để phân bổ.
+              <br />
+              <span style={{ fontSize: '11.5px', color: '#9a3412' }}>
+                💡 Gợi ý: Vui lòng đổi sang chiến dịch khác ở góc trên hoặc liên hệ Quản lý / Giám sát nạp thêm danh sách khách hàng mới.
+              </span>
+            </p>
+
+            <button
+              type="button"
+              className="dialog-primary"
+              onClick={() => onFetchCustomerForTab(activeTab.id)}
+              disabled={isFetchingCustomer}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#d97706',
+                border: 'none',
+                padding: '9px 20px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                color: '#fff',
+                fontSize: '12.5px',
+                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)',
+                cursor: isFetchingCustomer ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isFetchingCustomer ? (
+                <>
+                  <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Đang kiểm tra lại data...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCw size={15} />
+                  <span>Thử lấy lại khách cho {activeTab.label}</span>
+                </>
+              )}
+            </button>
+          </div>
         ) : (
           <div style={{ padding: '36px 16px', textAlign: 'center' }}>
             <p

@@ -22,7 +22,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useCallStore } from '@/store/useCallStore'
 import { useTelesaleCallStore } from '@/store/useTelesaleCallStore'
 import { DialogState, PageType } from '@/types'
-import { notify } from '@/utils/notify'
+import { notify, ToastType } from '@/utils/notify'
 import { getEffectiveSipConfig } from '@/utils/sip'
 import { parseSipTermination } from '@/utils/sipCallParser'
 
@@ -64,7 +64,7 @@ const AppShell: React.FC = () => {
 
   const [open, setOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<{ message: string; type?: ToastType } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
 
   // Tự động tải trước và cache toàn bộ danh mục enums vào React Query lúc mở ứng dụng
@@ -233,15 +233,32 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     let timeoutId: number
     const onToast = (event: Event) => {
-      const customEvent = event as CustomEvent<string>
-      setToast(customEvent.detail)
+      const customEvent = event as CustomEvent<any>
+      let message = ''
+      let type: ToastType = 'info'
+      let duration = 2800
+
+      if (typeof customEvent.detail === 'string') {
+        message = customEvent.detail
+      } else if (customEvent.detail && typeof customEvent.detail === 'object') {
+        message = customEvent.detail.message || ''
+        type = customEvent.detail.type || 'info'
+        duration =
+          customEvent.detail.duration ||
+          (type === 'warning' || type === 'error' ? 4500 : 2800)
+      }
+
+      setToast({ message, type })
       window.clearTimeout(timeoutId)
-      timeoutId = window.setTimeout(() => setToast(''), 2600)
+      timeoutId = window.setTimeout(() => setToast(null), duration)
     }
 
     const onUnauthorized = (event: Event) => {
       const customEvent = event as CustomEvent<{ message: string }>
-      setToast(customEvent.detail?.message || 'Phiên làm việc hết hạn.')
+      setToast({
+        message: customEvent.detail?.message || 'Phiên làm việc hết hạn.',
+        type: 'error',
+      })
 
       // Dọn dẹp SIP session và reset trạng thái cuộc gọi khi hết hạn phiên
       try {
@@ -353,7 +370,11 @@ const AppShell: React.FC = () => {
       <FloatingCallWidget />
 
       {/* Thông báo và Hộp thoại toàn cục */}
-      <Toast message={toast} />
+      <Toast
+        message={toast?.message || ''}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
       <Dialog dialog={dialog} onClose={() => setDialog(null)} />
     </div>
   )

@@ -298,7 +298,10 @@ export function useNextCustomerMutation() {
       return telesaleService.getNextCustomer(bodyPayload, source_erp)
     },
     onError: (err: any) => {
-      notify(err.message || 'Không thể lấy thông tin khách hàng tiếp theo.')
+      notify(err?.message || 'Không có khách hàng nào để gọi trong chiến dịch này', {
+        type: 'warning',
+        duration: 4500,
+      })
     },
   })
 }

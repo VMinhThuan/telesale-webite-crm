@@ -12,7 +12,7 @@ import {
   SaveCallResultPayload,
   SaveCallResultResponse,
 } from '../types/api'
-import apiClient, { apiClientZomzem, generateIdempotencyKey, getApiClient } from './apiClient'
+import apiClient, { AppApiError, apiClientZomzem, generateIdempotencyKey, getApiClient } from './apiClient'
 
 export interface GetNextCustomerPayload {
   campaign_id: number
@@ -126,11 +126,25 @@ export const telesaleService = {
    */
   async getNextCustomer(payload: GetNextCustomerPayload, source_erp?: ErpSource): Promise<NextCustomerDto> {
     const client = getApiClient(source_erp)
-    const response = await client.post<any, { result: NextCustomerDto }>(
+    const response = await client.post<any, any>(
       API_ENDPOINTS.CUSTOMER_NEXT,
       payload,
     )
-    const res = response.result || response
+
+    // Nếu Backend phản hồi thất bại hoặc chứa thông điệp lỗi (kể cả khi HTTP status 200)
+    if (response && response.success === false) {
+      const errMsg = response.error || response.message || 'Không có khách hàng nào để gọi'
+      throw new AppApiError(errMsg, 200, response)
+    }
+
+    const res = response?.result !== undefined && response?.result !== null ? response.result : response
+
+    // Nếu dữ liệu khách hàng không tồn tại hoặc không hợp lệ
+    if (!res || (typeof res === 'object' && !res.customer_id && !res.customer_name)) {
+      const errMsg = response?.error || response?.message || 'Không có khách hàng nào để gọi'
+      throw new AppApiError(errMsg, 200, response)
+    }
+
     if (res && typeof res === 'object') {
       res.source_erp = source_erp || 'locnuoc365'
     }

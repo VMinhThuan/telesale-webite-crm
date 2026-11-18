@@ -58,6 +58,7 @@ export interface TelesaleCallTab {
   callerNumber?: string
   draftResult?: TelesaleDraftResult
   terminationInfo?: ParsedCallTermination | null
+  fetchError?: string | null
 }
 
 const initialTabs: TelesaleCallTab[] = [
@@ -69,6 +70,7 @@ const initialTabs: TelesaleCallTab[] = [
     durationSec: 0,
     isMuted: false,
     isHeld: false,
+    fetchError: null,
   },
   {
     id: 2,
@@ -78,6 +80,7 @@ const initialTabs: TelesaleCallTab[] = [
     durationSec: 0,
     isMuted: false,
     isHeld: false,
+    fetchError: null,
   },
   {
     id: 3,
@@ -87,6 +90,7 @@ const initialTabs: TelesaleCallTab[] = [
     durationSec: 0,
     isMuted: false,
     isHeld: false,
+    fetchError: null,
   },
 ]
 

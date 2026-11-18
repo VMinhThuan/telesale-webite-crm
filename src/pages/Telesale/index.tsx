@@ -226,7 +226,7 @@ export const Telesale: React.FC = () => {
 
       const activeCampId = activeCamp?.campaign_id
       if (!activeCampId) {
-        notify('Vui lòng chọn chiến dịch trước khi lấy khách')
+        notify('Vui lòng chọn chiến dịch trước khi lấy khách', { type: 'warning' })
         return
       }
 
@@ -241,9 +241,15 @@ export const Telesale: React.FC = () => {
       ) {
         notify(
           `${targetTab.label} đang có cuộc gọi. Vui lòng chuyển sang Tab khác để nạp khách mới!`,
+          { type: 'warning' },
         )
         return
       }
+
+      // Clear trạng thái lỗi cũ trước khi lấy khách mới cho tab này
+      setTabs((prev) =>
+        prev.map((t) => (t.id === targetTabId ? { ...t, fetchError: null } : t)),
+      )
 
       try {
         const nextCust = await nextCustomerMutation.mutateAsync({
@@ -269,6 +275,7 @@ export const Telesale: React.FC = () => {
           )
           notify(
             `${tabAfterFetch?.label || `Tab ${targetTabId}`} đã phát sinh cuộc gọi trong lúc tải dữ liệu. Đã hủy ghi đè khách hàng mới vào tab này.`,
+            { type: 'warning' },
           )
           return
         }
@@ -282,6 +289,7 @@ export const Telesale: React.FC = () => {
               return {
                 ...t,
                 customer: nextCust,
+                fetchError: null,
                 selectedMemberId: nextCust.members?.[0]?.member_id,
                 status: 'idle',
                 durationSec: 0,
@@ -294,9 +302,24 @@ export const Telesale: React.FC = () => {
           }),
         )
 
-        notify(`Đã nạp khách hàng cho Số ${targetTabId}: ${nextCust.customer_name}`)
-      } catch {
-        // Lỗi đã được xử lý trong hook mutation
+        notify(`Đã nạp khách hàng cho Số ${targetTabId}: ${nextCust.customer_name}`, { type: 'success' })
+      } catch (err: any) {
+        const errorMsg =
+          err?.message ||
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'Không có khách hàng nào để gọi'
+
+        // Đánh dấu tab này đang gặp lỗi nạp khách để UI hiển thị banner cảnh báo
+        setTabs((prev) =>
+          prev.map((t) => (t.id === targetTabId ? { ...t, fetchError: errorMsg } : t)),
+        )
+
+        // Hiển thị thông báo Toast cảnh báo rõ ràng
+        notify(`⚠️ ${activeCamp?.name || 'Chiến dịch'}: ${errorMsg}`, {
+          type: 'warning',
+          duration: 4500,
+        })
       }
     },
     [nextCustomerMutation, selectedCampaign, campaignsList, setTabs, orderDate],
@@ -338,6 +361,7 @@ export const Telesale: React.FC = () => {
       setSelectedCampaignId(found.campaign_id)
       notify(`Đã chuyển sang chiến dịch: ${found.name}`)
       useTelesaleCallStore.getState().resetTabs()
+      setTabs((prev) => prev.map((t) => ({ ...t, fetchError: null })))
       handleFetchCustomerForTab(1, found)
     }
   }
@@ -924,6 +948,7 @@ export const Telesale: React.FC = () => {
           onReconnectSip={reconnectSip}
           currentCustomer={currentCustomer}
           onFetchNextCustomer={() => handleFetchCustomerForTab(activeTabId)}
+          selectedCampaignName={selectedCampaign?.name}
         />
 
         {/* CỘT 3: Hồ sơ khách hàng & Form kết quả cuộc gọi (đồng bộ theo Tab active) */}
