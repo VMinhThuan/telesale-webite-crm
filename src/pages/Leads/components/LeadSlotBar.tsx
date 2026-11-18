@@ -14,9 +14,10 @@ import { BranchSlotDto, ErpSource } from '../../../types/api'
 export interface LeadSlotBarProps {
   branchId: number
   branchName?: string
-  availableBranches?: { id: number; name: string; source_erp?: ErpSource }[]
-  onBranchChange?: (branchId: number) => void
+  availableBranches?: { key?: string; id: number; name: string; source_erp?: ErpSource }[]
+  onBranchChange?: (branchId: number, source_erp?: ErpSource, branchKey?: string) => void
   source_erp?: ErpSource
+  selectedBranchKey?: string
 }
 
 export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
@@ -25,6 +26,7 @@ export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
   availableBranches = [],
   onBranchChange,
   source_erp,
+  selectedBranchKey,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [selectedDate, setSelectedDate] = useState(() => dayjs().format('YYYY-MM-DD'))
@@ -105,8 +107,16 @@ export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
             <MapPin size={13} style={{ color: '#64748b' }} />
             {availableBranches.length > 0 && onBranchChange ? (
               <select
-                value={branchId}
-                onChange={(e) => onBranchChange(Number(e.target.value))}
+                value={selectedBranchKey || `${source_erp || 'locnuoc365'}_${branchId}`}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const found = availableBranches.find(
+                    (b) => (b.key || `${b.source_erp || 'locnuoc365'}_${b.id}`) === val,
+                  )
+                  if (found) {
+                    onBranchChange(found.id, found.source_erp, found.key)
+                  }
+                }}
                 style={{
                   height: '30px',
                   padding: '0 8px',
@@ -120,11 +130,14 @@ export const LeadSlotBar: React.FC<LeadSlotBarProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                {availableBranches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
+                {availableBranches.map((b) => {
+                  const optKey = b.key || `${b.source_erp || 'locnuoc365'}_${b.id}`
+                  return (
+                    <option key={optKey} value={optKey}>
+                      {b.name} ({b.source_erp === 'zomzem' ? 'Zomzem' : 'LocNuoc365'})
+                    </option>
+                  )
+                })}
               </select>
             ) : (
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#1d4ed8' }}>

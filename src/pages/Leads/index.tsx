@@ -38,29 +38,60 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
 
   const { data: campaignsData } = useCampaigns()
   const userBranchId = useAuthStore((s) => s.user?.branchId)
+  const [selectedBranchKey, setSelectedBranchKey] = useState<string | undefined>(undefined)
 
-  // Trích xuất danh sách các chi nhánh khả dụng từ chiến dịch, fallback theo chi nhánh của nhân viên
+  // Trích xuất danh sách tất cả các chi nhánh khả dụng từ chiến dịch của cả 2 ERP
+  // Dùng compound key `${erp}_${branch_id}` tránh việc chi nhánh cùng id (ví dụ branch_id = 3) ghi đè nhau
   const availableBranches = useMemo(() => {
-    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
+    const map = new Map<string, { key: string; id: number; name: string; source_erp: ErpSource }>()
     const list = campaignsData?.items || []
     list.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
+        const erp = c.source_erp || 'locnuoc365'
+        const key = `${erp}_${c.branch_id}`
+        map.set(key, {
+          key,
+          id: c.branch_id,
+          name: c.branch_name,
+          source_erp: erp,
+        })
       }
     })
-    if (userBranchId && !map.has(userBranchId)) {
-      map.set(userBranchId, { id: userBranchId, name: `Chi nhánh #${userBranchId}` })
+    if (userBranchId && !Array.from(map.values()).some((b) => b.id === userBranchId)) {
+      map.set(`locnuoc365_${userBranchId}`, {
+        key: `locnuoc365_${userBranchId}`,
+        id: userBranchId,
+        name: `Chi nhánh #${userBranchId}`,
+        source_erp: 'locnuoc365',
+      })
     }
     if (map.size === 0) {
-      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
+      map.set('locnuoc365_3', {
+        key: 'locnuoc365_3',
+        id: 3,
+        name: 'Chi Nhánh Đại Kim',
+        source_erp: 'locnuoc365',
+      })
     }
     return Array.from(map.values())
   }, [campaignsData, userBranchId])
 
-  // Chi nhánh cho thanh Slot Bar: ưu tiên chi nhánh đang chọn, hoặc chi nhánh đầu tiên có sẵn
-  const activeSlotBranchId = selectedBranchId || availableBranches[0]?.id || 3
-  const activeSlotBranch = availableBranches.find((b) => b.id === activeSlotBranchId)
-  const activeSlotBranchName = activeSlotBranch?.name
+  // Chi nhánh cho thanh Slot Bar: ưu tiên chi nhánh theo key đang chọn, hoặc Chi Nhánh Đại Kim (Hà Nội của LocNuoc365)
+  const activeSlotBranch = useMemo(() => {
+    if (selectedBranchKey) {
+      const found = availableBranches.find((b) => b.key === selectedBranchKey)
+      if (found) return found
+    }
+    if (selectedBranchId) {
+      const found = availableBranches.find((b) => b.id === selectedBranchId)
+      if (found) return found
+    }
+    const hanoi = availableBranches.find((b) => b.id === 3 && b.source_erp === 'locnuoc365')
+    return hanoi || availableBranches[0]
+  }, [selectedBranchKey, selectedBranchId, availableBranches])
+
+  const activeSlotBranchId = activeSlotBranch?.id || 3
+  const activeSlotBranchName = activeSlotBranch?.name || 'Chi Nhánh Đại Kim'
   const activeSlotBranchSource = activeSlotBranch?.source_erp || 'locnuoc365'
 
   // Lấy chi tiết khách hàng đang chọn từ đúng ERP để cung cấp tên cho header của Timeline
@@ -76,7 +107,13 @@ export const Leads: React.FC<LeadsProps> = ({ onOpenDialog }) => {
         branchId={activeSlotBranchId}
         branchName={activeSlotBranchName}
         availableBranches={availableBranches}
-        onBranchChange={setSelectedBranchId}
+        selectedBranchKey={activeSlotBranch?.key}
+        onBranchChange={(newBranchId, _source, newKey) => {
+          setSelectedBranchId(newBranchId)
+          if (newKey) {
+            setSelectedBranchKey(newKey)
+          }
+        }}
         source_erp={activeSlotBranchSource}
       />
 

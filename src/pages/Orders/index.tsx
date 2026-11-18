@@ -145,19 +145,38 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   const pq = determinePhanQuyen(user)
   const canAdjustAppointment = pq === 'admin' || pq === 'truong_nhom'
 
+  // Trích xuất danh sách tất cả các chi nhánh khả dụng từ chiến dịch của cả 2 ERP
+  // Dùng compound key `${erp}_${branch_id}` tránh việc chi nhánh cùng id (ví dụ branch_id = 3) ghi đè nhau
   const availableBranches = useMemo(() => {
-    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
+    const map = new Map<string, { key: string; id: number; name: string; source_erp: ErpSource }>()
     const list = campaignsData?.items || []
     list.forEach((c) => {
       if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
+        const erp = c.source_erp || 'locnuoc365'
+        const key = `${erp}_${c.branch_id}`
+        map.set(key, {
+          key,
+          id: c.branch_id,
+          name: c.branch_name,
+          source_erp: erp,
+        })
       }
     })
-    if (userBranchId && !map.has(userBranchId)) {
-      map.set(userBranchId, { id: userBranchId, name: `Chi nhánh #${userBranchId}` })
+    if (userBranchId && !Array.from(map.values()).some((b) => b.id === userBranchId)) {
+      map.set(`locnuoc365_${userBranchId}`, {
+        key: `locnuoc365_${userBranchId}`,
+        id: userBranchId,
+        name: `Chi nhánh #${userBranchId}`,
+        source_erp: 'locnuoc365',
+      })
     }
     if (map.size === 0) {
-      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
+      map.set('locnuoc365_3', {
+        key: 'locnuoc365_3',
+        id: 3,
+        name: 'Chi Nhánh Đại Kim',
+        source_erp: 'locnuoc365',
+      })
     }
     return Array.from(map.values())
   }, [campaignsData, userBranchId])
@@ -167,6 +186,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [erpSourceFilter, setErpSourceFilter] = useState<'all' | 'locnuoc365' | 'zomzem'>('all')
   const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined)
+  const [selectedBranchKey, setSelectedBranchKey] = useState<string | undefined>(undefined)
   const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const branchMenuRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
@@ -186,11 +206,18 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const selectedBranchObj = useMemo(() => {
+    if (!selectedBranchKey && !selectedBranchId) return null
+    if (selectedBranchKey) {
+      return availableBranches.find((b) => b.key === selectedBranchKey) || null
+    }
+    return availableBranches.find((b) => b.id === selectedBranchId) || null
+  }, [selectedBranchKey, selectedBranchId, availableBranches])
+
   const currentBranchLabel = useMemo(() => {
-    if (!selectedBranchId) return 'Tất cả chi nhánh'
-    const found = availableBranches.find((b) => b.id === selectedBranchId)
-    return found ? found.name : `Chi nhánh #${selectedBranchId}`
-  }, [selectedBranchId, availableBranches])
+    if (!selectedBranchObj) return 'Tất cả chi nhánh'
+    return selectedBranchObj.name
+  }, [selectedBranchObj])
 
   // Debounce ô tìm kiếm 400ms
   const debouncedQuery = useDebounce(query, 400)
@@ -295,17 +322,17 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   // Toàn bộ danh sách đơn hàng trang hiện tại (kèm client-side fallback nếu Backend chưa lọc branch_id)
   const ordersList: OrderDto[] = useMemo(() => {
     const rawList = ordersResponse?.items || []
-    if (selectedBranchId !== undefined) {
+    if (selectedBranchObj) {
       return rawList.filter((item) => {
         if (item.branch_id !== undefined) {
-          return item.branch_id === selectedBranchId
+          const itemErp = item.source_erp || 'locnuoc365'
+          return item.branch_id === selectedBranchObj.id && itemErp === selectedBranchObj.source_erp
         }
-        const branchObj = availableBranches.find((b) => b.id === selectedBranchId)
-        return branchObj && item.chi_nhanh === branchObj.name
+        return item.chi_nhanh === selectedBranchObj.name
       })
     }
     return rawList
-  }, [ordersResponse, selectedBranchId, availableBranches])
+  }, [ordersResponse, selectedBranchObj])
 
   // Đơn hàng đang hiển thị ở cột chi tiết (tìm theo compound key hoặc order_id)
   const activeOrder: OrderDto | null = useMemo(() => {
@@ -332,9 +359,12 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   }, [activeOrder])
 
   // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh và nguồn ERP của đơn hàng
-  const targetBranchId = selectedBranchId || activeOrder?.branch_id || availableBranches[0]?.id || 3
-  const targetBranch = availableBranches.find((b) => b.id === targetBranchId)
-  const targetBranchSource = activeOrder?.source_erp || targetBranch?.source_erp || 'locnuoc365'
+  const targetBranch = activeOrder
+    ? availableBranches.find((b) => b.id === activeOrder.branch_id && b.source_erp === (activeOrder.source_erp || 'locnuoc365')) || selectedBranchObj || availableBranches[0]
+    : selectedBranchObj || availableBranches[0]
+
+  const targetBranchId = activeOrder?.branch_id || selectedBranchObj?.id || targetBranch?.id || 3
+  const targetBranchSource = activeOrder?.source_erp || selectedBranchObj?.source_erp || targetBranch?.source_erp || 'locnuoc365'
   const { data: rawBranchSlots = [] } = useBranchSlots(
     targetBranchId,
     adjDate,
@@ -666,6 +696,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                       type="button"
                       onClick={() => {
                         setSelectedBranchId(undefined)
+                        setSelectedBranchKey(undefined)
                         setErpSourceFilter('all')
                         setBranchMenuOpen(false)
                         setPage(1)
@@ -677,25 +708,26 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                         padding: '8px 10px',
                         borderRadius: '6px',
                         border: 'none',
-                        backgroundColor: !selectedBranchId ? '#eff6ff' : 'transparent',
-                        color: !selectedBranchId ? '#1d4ed8' : '#334155',
-                        fontWeight: !selectedBranchId ? 600 : 400,
+                        backgroundColor: !selectedBranchObj ? '#eff6ff' : 'transparent',
+                        color: !selectedBranchObj ? '#1d4ed8' : '#334155',
+                        fontWeight: !selectedBranchObj ? 600 : 400,
                         fontSize: '11px',
                         cursor: 'pointer',
                         textAlign: 'left',
                         width: '100%',
                       }}
                     >
-                      <Building2 size={14} style={{ color: !selectedBranchId ? '#2563eb' : '#64748b' }} />
+                      <Building2 size={14} style={{ color: !selectedBranchObj ? '#2563eb' : '#64748b' }} />
                       <span>Tất cả chi nhánh</span>
                     </button>
                     {availableBranches.map((b) => {
-                      const isSelected = selectedBranchId === b.id
+                      const isSelected = selectedBranchObj?.key === b.key
                       return (
                         <button
-                          key={b.id}
+                          key={b.key}
                           type="button"
                           onClick={() => {
+                            setSelectedBranchKey(b.key)
                             setSelectedBranchId(b.id)
                             if (b.source_erp) {
                               setErpSourceFilter(b.source_erp)
@@ -706,6 +738,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                           style={{
                             display: 'flex',
                             alignItems: 'center',
+                            justifyContent: 'space-between',
                             gap: '8px',
                             padding: '8px 10px',
                             borderRadius: '6px',
@@ -719,8 +752,22 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
                             width: '100%',
                           }}
                         >
-                          <MapPin size={14} style={{ color: isSelected ? '#2563eb' : '#64748b' }} />
-                          <span>{b.name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <MapPin size={14} style={{ color: isSelected ? '#2563eb' : '#64748b' }} />
+                            <span>{b.name}</span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: b.source_erp === 'zomzem' ? '#fef3c7' : '#eff6ff',
+                              color: b.source_erp === 'zomzem' ? '#b45309' : '#1d4ed8',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {b.source_erp === 'zomzem' ? 'Zomzem' : 'LocNuoc365'}
+                          </span>
                         </button>
                       )
                     })}
