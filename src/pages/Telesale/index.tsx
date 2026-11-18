@@ -108,19 +108,33 @@ export const Telesale: React.FC = () => {
     return campaignsList[0]
   }, [campaignsList, selectedCampaignKey, selectedCampaignId])
 
-  // Trích xuất danh sách tất cả các chi nhánh khả dụng từ danh sách chiến dịch mà nhân viên có quyền
+  // Nguồn ERP của chiến dịch đang chọn
+  const currentErpSource: ErpSource = selectedCampaign?.source_erp || 'locnuoc365'
+
+  // Trích xuất danh sách tất cả các chi nhánh khả dụng theo nguồn ERP của chiến dịch đang chọn
+  // Lọc theo currentErpSource để loại bỏ hoàn toàn việc chi nhánh trùng branch_id (ví dụ branch_id = 3) giữa LocNuoc365 và Zomzem ghi đè lẫn nhau
   const availableBranches = useMemo(() => {
-    const map = new Map<number, { id: number; name: string; source_erp?: ErpSource }>()
-    campaignsList.forEach((c) => {
-      if (c.branch_id && c.branch_name) {
-        map.set(c.branch_id, { id: c.branch_id, name: c.branch_name, source_erp: c.source_erp })
-      }
-    })
+    const map = new Map<number, { id: number; name: string; source_erp: ErpSource }>()
+    campaignsList
+      .filter((c) => (c.source_erp || 'locnuoc365') === currentErpSource)
+      .forEach((c) => {
+        if (c.branch_id && c.branch_name) {
+          map.set(c.branch_id, {
+            id: c.branch_id,
+            name: c.branch_name,
+            source_erp: currentErpSource,
+          })
+        }
+      })
     if (map.size === 0) {
-      map.set(3, { id: 3, name: 'Trụ sở Hà Nội', source_erp: 'locnuoc365' })
+      map.set(3, {
+        id: 3,
+        name: currentErpSource === 'zomzem' ? 'Chi nhánh Gò Vấp' : 'Chi Nhánh Đại Kim',
+        source_erp: currentErpSource,
+      })
     }
     return Array.from(map.values())
-  }, [campaignsList])
+  }, [campaignsList, currentErpSource])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()
@@ -153,8 +167,8 @@ export const Telesale: React.FC = () => {
   const branchName =
     selectedCampaign?.branch_name ||
     currentBranch?.name ||
-    'Trụ sở Hà Nội'
-  const scheduleSourceErp = currentBranch?.source_erp || selectedCampaign?.source_erp || 'locnuoc365'
+    (currentErpSource === 'zomzem' ? 'Chi nhánh Gò Vấp' : 'Chi Nhánh Đại Kim')
+  const scheduleSourceErp = selectedCampaign?.source_erp || currentBranch?.source_erp || 'locnuoc365'
 
   const handleBranchChange = React.useCallback(
     (newBranchId: number) => {

@@ -334,7 +334,7 @@ export const Orders: React.FC<OrdersProps> = ({ onOpenDialog: _onOpenDialog }) =
   // Danh sách slot hẹn của chi nhánh theo ngày điều chỉnh và nguồn ERP của đơn hàng
   const targetBranchId = selectedBranchId || activeOrder?.branch_id || availableBranches[0]?.id || 3
   const targetBranch = availableBranches.find((b) => b.id === targetBranchId)
-  const targetBranchSource = targetBranch?.source_erp || activeOrder?.source_erp || 'locnuoc365'
+  const targetBranchSource = activeOrder?.source_erp || targetBranch?.source_erp || 'locnuoc365'
   const { data: rawBranchSlots = [] } = useBranchSlots(
     targetBranchId,
     adjDate,

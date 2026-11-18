@@ -96,7 +96,7 @@ export const LeadDetailAndCarePanel: React.FC<LeadDetailAndCarePanelProps> = ({
 
   // Tra cứu danh sách Slot ca hẹn KTV của Chi nhánh khi chốt đơn
   const selectedBranchObj = availableBranches.find((b) => b.id === selectedBranchId)
-  const slotBranchSource = selectedBranchObj?.source_erp || source_erp || customerDetail?.source_erp || 'locnuoc365'
+  const slotBranchSource = source_erp || customerDetail?.source_erp || selectedBranchObj?.source_erp || 'locnuoc365'
   const querySlotDate = outcome === 'closed' && nextCareDate ? nextCareDate : undefined
   const { data: rawSlots = [], isLoading: isLoadingSlots } = useBranchSlots(
     selectedBranchId,
