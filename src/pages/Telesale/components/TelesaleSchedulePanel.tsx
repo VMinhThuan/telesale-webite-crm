@@ -20,6 +20,8 @@ export interface TelesaleSchedulePanelProps {
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   branchName,
   branchId,
+  availableBranches,
+  onBranchChange,
   orderDate,
   onDateChange,
   selectedSlotId,

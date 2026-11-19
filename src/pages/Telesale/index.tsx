@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3,
+  Building2,
   CheckCircle2,
   CircleHelp,
   Clock3,
@@ -18,12 +19,14 @@ import {
 } from '../../hooks/useTelesale'
 import { useMakeCall } from '../../hooks/useMakeCall'
 import { useAuthStore } from '../../store/useAuthStore'
+import { determinePhanQuyen } from '../../services/auth.service'
 import { useCallStore } from '../../store/useCallStore'
 import { useTelesaleCallStore } from '../../store/useTelesaleCallStore'
+import { useCustomBranchConfig } from '../../hooks/useCustomBranchConfig'
 import sipService from '../../services/sipService'
 import { tabLeaderService } from '../../services/tabLeaderService'
 import { notify } from '../../utils/notify'
-import { ErpSource } from '../../types/api'
+import { CampaignDto, ErpSource } from '../../types/api'
 
 // 3 Khối Panels lớn của module Telesale
 import { TelesaleSchedulePanel } from './components/TelesaleSchedulePanel'
@@ -37,6 +40,7 @@ import {
 import { TelesaleHotkeysModal } from './components/TelesaleHotkeysModal'
 import { TelesaleImportModal } from './components/TelesaleImportModal'
 import { TelesaleCallLogsDrawer } from './components/TelesaleCallLogsDrawer'
+import { CustomBranchesModal } from './components/CustomBranchesModal'
 
 // Re-export để đảm bảo tính tương thích ngược toàn dự án
 export {
@@ -65,36 +69,85 @@ export const Telesale: React.FC = () => {
 
   // 1. Quản lý danh sách chiến dịch đàm thoại từ cả 2 hệ thống ERP
   const { data: campaignsData, isLoading: isLoadingCampaigns } = useCampaigns()
-  const campaignsList = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
+  const rawCampaigns = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
   const selectedCampaignId = useTelesaleCallStore((s) => s.selectedCampaignId)
   const setSelectedCampaignId = useTelesaleCallStore((s) => s.setSelectedCampaignId)
   const selectedCampaignKey = useTelesaleCallStore((s) => s.selectedCampaignKey)
   const setSelectedCampaignKey = useTelesaleCallStore((s) => s.setSelectedCampaignKey)
 
+  // Phân quyền quản trị Admin & Cấu hình chi nhánh bổ sung ngoài chiến dịch
+  const isAdmin = determinePhanQuyen(user) === 'admin'
+  const { data: customBranchConfigFile } = useCustomBranchConfig()
+  const customBranches = useMemo(
+    () => customBranchConfigFile?.branches || [],
+    [customBranchConfigFile?.branches],
+  )
+  const [isCustomBranchesModalOpen, setIsCustomBranchesModalOpen] = useState(false)
+
+  // Danh sách chiến dịch đầy đủ: Gộp chiến dịch API + Chiến dịch/Chi nhánh bổ sung do Admin cấu hình
+  const campaignsList = useMemo(() => {
+    const list: CampaignDto[] = [...rawCampaigns]
+    customBranches
+      .filter((b) => b.is_active)
+      .forEach((b) => {
+        const isExist = list.some(
+          (c) =>
+            Number(c.branch_id) === Number(b.branch_id) &&
+            (c.source_erp || 'locnuoc365') === (b.source_erp || 'locnuoc365'),
+        )
+        if (!isExist) {
+          list.push({
+            campaign_id: b.campaign_id ? Number(b.campaign_id) : Number(b.branch_id),
+            name: b.name || b.branch_name, // Tên chiến dịch hiển thị trên dropdown
+            branch_id: Number(b.branch_id),
+            branch_name: b.branch_name, // Tên chi nhánh hiển thị ở Cột 1 và Cột 3
+            source_erp: b.source_erp,
+          })
+        }
+      })
+    return list
+  }, [rawCampaigns, customBranches])
+
   const getCampaignKey = (c: { campaign_id: number; source_erp?: string }) =>
     `${c.source_erp || 'locnuoc365'}_${c.campaign_id}`
 
-  // Ưu tiên chọn chiến dịch Hà Nội làm mặc định khi danh sách tải xong nếu chưa có chiến dịch nào được chọn
+  // Khởi tạo chiến dịch mặc định ban đầu: CHỈ chọn từ chiến dịch chuẩn API (rawCampaigns), ưu tiên Hà Nội, tuyệt đối không tự ý lấy chi nhánh bổ sung của Admin
+  const hasInitializedDefaultCampaignRef = useRef(false)
   useEffect(() => {
-    if (campaignsList.length > 0 && !selectedCampaignKey && !selectedCampaignId) {
-      const hanoiCampaign = campaignsList.find((c) => {
-        const name = (c.name || '').toLowerCase()
-        const branchName = (c.branch_name || '').toLowerCase()
-        return (
-          name.includes('hà nội') ||
-          name.includes('ha noi') ||
-          branchName.includes('hà nội') ||
-          branchName.includes('ha noi') ||
-          branchName.includes('đại kim') ||
-          branchName.includes('dai kim')
-        )
-      })
+    if (rawCampaigns.length === 0) return
 
-      const targetCamp = hanoiCampaign || campaignsList[0]
-      setSelectedCampaignKey(getCampaignKey(targetCamp))
-      setSelectedCampaignId(targetCamp.campaign_id)
+    if (!hasInitializedDefaultCampaignRef.current) {
+      hasInitializedDefaultCampaignRef.current = true
+
+      // Kiểm tra xem chiến dịch đang lưu có phải là 1 chiến dịch chuẩn trong rawCampaigns không
+      const isCurrentInRaw = selectedCampaignKey
+        ? rawCampaigns.some((c) => getCampaignKey(c) === selectedCampaignKey)
+        : false
+
+      // Nếu chưa có chiến dịch được chọn, hoặc đang bị lưu sai vào chi nhánh bổ sung của admin:
+      // Luôn khôi phục về chiến dịch chuẩn API ban đầu (ưu tiên Hà Nội / Chi nhánh Đại Kim, hoặc rawCampaigns[0])
+      if (!selectedCampaignKey || !isCurrentInRaw) {
+        const hanoiCampaign = rawCampaigns.find((c) => {
+          const name = (c.name || '').toLowerCase()
+          const branchName = (c.branch_name || '').toLowerCase()
+          return (
+            name.includes('hà nội') ||
+            name.includes('ha noi') ||
+            branchName.includes('hà nội') ||
+            branchName.includes('ha noi') ||
+            branchName.includes('đại kim') ||
+            branchName.includes('dai kim')
+          )
+        })
+
+        const targetCamp = hanoiCampaign || rawCampaigns[0]
+        if (targetCamp) {
+          setSelectedCampaignKey(getCampaignKey(targetCamp))
+          setSelectedCampaignId(targetCamp.campaign_id)
+        }
+      }
     }
-  }, [campaignsList, selectedCampaignKey, selectedCampaignId, setSelectedCampaignKey, setSelectedCampaignId])
+  }, [rawCampaigns, selectedCampaignKey, setSelectedCampaignKey, setSelectedCampaignId])
 
   const selectedCampaign = useMemo(() => {
     if (selectedCampaignKey) {
@@ -105,16 +158,20 @@ export const Telesale: React.FC = () => {
       const match = campaignsList.find((c) => c.campaign_id === selectedCampaignId)
       if (match) return match
     }
-    return campaignsList[0]
-  }, [campaignsList, selectedCampaignKey, selectedCampaignId])
+    // Fallback: Ưu tiên chiến dịch gốc từ API (rawCampaigns), tuyệt đối không tự ý fallback vào chi nhánh bổ sung
+    return rawCampaigns[0] || undefined
+  }, [campaignsList, rawCampaigns, selectedCampaignKey, selectedCampaignId])
 
   // Nguồn ERP của chiến dịch đang chọn
   const currentErpSource: ErpSource = selectedCampaign?.source_erp || 'locnuoc365'
 
   // Trích xuất danh sách tất cả các chi nhánh khả dụng theo nguồn ERP của chiến dịch đang chọn
-  // Lọc theo currentErpSource để loại bỏ hoàn toàn việc chi nhánh trùng branch_id (ví dụ branch_id = 3) giữa LocNuoc365 và Zomzem ghi đè lẫn nhau
+  // 1. Lọc theo currentErpSource để loại bỏ hoàn toàn việc chi nhánh trùng branch_id (ví dụ branch_id = 3) giữa LocNuoc365 và Zomzem ghi đè lẫn nhau
+  // 2. Merge thêm các chi nhánh bổ sung ngoài chiến dịch do Admin cấu hình (customBranches) đang active và cùng nguồn currentErpSource
   const availableBranches = useMemo(() => {
     const map = new Map<number, { id: number; name: string; source_erp: ErpSource }>()
+    
+    // 1. Chi nhánh tự động trích xuất từ campaigns API của nguồn đang chọn
     campaignsList
       .filter((c) => (c.source_erp || 'locnuoc365') === currentErpSource)
       .forEach((c) => {
@@ -126,6 +183,20 @@ export const Telesale: React.FC = () => {
           })
         }
       })
+
+    // 2. Chi nhánh bổ sung ngoài chiến dịch do Admin cấu hình
+    customBranches
+      .filter((b) => b.is_active && b.source_erp === currentErpSource)
+      .forEach((b) => {
+        if (!map.has(b.branch_id)) {
+          map.set(b.branch_id, {
+            id: b.branch_id,
+            name: b.branch_name,
+            source_erp: currentErpSource,
+          })
+        }
+      })
+
     if (map.size === 0) {
       map.set(3, {
         id: 3,
@@ -134,7 +205,7 @@ export const Telesale: React.FC = () => {
       })
     }
     return Array.from(map.values())
-  }, [campaignsList, currentErpSource])
+  }, [campaignsList, currentErpSource, customBranches])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()
@@ -366,7 +437,21 @@ export const Telesale: React.FC = () => {
   // Không bao giờ reset hay nạp đè khi người dùng chỉ chuyển trang rồi quay lại
   const hasCheckedInitialFetchRef = useRef(false)
   useEffect(() => {
-    if (!selectedCampaign || hasCheckedInitialFetchRef.current) return
+    // Chỉ nạp khách ban đầu khi đã có selectedCampaign và danh sách chiến dịch API gốc (rawCampaigns) đã sẵn sàng
+    if (!selectedCampaign || rawCampaigns.length === 0 || hasCheckedInitialFetchRef.current) return
+
+    // Tuyệt đối không tự động nạp khách ban đầu cho chi nhánh bổ sung ngoài chiến dịch của Admin
+    const isCustomBranch = customBranches.some(
+      (b) =>
+        Number(b.branch_id) === Number(selectedCampaign.branch_id) &&
+        (b.source_erp || 'locnuoc365') === (selectedCampaign.source_erp || 'locnuoc365'),
+    )
+    const isRawCampaign = rawCampaigns.some(
+      (c) => getCampaignKey(c) === getCampaignKey(selectedCampaign),
+    )
+    if (!isRawCampaign && isCustomBranch) {
+      return
+    }
 
     const currentTabs = useTelesaleCallStore.getState().tabs
     const hasAnyCustomerOrCall =
@@ -379,7 +464,7 @@ export const Telesale: React.FC = () => {
     } else {
       hasCheckedInitialFetchRef.current = true
     }
-  }, [handleFetchCustomerForTab, selectedCampaign])
+  }, [handleFetchCustomerForTab, selectedCampaign, rawCampaigns, customBranches])
 
   // Xử lý chuyển chiến dịch chủ động từ người dùng (kèm Guard bảo vệ cuộc gọi)
   const handleCampaignChange = (newCampKey: string) => {
@@ -870,6 +955,48 @@ export const Telesale: React.FC = () => {
             )}
           </button>
 
+          {/* Nút Quản lý Chi nhánh Bổ sung dành riêng cho Admin */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsCustomBranchesModalOpen(true)}
+              style={{
+                height: '36px',
+                padding: '0 13px',
+                borderRadius: '8px',
+                border: '1.5px solid #fed7aa',
+                background: '#fff7ed',
+                color: '#c2410c',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+              }}
+              title="Cấu hình danh sách chi nhánh bổ sung ngoài chiến dịch (Dành riêng cho Admin)"
+            >
+              <Building2 size={15} />
+              <span>Chi nhánh bổ sung</span>
+              {customBranches.filter((b) => b.is_active).length > 0 && (
+                <span
+                  style={{
+                    background: '#ea580c',
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    padding: '1px 7px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {customBranches.filter((b) => b.is_active).length}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             className="help"
             type="button"
@@ -1039,6 +1166,15 @@ export const Telesale: React.FC = () => {
         isOpen={isCallLogsDrawerOpen}
         onClose={() => setIsCallLogsDrawerOpen(false)}
       />
+
+      {/* Modal quản lý chi nhánh bổ sung ngoài chiến dịch (Chỉ dành cho Admin) */}
+      {isAdmin && (
+        <CustomBranchesModal
+          isOpen={isCustomBranchesModalOpen}
+          onClose={() => setIsCustomBranchesModalOpen(false)}
+          campaigns={rawCampaigns}
+        />
+      )}
     </div>
   )
 }

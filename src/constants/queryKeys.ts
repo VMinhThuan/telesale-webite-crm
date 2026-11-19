@@ -83,6 +83,12 @@ export const queryKeys = {
     all: ['userRoleConfig'] as const,
     config: () => [...queryKeys.userRoleConfig.all, 'config'] as const,
   },
+
+  // 10. Cấu hình chi nhánh bổ sung ngoài chiến dịch (Cloudflare R2)
+  customBranchConfig: {
+    all: ['customBranchConfig'] as const,
+    config: () => [...queryKeys.customBranchConfig.all, 'config'] as const,
+  },
 } as const
 
 export default queryKeys

@@ -73,6 +73,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   selectedCampaignName,
   branchId,
   branchName,
+  availableBranches,
   onBranchChange,
   orderDate,
   onOrderDateChange,
