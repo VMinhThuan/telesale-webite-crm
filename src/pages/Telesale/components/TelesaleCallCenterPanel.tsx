@@ -28,6 +28,7 @@ import { ParsedCallTermination } from '../../../utils/sipCallParser'
 import { TelesaleScriptEditModal } from './TelesaleScriptEditModal'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { determinePhanQuyen } from '../../../services/auth.service'
+import { useTelesaleCallStore } from '../../../store/useTelesaleCallStore'
 
 export interface TelesaleCallTab {
   id: number
@@ -52,7 +53,11 @@ export interface TelesaleCallCenterPanelProps {
   onToggleMute: () => void
   onToggleHold: () => void
   onEndCall: () => void
-  onFetchCustomerForTab: (tabId: number) => void
+  onFetchCustomerForTab: (
+    tabId: number,
+    campaignOverride?: any,
+    options?: { autoDial?: boolean },
+  ) => void | Promise<any>
   isFetchingCustomer: boolean
   isDialing?: boolean
   // Trạng thái SIP Softphone tổng đài
@@ -91,6 +96,7 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
   // Lấy tab đang active
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
   const currentCustomer = activeTab?.customer
+  const isAutoDialEnabled = useTelesaleCallStore((s) => s.isAutoDialEnabled)
 
   // Phân quyền: Chỉ admin mới có quyền chỉnh sửa kịch bản tư vấn
   const user = useAuthStore((s) => s.user)
@@ -860,8 +866,8 @@ export const TelesaleCallCenterPanel: React.FC<TelesaleCallCenterPanelProps> = (
                         <button
                           type="button"
                           disabled={isFetchingCustomer || isDialing}
-                          onClick={() => onFetchCustomerForTab(activeTab.id)}
-                          title="Chuyển sang khách hàng tiếp theo trong chiến dịch cho tab này"
+                          onClick={() => onFetchCustomerForTab(activeTab.id, undefined, { autoDial: isAutoDialEnabled })}
+                          title="Chuyển sang khách hàng tiếp theo trong chiến dịch và tự động gọi nếu bật 'Tự động chuyển khách'"
                           style={{
                             padding: '8px 16px',
                             borderRadius: '6px',

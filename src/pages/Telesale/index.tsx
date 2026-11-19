@@ -216,7 +216,11 @@ export const Telesale: React.FC = () => {
 
   // Hàm nạp khách hàng từ chiến dịch vào một Tab cụ thể
   const handleFetchCustomerForTab = React.useCallback(
-    async (targetTabId: number, campaignOverride?: any) => {
+    async (
+      targetTabId: number,
+      campaignOverride?: any,
+      options?: { autoDial?: boolean },
+    ) => {
       let activeCamp: any = selectedCampaign
       if (campaignOverride && typeof campaignOverride === 'object') {
         activeCamp = campaignOverride
@@ -245,6 +249,9 @@ export const Telesale: React.FC = () => {
         )
         return
       }
+
+      // Đảm bảo gác máy triệt để trên SIP nếu line này còn session sót lại từ cuộc gọi trước
+      sipService.hangup(targetTabId)
 
       // Clear trạng thái lỗi cũ trước khi lấy khách mới cho tab này
       setTabs((prev) =>
@@ -303,6 +310,34 @@ export const Telesale: React.FC = () => {
         )
 
         notify(`Đã nạp khách hàng cho Số ${targetTabId}: ${nextCust.customer_name}`, { type: 'success' })
+
+        // 3. Nếu bật chế độ tự động gọi (autoDial) và nạp thành công khách mới: Tự động kết nối cuộc gọi luôn
+        if (options?.autoDial && nextCust) {
+          // Trì hoãn 450ms để giải phóng session SIP cũ và UI render xong thông tin khách mới
+          setTimeout(async () => {
+            const currentTab = useTelesaleCallStore.getState().tabs.find((t) => t.id === targetTabId)
+            // Đảm bảo tab vẫn ở trạng thái rảnh rỗi (idle)
+            if (currentTab && currentTab.status === 'idle') {
+              const targetMemberId =
+                currentTab.selectedMemberId ||
+                nextCust.members?.[0]?.member_id
+
+              notify(`Đang tự động kết nối cuộc gọi tới: ${nextCust.customer_name}...`, {
+                type: 'info',
+              })
+
+              await makeCall({
+                customerId: nextCust.customer_id,
+                customerName: nextCust.customer_name,
+                memberId: targetMemberId,
+                lineId: targetTabId,
+                customer: nextCust,
+                isTelesale: true,
+              })
+            }
+          }, 450)
+        }
+
         return nextCust
       } catch (err: any) {
         const errorMsg =
@@ -324,7 +359,7 @@ export const Telesale: React.FC = () => {
         return null
       }
     },
-    [nextCustomerMutation, selectedCampaign, campaignsList, setTabs, orderDate],
+    [nextCustomerMutation, selectedCampaign, campaignsList, setTabs, orderDate, makeCall],
   )
 
   // Khởi tạo nạp khách hàng ban đầu cho Tab 1 DUY NHẤT 1 LẦN khi hệ thống chưa có khách trên bất kỳ tab nào
@@ -492,39 +527,12 @@ export const Telesale: React.FC = () => {
         }),
       )
 
-      // 2. Tự động nạp khách hàng tiếp theo vào chính tab vừa lưu
+      // 2. Tự động nạp khách hàng tiếp theo vào chính tab vừa lưu (kèm cờ autoDial)
       setTimeout(async () => {
-        const nextCust = await handleFetchCustomerForTab(activeTabId)
-
-        // 3. Nếu là luồng tự động chuyển khách và nạp thành công khách mới: Tự động kết nối cuộc gọi luôn
-        if (options?.autoDial && nextCust) {
-          // Trì hoãn 400ms để phiên SIP cũ giải phóng hoàn toàn và UI render xong khách mới
-          setTimeout(async () => {
-            const currentTab = useTelesaleCallStore.getState().tabs.find((t) => t.id === activeTabId)
-            // Đảm bảo tab vẫn ở trạng thái idle
-            if (currentTab && currentTab.status === 'idle') {
-              const targetMemberId =
-                currentTab.selectedMemberId ||
-                nextCust.members?.[0]?.member_id
-
-              notify(`Đang tự động kết nối cuộc gọi tới: ${nextCust.customer_name}...`, {
-                type: 'info',
-              })
-
-              await makeCall({
-                customerId: nextCust.customer_id,
-                customerName: nextCust.customer_name,
-                memberId: targetMemberId,
-                lineId: activeTabId,
-                customer: nextCust,
-                isTelesale: true,
-              })
-            }
-          }, 400)
-        }
+        await handleFetchCustomerForTab(activeTabId, undefined, { autoDial: options?.autoDial })
       }, 400)
     },
-    [activeTabId, orderDate, setTabs, handleFetchCustomerForTab, makeCall],
+    [activeTabId, orderDate, setTabs, handleFetchCustomerForTab],
   )
 
   // Chuyển quyền tổng đài SIP sang tab hiện tại thông qua cơ chế Two-Phase Safe Handoff

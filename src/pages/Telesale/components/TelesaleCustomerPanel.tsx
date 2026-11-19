@@ -118,8 +118,9 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   const [callbackTime, setCallbackTime] = useState('14:30')
   const [note, setNote] = useState('')
 
-  // Chế độ tự động lưu kết quả & nạp khách mới khi khách không nghe máy / thuê bao / lỗi số
-  const [autoNextOnNoAnswer, setAutoNextOnNoAnswer] = useState(true)
+  // Chế độ tự động chuyển khách & tự động gọi (Master Switch đồng bộ toàn hệ thống & persist localStorage)
+  const isAutoDialEnabled = useTelesaleCallStore((s) => s.isAutoDialEnabled)
+  const setIsAutoDialEnabled = useTelesaleCallStore((s) => s.setIsAutoDialEnabled)
   const [autoNextCountdown, setAutoNextCountdown] = useState<number | null>(null)
   const autoNextTimerRef = useRef<any>(null)
   const lastAutoHandledCallRef = useRef<string | null>(null)
@@ -130,7 +131,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       autoNextTimerRef.current = null
     }
     setAutoNextCountdown(null)
-    notify('Đã dừng tự động chuyển khách.', { type: 'info' })
+    notify('Đã dừng tự động chuyển khách cho cuộc gọi này.', { type: 'info' })
   }
 
   // Cây lý do từ chối 3 tầng & Nỗi đau KH
@@ -243,7 +244,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       return
     }
 
-    if (!autoNextOnNoAnswer || !currentCustomer || activeTabStatus !== 'ended') {
+    if (!isAutoDialEnabled || !currentCustomer || activeTabStatus !== 'ended') {
       if (autoNextTimerRef.current) {
         clearInterval(autoNextTimerRef.current)
         autoNextTimerRef.current = null
@@ -311,7 +312,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
           notify(`Cuộc gọi (${label}) - Đã tự động lưu & chuyển khách tiếp theo.`, {
             type: 'success',
           })
-          onSaveResultSuccessRef.current({ autoDial: true })
+          onSaveResultSuccessRef.current({ autoDial: isAutoDialEnabled })
         } catch (err: any) {
           notify(err?.message || 'Lỗi khi tự động lưu kết quả cuộc gọi.', {
             type: 'warning',
@@ -331,7 +332,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     activeTabTerminationInfo?.code,
     activeTabTerminationInfo?.sipStatusCode,
     activeTabTerminationInfo?.isNormalEnd,
-    autoNextOnNoAnswer,
+    isAutoDialEnabled,
     currentCustomer?.customer_id,
     activeTabId,
     source_erp,
@@ -593,8 +594,8 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       // Làm mới key sau khi lưu thành công
       currentOrderKeyRef.current = generateIdempotencyKey()
 
-      // Gọi callback để thông báo hoàn thành
-      onSaveResultSuccess()
+      // Gọi callback để thông báo hoàn thành (kèm cờ autoDial theo Master Switch)
+      onSaveResultSuccess({ autoDial: isAutoDialEnabled })
     } catch (err: any) {
       if (err?.status === 409) {
         notify('Yêu cầu chốt đơn đang được hệ thống xử lý hoặc khách hàng đang có đơn chưa hoàn tất.')
@@ -757,12 +758,12 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
                 cursor: 'pointer',
                 userSelect: 'none',
               }}
-              title="Tự động lưu 'Không nghe máy' và nạp khách mới khi cuộc gọi không kết nối"
+              title="Tự động nạp khách mới & tự động gọi khi lưu kết quả hoặc đổi khách"
             >
               <input
                 type="checkbox"
-                checked={autoNextOnNoAnswer}
-                onChange={(e) => setAutoNextOnNoAnswer(e.target.checked)}
+                checked={isAutoDialEnabled}
+                onChange={(e) => setIsAutoDialEnabled(e.target.checked)}
                 style={{ cursor: 'pointer' }}
               />
               <span>Tự động chuyển khách</span>

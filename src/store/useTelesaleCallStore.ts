@@ -94,17 +94,28 @@ const initialTabs: TelesaleCallTab[] = [
   },
 ]
 
+const getInitialAutoDial = (): boolean => {
+  try {
+    const saved = localStorage.getItem('telesale_auto_dial')
+    return saved !== null ? saved === 'true' : true
+  } catch {
+    return true
+  }
+}
+
 interface TelesaleCallState {
   tabs: TelesaleCallTab[]
   activeTabId: number
   selectedCampaignId: number | null
   selectedCampaignKey: string | null
   drafts: Record<number, TelesaleDraftResult>
+  isAutoDialEnabled: boolean
 
   // Actions
   setActiveTabId: (id: number) => void
   setSelectedCampaignId: (campaignId: number | null) => void
   setSelectedCampaignKey: (key: string | null) => void
+  setIsAutoDialEnabled: (enabled: boolean) => void
   setTabs: (
     tabsOrUpdater:
       | TelesaleCallTab[]
@@ -128,10 +139,19 @@ export const useTelesaleCallStore = create<TelesaleCallState>((set, get) => ({
     2: createDefaultDraftResult(),
     3: createDefaultDraftResult(),
   },
+  isAutoDialEnabled: getInitialAutoDial(),
 
   setActiveTabId: (id: number) => set({ activeTabId: id }),
   setSelectedCampaignId: (id: number | null) => set({ selectedCampaignId: id }),
   setSelectedCampaignKey: (key: string | null) => set({ selectedCampaignKey: key }),
+  setIsAutoDialEnabled: (enabled: boolean) => {
+    try {
+      localStorage.setItem('telesale_auto_dial', String(enabled))
+    } catch {
+      // Bỏ qua lỗi trình duyệt nếu localStorage bị block
+    }
+    set({ isAutoDialEnabled: enabled })
+  },
 
   setTabs: (tabsOrUpdater) =>
     set((state) => ({
