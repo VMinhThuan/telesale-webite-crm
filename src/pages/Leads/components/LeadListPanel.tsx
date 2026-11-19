@@ -28,6 +28,7 @@ import { CareStatusType, CustomerDto, ErpSource } from '../../../types/api'
 import { formatDateTime } from '../../../utils/formatters'
 import customerService from '../../../services/customer.service'
 import dayjs from '../../../lib/dayjs'
+import { LeadRowNote } from './LeadRowNote'
 
 export const CARE_STATUS_OPTIONS: {
   value: 'all' | CareStatusType
@@ -718,15 +719,16 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
               <th>Khách hàng</th>
               <th>Liên hệ gần nhất</th>
               <th>Lịch chăm sóc</th>
+              <th style={{ minWidth: '160px' }}>Ghi chú</th>
               <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
             {isLoadingList ? (
-              <TableSkeleton rows={PAGE_SIZE} cols={4} />
+              <TableSkeleton rows={PAGE_SIZE} cols={5} />
             ) : isErrorList ? (
               <ErrorState
-                colSpan={4}
+                colSpan={5}
                 message="Không thể kết nối đến máy chủ ERP."
                 onRetry={refetchList}
               />
@@ -768,6 +770,13 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
                     </td>
                     <td>{formatDateTime(lead.last_contact_at)}</td>
                     <td>{formatDateTime(lead.next_care_at)}</td>
+                    <td style={{ whiteSpace: 'normal', minWidth: '160px', maxWidth: '300px' }}>
+                      <LeadRowNote
+                        customerId={lead.customer_id}
+                        sourceErp={lead.source_erp}
+                        fallbackNote={lead.note}
+                      />
+                    </td>
                     <td>
                       <span className={clsx('lead-status', tone)}>
                         {lead.care_status === 'closed' ? (
@@ -789,7 +798,7 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
               })
             ) : (
               <EmptyState
-                colSpan={4}
+                colSpan={5}
                 title="Không tìm thấy khách hàng"
                 description="Không có khách hàng nào phù hợp với bộ lọc hoặc từ khóa tìm kiếm."
                 actionText="Xóa bộ lọc tìm kiếm"

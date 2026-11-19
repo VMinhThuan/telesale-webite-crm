@@ -16,9 +16,10 @@ import { LeadTimelinePanel, HISTORY_TYPE_OPTIONS } from './components/LeadTimeli
 import { LeadDetailAndCarePanel, careOutcomes } from './components/LeadDetailAndCarePanel'
 import { LeadMediaPanel } from './components/LeadMediaPanel'
 import { LeadSlotBar } from './components/LeadSlotBar'
+import { LeadRowNote } from './components/LeadRowNote'
 
 // Re-export constants để đảm bảo tương thích ngược 100%
-export { CARE_STATUS_OPTIONS, DATE_PRESET_OPTIONS, HISTORY_TYPE_OPTIONS, careOutcomes, LeadSlotBar }
+export { CARE_STATUS_OPTIONS, DATE_PRESET_OPTIONS, HISTORY_TYPE_OPTIONS, careOutcomes, LeadSlotBar, LeadRowNote }
 
 export interface LeadsProps {
   onOpenDialog?: (dialog: DialogState) => void

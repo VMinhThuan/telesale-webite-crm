@@ -107,6 +107,7 @@ export interface CustomerDto {
   next_care_at?: string
   user_id?: number
   source_erp?: ErpSource
+  note?: string
 }
 
 export interface CustomerDetailDto extends CustomerDto {
