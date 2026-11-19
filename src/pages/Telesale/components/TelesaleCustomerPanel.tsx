@@ -64,7 +64,7 @@ export interface TelesaleCustomerPanelProps {
   activeTabStatus?: string
   onFetchNextCustomer?: () => void
   onCustomerUpdate?: (updatedCustomer: NextCustomerDto) => void
-  onSaveResultSuccess: () => void
+  onSaveResultSuccess: (options?: { autoDial?: boolean }) => void
   source_erp?: ErpSource
 }
 
@@ -102,6 +102,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
   } = useEnums()
 
   const saveCallResultMutation = useSaveCallResultMutation()
+  const saveCallResultMutationRef = useRef(saveCallResultMutation)
+  saveCallResultMutationRef.current = saveCallResultMutation
+
+  const onSaveResultSuccessRef = useRef(onSaveResultSuccess)
+  onSaveResultSuccessRef.current = onSaveResultSuccess
 
   // Khóa chống double-click tức thời và quản lý Idempotency-Key
   const isSubmittingResultRef = useRef(false)
@@ -125,7 +130,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       autoNextTimerRef.current = null
     }
     setAutoNextCountdown(null)
-    notify('Đã dừng tự động chuyển khách.')
+    notify('Đã dừng tự động chuyển khách.', { type: 'info' })
   }
 
   // Cây lý do từ chối 3 tầng & Nỗi đau KH
@@ -239,6 +244,11 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     }
 
     if (!autoNextOnNoAnswer || !currentCustomer || activeTabStatus !== 'ended') {
+      if (autoNextTimerRef.current) {
+        clearInterval(autoNextTimerRef.current)
+        autoNextTimerRef.current = null
+      }
+      setAutoNextCountdown(null)
       return
     }
 
@@ -267,6 +277,10 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
       clearInterval(autoNextTimerRef.current)
     }
 
+    const terminationSnapshot = activeTabTerminationInfo
+    const customerSnapshot = currentCustomer
+    const currentErp = currentCustomer.source_erp || source_erp
+
     autoNextTimerRef.current = setInterval(async () => {
       timeLeft -= 1
       if (timeLeft > 0) {
@@ -278,26 +292,30 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
 
         try {
           const autoResult =
-            activeTabTerminationInfo.suggestedOutcome === 'wrong_number'
+            terminationSnapshot.suggestedOutcome === 'wrong_number'
               ? 'wrong_number'
               : 'no_answer'
-          const label = activeTabTerminationInfo.shortLabel || 'Không nghe máy'
+          const label = terminationSnapshot.shortLabel || 'Không nghe máy'
 
-          await saveCallResultMutation.mutateAsync({
-            customerId: currentCustomer.customer_id,
+          await saveCallResultMutationRef.current.mutateAsync({
+            customerId: customerSnapshot.customer_id,
             payload: {
               result: autoResult,
               note: `Hệ thống tự động ghi nhận: ${label}`,
             },
             idempotencyKey: currentOrderKeyRef.current,
-            source_erp: currentCustomer.source_erp || source_erp,
+            source_erp: currentErp,
           })
 
           currentOrderKeyRef.current = generateIdempotencyKey()
-          notify(`Cuộc gọi không nghe máy (${label}) - Đã tự động lưu & nạp khách tiếp theo.`)
-          onSaveResultSuccess()
+          notify(`Cuộc gọi (${label}) - Đã tự động lưu & chuyển khách tiếp theo.`, {
+            type: 'success',
+          })
+          onSaveResultSuccessRef.current({ autoDial: true })
         } catch (err: any) {
-          notify(err?.message || 'Lỗi khi tự động lưu kết quả cuộc gọi.')
+          notify(err?.message || 'Lỗi khi tự động lưu kết quả cuộc gọi.', {
+            type: 'warning',
+          })
         }
       }
     }, 1000)
@@ -310,12 +328,13 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
     }
   }, [
     activeTabStatus,
-    activeTabTerminationInfo,
+    activeTabTerminationInfo?.code,
+    activeTabTerminationInfo?.sipStatusCode,
+    activeTabTerminationInfo?.isNormalEnd,
     autoNextOnNoAnswer,
-    currentCustomer,
+    currentCustomer?.customer_id,
     activeTabId,
-    saveCallResultMutation,
-    onSaveResultSuccess,
+    source_erp,
   ])
 
   // 2. Tự động lưu mọi thay đổi form vào bản nháp của activeTabId trong Store
@@ -768,7 +787,7 @@ export const TelesaleCustomerPanel: React.FC<TelesaleCustomerPanelProps> = ({
             }}
           >
             <span>
-              ⚡ <b>Không kết nối:</b> Tự động lưu & nạp khách mới sau <b>{autoNextCountdown}s</b>...
+              ⚡ <b>Không kết nối:</b> Tự động lưu & gọi khách mới sau <b>{autoNextCountdown}s</b>...
             </span>
             <button
               type="button"
