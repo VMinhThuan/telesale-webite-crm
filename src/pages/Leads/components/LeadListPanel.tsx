@@ -321,9 +321,10 @@ export const LeadListPanel: React.FC<LeadListPanelProps> = ({
               </button>
               {availableBranches.map((b) => {
                 const isSelected = currentBranchId === b.id
+                const branchKey = (b as any).key || `${b.source_erp || 'locnuoc365'}_${b.id}`
                 return (
                   <button
-                    key={b.id}
+                    key={branchKey}
                     type="button"
                     onClick={() => {
                       handleBranchSelect(b.id)

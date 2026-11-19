@@ -32,6 +32,7 @@ export function useSaveCustomBranchConfigMutation() {
     onSuccess: (savedConfig) => {
       queryClient.setQueryData(queryKeys.customBranchConfig.config(), savedConfig)
       queryClient.invalidateQueries({ queryKey: queryKeys.customBranchConfig.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.telesale.campaigns() })
       notify('Đã cập nhật danh sách chi nhánh bổ sung thành công!', { type: 'success' })
     },
     onError: (err: any) => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { telesaleService } from './telesale.service'
-import apiClient from './apiClient'
+import apiClient, { apiClientZomzem } from './apiClient'
+import customBranchConfigService from './customBranchConfig.service'
 
 vi.mock('./apiClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./apiClient')>()
@@ -19,6 +20,120 @@ vi.mock('./apiClient', async (importOriginal) => {
       get: vi.fn(),
     })),
   }
+})
+
+vi.mock('./customBranchConfig.service', () => ({
+  default: {
+    getConfig: vi.fn(),
+  },
+}))
+
+describe('telesaleService.getCampaigns', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('gộp chiến dịch từ LocNuoc365, Zomzem và các chi nhánh bổ sung active của Admin', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      result: {
+        items: [
+          { campaign_id: 1, name: 'Hà Nội', branch_id: 3, branch_name: 'Chi Nhánh Đại Kim' },
+        ],
+      },
+    })
+    vi.mocked(apiClientZomzem.get).mockResolvedValueOnce({
+      result: {
+        items: [
+          { campaign_id: 2, name: 'Sài Gòn', branch_id: 20, branch_name: 'Chi Nhánh Q1' },
+        ],
+      },
+    })
+    vi.mocked(customBranchConfigService.getConfig).mockResolvedValueOnce({
+      version: '1.0',
+      updatedAt: '2026-11-20T00:00:00Z',
+      branches: [
+        {
+          id: 'b-104',
+          name: 'Lào Xao',
+          branch_id: 104,
+          branch_name: 'An Phước',
+          source_erp: 'locnuoc365',
+          is_active: true,
+        },
+        {
+          id: 'b-999',
+          name: 'Tạm ẩn',
+          branch_id: 999,
+          branch_name: 'Chi Nhánh Ẩn',
+          source_erp: 'locnuoc365',
+          is_active: false,
+        },
+      ],
+    })
+
+    const res = await telesaleService.getCampaigns()
+
+    expect(res.items).toHaveLength(3)
+    // 1. LocNuoc365 item
+    expect(res.items[0]).toEqual({
+      campaign_id: 1,
+      name: 'Hà Nội',
+      branch_id: 3,
+      branch_name: 'Chi Nhánh Đại Kim',
+      source_erp: 'locnuoc365',
+      is_custom: false,
+    })
+    // 2. Zomzem item
+    expect(res.items[1]).toEqual({
+      campaign_id: 2,
+      name: 'Sài Gòn',
+      branch_id: 20,
+      branch_name: 'Chi Nhánh Q1',
+      source_erp: 'zomzem',
+      is_custom: false,
+    })
+    // 3. Active Custom Branch (b-104)
+    expect(res.items[2]).toEqual({
+      campaign_id: 104,
+      name: 'Lào Xao',
+      branch_id: 104,
+      branch_name: 'An Phước',
+      source_erp: 'locnuoc365',
+      is_custom: true,
+    })
+  })
+
+  it('không thêm trùng chi nhánh nếu branch_id và source_erp đã tồn tại trong API campaigns', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      result: {
+        items: [
+          { campaign_id: 1, name: 'Hà Nội', branch_id: 3, branch_name: 'Chi Nhánh Đại Kim' },
+        ],
+      },
+    })
+    vi.mocked(apiClientZomzem.get).mockResolvedValueOnce({
+      result: { items: [] },
+    })
+    vi.mocked(customBranchConfigService.getConfig).mockResolvedValueOnce({
+      version: '1.0',
+      updatedAt: '2026-11-20T00:00:00Z',
+      branches: [
+        {
+          id: 'b-dup',
+          name: 'Đại Kim duplicate',
+          branch_id: 3,
+          branch_name: 'Chi Nhánh Đại Kim',
+          source_erp: 'locnuoc365',
+          is_active: true,
+        },
+      ],
+    })
+
+    const res = await telesaleService.getCampaigns()
+    expect(res.items).toHaveLength(1)
+    expect(res.items[0].branch_id).toBe(3)
+    expect(res.items[0].is_custom).toBe(false)
+  })
 })
 
 describe('telesaleService.getNextCustomer', () => {

@@ -69,7 +69,13 @@ export const Telesale: React.FC = () => {
 
   // 1. Quản lý danh sách chiến dịch đàm thoại từ cả 2 hệ thống ERP
   const { data: campaignsData, isLoading: isLoadingCampaigns } = useCampaigns()
-  const rawCampaigns = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
+  // Danh sách chiến dịch đầy đủ: tự động gộp chiến dịch API + Chiến dịch/Chi nhánh bổ sung do Admin cấu hình từ useCampaigns
+  const campaignsList = useMemo(() => campaignsData?.items || [], [campaignsData?.items])
+  // Danh sách chiến dịch chuẩn từ ERP (loại trừ chi nhánh bổ sung) để phục vụ khởi tạo mặc định ban đầu và kiểm tra trùng lặp
+  const rawCampaigns = useMemo(
+    () => (campaignsData?.items || []).filter((c) => !c.is_custom),
+    [campaignsData?.items],
+  )
   const selectedCampaignId = useTelesaleCallStore((s) => s.selectedCampaignId)
   const setSelectedCampaignId = useTelesaleCallStore((s) => s.setSelectedCampaignId)
   const selectedCampaignKey = useTelesaleCallStore((s) => s.selectedCampaignKey)
@@ -83,30 +89,6 @@ export const Telesale: React.FC = () => {
     [customBranchConfigFile?.branches],
   )
   const [isCustomBranchesModalOpen, setIsCustomBranchesModalOpen] = useState(false)
-
-  // Danh sách chiến dịch đầy đủ: Gộp chiến dịch API + Chiến dịch/Chi nhánh bổ sung do Admin cấu hình
-  const campaignsList = useMemo(() => {
-    const list: CampaignDto[] = [...rawCampaigns]
-    customBranches
-      .filter((b) => b.is_active)
-      .forEach((b) => {
-        const isExist = list.some(
-          (c) =>
-            Number(c.branch_id) === Number(b.branch_id) &&
-            (c.source_erp || 'locnuoc365') === (b.source_erp || 'locnuoc365'),
-        )
-        if (!isExist) {
-          list.push({
-            campaign_id: b.campaign_id ? Number(b.campaign_id) : Number(b.branch_id),
-            name: b.name || b.branch_name, // Tên chiến dịch hiển thị trên dropdown
-            branch_id: Number(b.branch_id),
-            branch_name: b.branch_name, // Tên chi nhánh hiển thị ở Cột 1 và Cột 3
-            source_erp: b.source_erp,
-          })
-        }
-      })
-    return list
-  }, [rawCampaigns, customBranches])
 
   const getCampaignKey = (c: { campaign_id: number; source_erp?: string }) =>
     `${c.source_erp || 'locnuoc365'}_${c.campaign_id}`
@@ -166,12 +148,11 @@ export const Telesale: React.FC = () => {
   const currentErpSource: ErpSource = selectedCampaign?.source_erp || 'locnuoc365'
 
   // Trích xuất danh sách tất cả các chi nhánh khả dụng theo nguồn ERP của chiến dịch đang chọn
-  // 1. Lọc theo currentErpSource để loại bỏ hoàn toàn việc chi nhánh trùng branch_id (ví dụ branch_id = 3) giữa LocNuoc365 và Zomzem ghi đè lẫn nhau
-  // 2. Merge thêm các chi nhánh bổ sung ngoài chiến dịch do Admin cấu hình (customBranches) đang active và cùng nguồn currentErpSource
+  // (campaignsList đã tự động gộp chiến dịch API và chi nhánh bổ sung của Admin từ useCampaigns)
   const availableBranches = useMemo(() => {
     const map = new Map<number, { id: number; name: string; source_erp: ErpSource }>()
     
-    // 1. Chi nhánh tự động trích xuất từ campaigns API của nguồn đang chọn
+    // Chi nhánh tự động trích xuất từ campaignsList của nguồn đang chọn
     campaignsList
       .filter((c) => (c.source_erp || 'locnuoc365') === currentErpSource)
       .forEach((c) => {
@@ -179,19 +160,6 @@ export const Telesale: React.FC = () => {
           map.set(c.branch_id, {
             id: c.branch_id,
             name: c.branch_name,
-            source_erp: currentErpSource,
-          })
-        }
-      })
-
-    // 2. Chi nhánh bổ sung ngoài chiến dịch do Admin cấu hình
-    customBranches
-      .filter((b) => b.is_active && b.source_erp === currentErpSource)
-      .forEach((b) => {
-        if (!map.has(b.branch_id)) {
-          map.set(b.branch_id, {
-            id: b.branch_id,
-            name: b.branch_name,
             source_erp: currentErpSource,
           })
         }
@@ -205,7 +173,7 @@ export const Telesale: React.FC = () => {
       })
     }
     return Array.from(map.values())
-  }, [campaignsList, currentErpSource, customBranches])
+  }, [campaignsList, currentErpSource])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()

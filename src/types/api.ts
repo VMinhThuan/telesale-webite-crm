@@ -220,6 +220,7 @@ export interface CampaignDto {
   branch_id: number
   branch_name: string
   source_erp?: ErpSource
+  is_custom?: boolean
 }
 
 export interface CampaignsResponse {

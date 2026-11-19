@@ -13,6 +13,7 @@ import {
   SaveCallResultResponse,
 } from '../types/api'
 import apiClient, { AppApiError, apiClientZomzem, generateIdempotencyKey, getApiClient } from './apiClient'
+import customBranchConfigService from './customBranchConfig.service'
 
 export interface GetNextCustomerPayload {
   campaign_id: number
@@ -83,11 +84,13 @@ export const telesaleService = {
 
   /**
    * Lấy danh sách chiến dịch đang hoạt động từ cả 2 hệ thống ERP (LocNuoc365 & Zomzem)
+   * và tự động gộp các chi nhánh bổ sung do Admin cấu hình (Cloudflare R2 / LocalStorage)
    */
   async getCampaigns(): Promise<CampaignsResponse> {
-    const [ln365Settled, zomzemSettled] = await Promise.allSettled([
+    const [ln365Settled, zomzemSettled, customConfigSettled] = await Promise.allSettled([
       apiClient.get<any, { result: CampaignsResponse }>(API_ENDPOINTS.CAMPAIGNS),
       apiClientZomzem.get<any, { result: CampaignsResponse }>(API_ENDPOINTS.CAMPAIGNS),
+      customBranchConfigService.getConfig(),
     ])
 
     let ln365Items: CampaignDto[] = []
@@ -97,6 +100,7 @@ export const telesaleService = {
       ln365Items = list.map((c: any) => ({
         ...c,
         source_erp: 'locnuoc365' as ErpSource,
+        is_custom: false,
       }))
     } else {
       console.warn('[LN365] Lỗi lấy danh sách chiến dịch:', ln365Settled.reason)
@@ -109,12 +113,39 @@ export const telesaleService = {
       zomzemItems = list.map((c: any) => ({
         ...c,
         source_erp: 'zomzem' as ErpSource,
+        is_custom: false,
       }))
     } else {
       console.warn('[Zomzem] Chưa có chiến dịch hoặc lỗi kết nối Zomzem:', zomzemSettled.reason)
     }
 
-    const combinedItems = [...ln365Items, ...zomzemItems]
+    const combinedItems: CampaignDto[] = [...ln365Items, ...zomzemItems]
+
+    // Gộp các chi nhánh bổ sung của Admin (chỉ lấy các chi nhánh đang bật is_active: true)
+    if (customConfigSettled.status === 'fulfilled' && customConfigSettled.value?.branches) {
+      const customBranches = customConfigSettled.value.branches
+      customBranches
+        .filter((b) => b.is_active)
+        .forEach((b) => {
+          const bErp = (b.source_erp || 'locnuoc365') as ErpSource
+          const isExist = combinedItems.some(
+            (c) =>
+              Number(c.branch_id) === Number(b.branch_id) &&
+              (c.source_erp || 'locnuoc365') === bErp,
+          )
+          if (!isExist) {
+            combinedItems.push({
+              campaign_id: b.campaign_id ? Number(b.campaign_id) : Number(b.branch_id),
+              name: b.name || b.branch_name,
+              branch_id: Number(b.branch_id),
+              branch_name: b.branch_name,
+              source_erp: bErp,
+              is_custom: true,
+            })
+          }
+        })
+    }
+
     return {
       items: combinedItems,
       total: combinedItems.length,
