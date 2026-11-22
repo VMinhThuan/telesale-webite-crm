@@ -55,12 +55,13 @@ class CustomBranchConfigService {
 
       if (response.ok) {
         const data = await response.json()
-        if (data && Array.isArray(data.branches)) {
+        if (data && (Array.isArray(data.branches) || data.branchAddresses)) {
           const config: CustomBranchConfigFile = {
             version: data.version || defaultCustomBranchConfig.version,
             updatedAt: data.updatedAt || defaultCustomBranchConfig.updatedAt,
             updatedBy: data.updatedBy,
             branches: data.branches || [],
+            branchAddresses: data.branchAddresses || {},
           }
           // Lưu dự phòng vào localStorage
           try {
@@ -117,12 +118,13 @@ class CustomBranchConfigService {
       if (res.Body) {
         const str = await res.Body.transformToString()
         const data = JSON.parse(str)
-        if (data && Array.isArray(data.branches)) {
+        if (data && (Array.isArray(data.branches) || data.branchAddresses)) {
           const config: CustomBranchConfigFile = {
             version: data.version || defaultCustomBranchConfig.version,
             updatedAt: data.updatedAt || defaultCustomBranchConfig.updatedAt,
             updatedBy: data.updatedBy,
             branches: data.branches || [],
+            branchAddresses: data.branchAddresses || {},
           }
           try {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config))
@@ -176,6 +178,26 @@ class CustomBranchConfigService {
     }
 
     return updatedConfig
+  }
+
+  /**
+   * Cập nhật địa chỉ cho một chi nhánh bất kỳ (dựa trên compound key: `${source_erp}_${branch_id}`)
+   */
+  async saveBranchAddress(
+    branchKey: string,
+    address: string,
+    updatedBy?: string,
+  ): Promise<CustomBranchConfigFile> {
+    const current = await this.getConfig()
+    const nextAddresses = {
+      ...(current.branchAddresses || {}),
+      [branchKey]: address.trim(),
+    }
+    const nextConfig: CustomBranchConfigFile = {
+      ...current,
+      branchAddresses: nextAddresses,
+    }
+    return this.saveConfig(nextConfig, updatedBy)
   }
 }
 

@@ -1,15 +1,39 @@
-import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Edit2,
+  MapPin,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import clsx from 'clsx'
 import dayjs from '../../../lib/dayjs'
 import { useBranchSlots } from '../../../hooks/useOrders'
 import { BranchSlotDto, ErpSource } from '../../../types/api'
 
+export interface TelesaleScheduleBranchItem {
+  key: string
+  id: number
+  name: string
+  source_erp: ErpSource
+}
+
 export interface TelesaleSchedulePanelProps {
   branchName?: string
   branchId: number
-  availableBranches?: { id: number; name: string }[]
-  onBranchChange?: (branchId: number) => void
+  availableBranches?: TelesaleScheduleBranchItem[]
+  currentBranchKey?: string
+  campaignBranchKey?: string
+  campaignBranchName?: string
+  branchAddress?: string
+  isAdmin?: boolean
+  onBranchChange?: (branchId: number, source_erp?: ErpSource) => void
+  onResetToCampaignBranch?: () => void
+  onUpdateAddress?: (newAddress: string) => Promise<void> | void
   orderDate: string
   onDateChange: (date: string) => void
   selectedSlotId?: number
@@ -20,14 +44,63 @@ export interface TelesaleSchedulePanelProps {
 export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   branchName,
   branchId,
-  availableBranches,
+  availableBranches = [],
+  currentBranchKey,
+  campaignBranchKey,
+  campaignBranchName,
+  branchAddress,
+  isAdmin,
   onBranchChange,
+  onResetToCampaignBranch,
+  onUpdateAddress,
   orderDate,
   onDateChange,
   selectedSlotId,
   onSelectSlot,
   source_erp,
 }) => {
+  // Trạng thái mở menu dropdown chi nhánh
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Trạng thái chỉnh sửa địa chỉ inline của Admin
+  const [isEditingAddress, setIsEditingAddress] = useState(false)
+  const [editingAddressValue, setEditingAddressValue] = useState('')
+  const [isSavingAddress, setIsSavingAddress] = useState(false)
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Xác định xem tab này có đang chọn một chi nhánh khác chi nhánh gốc của chiến dịch không
+  const isDifferentFromCampaign = Boolean(
+    campaignBranchKey && currentBranchKey && currentBranchKey !== campaignBranchKey,
+  )
+
+  // Chi nhánh gốc của chiến dịch
+  const campaignBranch = useMemo(() => {
+    if (!campaignBranchKey || !availableBranches.length) return null
+    return availableBranches.find((b) => b.key === campaignBranchKey) || null
+  }, [campaignBranchKey, availableBranches])
+
+  // Xử lý lưu địa chỉ inline
+  const handleSaveAddress = async () => {
+    if (!onUpdateAddress) return
+    setIsSavingAddress(true)
+    try {
+      await onUpdateAddress(editingAddressValue)
+      setIsEditingAddress(false)
+    } finally {
+      setIsSavingAddress(false)
+    }
+  }
   // Quản lý ngày bắt đầu của cửa sổ 3 ngày (mặc định từ hôm nay)
   const [startDateStr, setStartDateStr] = useState<string>(() => {
     return orderDate ? dayjs(orderDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')
@@ -207,10 +280,305 @@ export const TelesaleSchedulePanel: React.FC<TelesaleSchedulePanelProps> = ({
   return (
     <section className="call-panel schedule-panel">
       {/* Tiêu đề Lịch hẹn chi nhánh */}
-      <div className="call-panel-heading">
-        <div>
-          <p className="eyebrow">LỊCH HẸN CHI NHÁNH</p>
-          <h2>{branchName || 'Chi nhánh'}</h2>
+      <div className="call-panel-heading" style={{ position: 'relative', paddingBottom: '8px' }}>
+        <div style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <p className="eyebrow" style={{ margin: 0 }}>LỊCH HẸN CHI NHÁNH</p>
+            {isDifferentFromCampaign && onResetToCampaignBranch && (
+              <button
+                type="button"
+                onClick={onResetToCampaignBranch}
+                title={`Khôi phục về chi nhánh gốc của chiến dịch: ${campaignBranchName || 'Chi nhánh gốc'}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  color: '#1d4ed8',
+                  borderRadius: '12px',
+                  padding: '2px 8px',
+                  fontSize: '10.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <RotateCcw size={11} />
+                <span>Về {campaignBranchName || 'Gốc'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Tên chi nhánh dạng Dropdown linh hoạt */}
+          <div style={{ position: 'relative', width: '100%' }} ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '6px',
+                width: '100%',
+                background: isDifferentFromCampaign ? '#fffbeb' : '#f8fafc',
+                border: isDifferentFromCampaign ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                borderRadius: '7px',
+                padding: '5px 8px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                boxShadow: isDifferentFromCampaign ? '0 1px 2px rgba(245, 158, 11, 0.1)' : 'none',
+              }}
+              title="Nhấn để chọn hiển thị slot của chi nhánh khác"
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                <Building2 size={14} style={{ color: isDifferentFromCampaign ? '#d97706' : '#2563eb', flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    color: isDifferentFromCampaign ? '#b45309' : '#0f172a',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {branchName || 'Chi nhánh'}
+                </span>
+                {isDifferentFromCampaign && (
+                  <span
+                    style={{
+                      fontSize: '9.5px',
+                      background: '#fef3c7',
+                      color: '#b45309',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Tùy chọn
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                size={14}
+                style={{
+                  color: '#64748b',
+                  flexShrink: 0,
+                  transform: isMenuOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </button>
+
+            {/* Menu Dropdown danh sách chi nhánh */}
+            {isMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  left: 0,
+                  width: '100%',
+                  minWidth: '270px',
+                  maxHeight: '280px',
+                  overflowY: 'auto',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.08)',
+                  zIndex: 80,
+                  padding: '6px',
+                }}
+              >
+                {/* 1. Chi nhánh gốc của chiến dịch (Ghim dòng 1) */}
+                {campaignBranch && (
+                  <>
+                    <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                      Chi nhánh gốc chiến dịch
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onBranchChange?.(campaignBranch.id, campaignBranch.source_erp)
+                        setIsMenuOpen(false)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: currentBranchKey === campaignBranch.key ? '#eff6ff' : 'transparent',
+                        color: currentBranchKey === campaignBranch.key ? '#1d4ed8' : '#1e293b',
+                        fontWeight: currentBranchKey === campaignBranch.key ? 700 : 500,
+                        fontSize: '11.5px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={13} style={{ color: '#2563eb' }} />
+                        <span>{campaignBranch.name}</span>
+                      </div>
+                      <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+                        Gốc
+                      </span>
+                    </button>
+                    <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+                  </>
+                )}
+
+                {/* 2. Danh sách các chi nhánh khác */}
+                <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Các chi nhánh khác ({availableBranches.filter((b) => b.key !== campaignBranchKey).length})
+                </div>
+                {availableBranches
+                  .filter((b) => b.key !== campaignBranchKey)
+                  .map((b) => {
+                    const isSelected = currentBranchKey === b.key
+                    return (
+                      <button
+                        key={b.key}
+                        type="button"
+                        onClick={() => {
+                          onBranchChange?.(b.id, b.source_erp)
+                          setIsMenuOpen(false)
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isSelected ? '#eff6ff' : 'transparent',
+                          color: isSelected ? '#1d4ed8' : '#334155',
+                          fontWeight: isSelected ? 700 : 400,
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={13} style={{ color: isSelected ? '#2563eb' : '#94a3b8' }} />
+                          <span>{b.name}</span>
+                        </div>
+                        <span style={{ fontSize: '9.5px', color: '#64748b' }}>
+                          {b.source_erp === 'zomzem' ? 'Zomzem' : 'LN365'}
+                        </span>
+                      </button>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* Dòng hiển thị địa chỉ chi nhánh + Nút sửa inline của Admin */}
+          <div style={{ marginTop: '5px', fontSize: '11px', color: '#64748b', minHeight: '22px', display: 'flex', alignItems: 'center' }}>
+            {isEditingAddress ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+                <input
+                  type="text"
+                  value={editingAddressValue}
+                  onChange={(e) => setEditingAddressValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveAddress()
+                    if (e.key === 'Escape') setIsEditingAddress(false)
+                  }}
+                  placeholder="Nhập địa chỉ chi nhánh..."
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    fontSize: '11px',
+                    padding: '3px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid #3b82f6',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveAddress}
+                  disabled={isSavingAddress}
+                  style={{
+                    border: 'none',
+                    background: '#2563eb',
+                    color: '#fff',
+                    borderRadius: '4px',
+                    padding: '3px 7px',
+                    fontSize: '10.5px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  {isSavingAddress ? '...' : 'Lưu'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAddress(false)}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    background: '#fff',
+                    color: '#64748b',
+                    borderRadius: '4px',
+                    padding: '3px 6px',
+                    fontSize: '10.5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Hủy
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px', width: '100%' }}>
+                <span
+                  title={branchAddress || 'Chưa cập nhật địa chỉ'}
+                  style={{
+                    flex: 1,
+                    color: branchAddress ? '#475569' : '#94a3b8',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: 1.35,
+                    fontSize: '11px',
+                  }}
+                >
+                  📍 {branchAddress || 'Chưa cập nhật địa chỉ'}
+                </span>
+                {isAdmin && onUpdateAddress && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAddressValue(branchAddress || '')
+                      setIsEditingAddress(true)
+                    }}
+                    title="Chỉnh sửa địa chỉ chi nhánh này (Admin)"
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#2563eb',
+                      cursor: 'pointer',
+                      padding: '1px 3px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }}
+                  >
+                    <Edit2 size={11} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

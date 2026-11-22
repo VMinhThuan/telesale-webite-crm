@@ -17,10 +17,12 @@ export interface CustomBranchConfigFile {
   updatedAt: string
   updatedBy?: string
   branches: CustomBranchItem[]
+  branchAddresses?: Record<string, string> // key: `${source_erp}_${branch_id}` -> địa chỉ chi nhánh
 }
 
 export const defaultCustomBranchConfig: CustomBranchConfigFile = {
   version: '1.0',
   updatedAt: new Date().toISOString(),
   branches: [],
+  branchAddresses: {},
 }

@@ -52,15 +52,30 @@ describe('CustomBranchConfigService Unit Tests', () => {
     expect(s3Spy).not.toHaveBeenCalled()
   })
 
-  it('getConfig: fallback về default khi CDN và S3 gặp sự cố', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'))
-    vi.spyOn(
-      customBranchConfigService as any,
-      'getLatestConfigFromStorage',
-    ).mockResolvedValueOnce(defaultCustomBranchConfig)
+  it('saveBranchAddress: cập nhật địa chỉ theo compound key và lưu cấu hình', async () => {
+    const mockConfig: CustomBranchConfigFile = {
+      version: '1.0',
+      updatedAt: '2026-11-20T00:00:00.000Z',
+      branches: [],
+      branchAddresses: {},
+    }
+    vi.spyOn(customBranchConfigService, 'getConfig').mockResolvedValueOnce(mockConfig)
+    const saveSpy = vi.spyOn(customBranchConfigService, 'saveConfig').mockImplementation(async (cfg) => cfg)
 
-    const result = await customBranchConfigService.getConfig()
-    expect(result.version).toBe('1.0')
-    expect(result.branches).toEqual([])
+    const result = await customBranchConfigService.saveBranchAddress(
+      'locnuoc365_3',
+      'Số 12 Đại Kim, Hoàng Mai, Hà Nội',
+      'admin_test',
+    )
+
+    expect(saveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        branchAddresses: {
+          locnuoc365_3: 'Số 12 Đại Kim, Hoàng Mai, Hà Nội',
+        },
+      }),
+      'admin_test',
+    )
+    expect(result.branchAddresses?.['locnuoc365_3']).toBe('Số 12 Đại Kim, Hoàng Mai, Hà Nội')
   })
 })

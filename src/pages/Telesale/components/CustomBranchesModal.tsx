@@ -221,6 +221,7 @@ export const CustomBranchesModal: React.FC<CustomBranchesModalProps> = ({
         version: config?.version || '1.0',
         updatedAt: new Date().toISOString(),
         branches: branchesList,
+        branchAddresses: config?.branchAddresses || {},
       })
     } catch {
       // Error handled in mutation

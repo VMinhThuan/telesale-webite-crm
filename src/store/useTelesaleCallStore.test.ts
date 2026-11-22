@@ -34,12 +34,23 @@ describe('useTelesaleCallStore Zustand Tests', () => {
   })
 
   it('cập nhật và reset bản nháp của tab', () => {
-    useTelesaleCallStore.getState().updateTabDraft(1, { note: 'Khách hẹn gọi lại sau 15h' })
-    expect(useTelesaleCallStore.getState().getTabDraft(1).note).toBe('Khách hẹn gọi lại sau 15h')
+    useTelesaleCallStore.getState().updateTabDraft(1, {
+      note: 'Khách hẹn gọi lại sau 15h',
+      branchId: 104,
+      branchSourceErp: 'zomzem',
+      branchKey: 'zomzem_104',
+    })
+    const draft = useTelesaleCallStore.getState().getTabDraft(1)
+    expect(draft.note).toBe('Khách hẹn gọi lại sau 15h')
+    expect(draft.branchId).toBe(104)
+    expect(draft.branchSourceErp).toBe('zomzem')
+    expect(draft.branchKey).toBe('zomzem_104')
 
     useTelesaleCallStore.getState().resetTabDraft(1, '2026-11-20')
     const resetDraft = useTelesaleCallStore.getState().getTabDraft(1)
     expect(resetDraft.note).toBe('')
     expect(resetDraft.orderDate).toBe('2026-11-20')
+    expect(resetDraft.branchId).toBeUndefined()
+    expect(resetDraft.branchKey).toBeUndefined()
   })
 })

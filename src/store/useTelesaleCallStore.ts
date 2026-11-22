@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CallResultOutcome, NextCustomerDto } from '../types/api'
+import { CallResultOutcome, ErpSource, NextCustomerDto } from '../types/api'
 import { ParsedCallTermination } from '../utils/sipCallParser'
 
 export interface TelesaleDraftResult {
@@ -22,6 +22,8 @@ export interface TelesaleDraftResult {
   orderTime: string
   orderSlotId?: number
   branchId?: number
+  branchSourceErp?: ErpSource
+  branchKey?: string
 }
 
 export const createDefaultDraftResult = (defaultOrderDate = ''): TelesaleDraftResult => ({
@@ -44,6 +46,8 @@ export const createDefaultDraftResult = (defaultOrderDate = ''): TelesaleDraftRe
   orderTime: '08:30',
   orderSlotId: undefined,
   branchId: undefined,
+  branchSourceErp: undefined,
+  branchKey: undefined,
 })
 
 export interface TelesaleCallTab {

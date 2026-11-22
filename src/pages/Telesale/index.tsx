@@ -22,7 +22,7 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { determinePhanQuyen } from '../../services/auth.service'
 import { useCallStore } from '../../store/useCallStore'
 import { useTelesaleCallStore } from '../../store/useTelesaleCallStore'
-import { useCustomBranchConfig } from '../../hooks/useCustomBranchConfig'
+import { useCustomBranchConfig, useSaveBranchAddressMutation } from '../../hooks/useCustomBranchConfig'
 import sipService from '../../services/sipService'
 import { tabLeaderService } from '../../services/tabLeaderService'
 import { notify } from '../../utils/notify'
@@ -147,33 +147,39 @@ export const Telesale: React.FC = () => {
   // Nguồn ERP của chiến dịch đang chọn
   const currentErpSource: ErpSource = selectedCampaign?.source_erp || 'locnuoc365'
 
-  // Trích xuất danh sách tất cả các chi nhánh khả dụng theo nguồn ERP của chiến dịch đang chọn
-  // (campaignsList đã tự động gộp chiến dịch API và chi nhánh bổ sung của Admin từ useCampaigns)
-  const availableBranches = useMemo(() => {
-    const map = new Map<number, { id: number; name: string; source_erp: ErpSource }>()
+  // Trích xuất danh sách TẤT CẢ các chi nhánh khả dụng từ cả 2 nguồn ERP (Lọc Nước 365 & Zomzem)
+  // để phục vụ việc xem slot linh hoạt liên chi nhánh (Cross-ERP)
+  const allAvailableBranches = useMemo(() => {
+    const map = new Map<string, { key: string; id: number; name: string; source_erp: ErpSource }>()
     
-    // Chi nhánh tự động trích xuất từ campaignsList của nguồn đang chọn
-    campaignsList
-      .filter((c) => (c.source_erp || 'locnuoc365') === currentErpSource)
-      .forEach((c) => {
-        if (c.branch_id && c.branch_name) {
-          map.set(c.branch_id, {
-            id: c.branch_id,
-            name: c.branch_name,
-            source_erp: currentErpSource,
-          })
-        }
-      })
+    campaignsList.forEach((c) => {
+      if (c.branch_id && c.branch_name) {
+        const erp = (c.source_erp || 'locnuoc365') as ErpSource
+        const key = `${erp}_${c.branch_id}`
+        map.set(key, {
+          key,
+          id: c.branch_id,
+          name: c.branch_name,
+          source_erp: erp,
+        })
+      }
+    })
 
     if (map.size === 0) {
-      map.set(3, {
+      map.set('locnuoc365_3', {
+        key: 'locnuoc365_3',
         id: 3,
-        name: currentErpSource === 'zomzem' ? 'Chi nhánh Gò Vấp' : 'Chi Nhánh Đại Kim',
-        source_erp: currentErpSource,
+        name: 'Chi Nhánh Đại Kim',
+        source_erp: 'locnuoc365',
       })
     }
     return Array.from(map.values())
-  }, [campaignsList, currentErpSource])
+  }, [campaignsList])
+
+  // Chi nhánh chỉ thuộc nguồn ERP của chiến dịch đang chọn (dùng cho bộ lọc thông thường nếu cần)
+  const availableBranches = useMemo(() => {
+    return allAvailableBranches.filter((b) => b.source_erp === currentErpSource)
+  }, [allAvailableBranches, currentErpSource])
 
   // 2. Thống kê kết quả đàm thoại trong ngày
   const { data: dailyResults } = useDailyResults()
@@ -200,27 +206,74 @@ export const Telesale: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isCallLogsDrawerOpen, setIsCallLogsDrawerOpen] = useState(false)
 
-  // Chi nhánh ưu tiên trực tiếp theo chiến dịch đang chọn (mỗi chiến dịch đã ứng với 1 chi nhánh)
-  const branchId = selectedCampaign?.branch_id || activeTab?.draftResult?.branchId || 3
-  const currentBranch = availableBranches.find((b) => b.id === branchId)
-  const branchName =
-    selectedCampaign?.branch_name ||
-    currentBranch?.name ||
-    (currentErpSource === 'zomzem' ? 'Chi nhánh Gò Vấp' : 'Chi Nhánh Đại Kim')
-  const scheduleSourceErp = selectedCampaign?.source_erp || currentBranch?.source_erp || 'locnuoc365'
+  // 1. Chi nhánh gốc của chiến dịch đang chọn
+  const campaignBranchId = selectedCampaign?.branch_id || 3
+  const campaignSourceErp: ErpSource = selectedCampaign?.source_erp || 'locnuoc365'
+  const campaignBranchKey = `${campaignSourceErp}_${campaignBranchId}`
+  const campaignBranchName = selectedCampaign?.branch_name || 'Chi Nhánh Đại Kim'
 
+  // 2. Lấy draft của Tab đang active để xác định chi nhánh đang xem cho Tab đó
+  const activeTabDraft = useTelesaleCallStore((s) => s.drafts[activeTabId])
+  const activeBranchKey =
+    activeTabDraft?.branchKey ||
+    (activeTabDraft?.branchId
+      ? `${activeTabDraft.branchSourceErp || campaignSourceErp}_${activeTabDraft.branchId}`
+      : campaignBranchKey)
+
+  // 3. Chi nhánh đang chọn (Ưu tiên draft của tab -> Fallback sang chi nhánh gốc chiến dịch)
+  const currentBranch =
+    allAvailableBranches.find((b) => b.key === activeBranchKey) ||
+    allAvailableBranches.find((b) => b.id === campaignBranchId && b.source_erp === campaignSourceErp) ||
+    allAvailableBranches[0]
+
+  const branchId = currentBranch.id
+  const branchName = currentBranch.name
+  const scheduleSourceErp = currentBranch.source_erp
+
+  // 4. Địa chỉ chi nhánh từ cấu hình R2 (kèm inline edit của Admin)
+  const branchAddress = customBranchConfigFile?.branchAddresses?.[currentBranch.key] || ''
+  const saveBranchAddressMutation = useSaveBranchAddressMutation()
+
+  const handleUpdateAddress = React.useCallback(
+    async (newAddress: string) => {
+      await saveBranchAddressMutation.mutateAsync({
+        branchKey: currentBranch.key,
+        address: newAddress,
+      })
+    },
+    [saveBranchAddressMutation, currentBranch.key],
+  )
+
+  // Đổi chi nhánh cho tab hiện tại (lưu vào draft của Tab đó, không ảnh hưởng tab khác)
   const handleBranchChange = React.useCallback(
-    (newBranchId: number) => {
+    (newBranchId: number, newSourceErp?: ErpSource) => {
+      const erp = newSourceErp || currentBranch.source_erp || 'locnuoc365'
+      const key = `${erp}_${newBranchId}`
       useTelesaleCallStore.getState().updateTabDraft(activeTabId, {
         branchId: newBranchId,
+        branchSourceErp: erp,
+        branchKey: key,
         orderSlotId: undefined, // Reset slot cũ vì slot không còn hiệu lực trên chi nhánh mới
       })
       setOrderSlotId(undefined)
-      const name = availableBranches.find((b) => b.id === newBranchId)?.name || `Chi nhánh #${newBranchId}`
+      const found = allAvailableBranches.find((b) => b.key === key)
+      const name = found?.name || `Chi nhánh #${newBranchId}`
       notify(`Đã chuyển sang ${name}. Lịch slot hẹn đã được cập nhật.`)
     },
-    [activeTabId, availableBranches],
+    [activeTabId, allAvailableBranches, currentBranch.source_erp],
   )
+
+  // Khôi phục về chi nhánh gốc của chiến dịch hiện tại (1-click reset)
+  const handleResetToCampaignBranch = React.useCallback(() => {
+    useTelesaleCallStore.getState().updateTabDraft(activeTabId, {
+      branchId: campaignBranchId,
+      branchSourceErp: campaignSourceErp,
+      branchKey: campaignBranchKey,
+      orderSlotId: undefined,
+    })
+    setOrderSlotId(undefined)
+    notify(`Đã quay về chi nhánh gốc: ${campaignBranchName}`)
+  }, [activeTabId, campaignBranchId, campaignSourceErp, campaignBranchKey, campaignBranchName])
 
   // Kiểm tra xem hiện tại có cuộc gọi nào đang hoạt động trên bất kỳ line nào không
   const hasActiveCalls = useMemo(() => {
@@ -1043,8 +1096,15 @@ export const Telesale: React.FC = () => {
         <TelesaleSchedulePanel
           branchName={branchName}
           branchId={branchId}
-          availableBranches={availableBranches}
+          availableBranches={allAvailableBranches}
+          currentBranchKey={currentBranch.key}
+          campaignBranchKey={campaignBranchKey}
+          campaignBranchName={campaignBranchName}
+          branchAddress={branchAddress}
+          isAdmin={isAdmin}
           onBranchChange={handleBranchChange}
+          onResetToCampaignBranch={handleResetToCampaignBranch}
+          onUpdateAddress={handleUpdateAddress}
           orderDate={orderDate}
           onDateChange={handleOrderDateChange}
           selectedSlotId={orderSlotId}
@@ -1061,6 +1121,8 @@ export const Telesale: React.FC = () => {
               orderTime: slotTime,
               orderDate: d,
               branchId,
+              branchSourceErp: scheduleSourceErp,
+              branchKey: currentBranch.key,
             })
           }}
         />
@@ -1095,7 +1157,7 @@ export const Telesale: React.FC = () => {
           selectedCampaignName={selectedCampaign?.name}
           branchId={branchId}
           branchName={branchName}
-          availableBranches={availableBranches}
+          availableBranches={allAvailableBranches}
           onBranchChange={handleBranchChange}
           orderDate={orderDate}
           onOrderDateChange={handleOrderDateChange}

@@ -43,3 +43,31 @@ export function useSaveCustomBranchConfigMutation() {
     },
   })
 }
+
+/**
+ * Mutation cập nhật địa chỉ nhanh cho 1 chi nhánh
+ */
+export function useSaveBranchAddressMutation() {
+  const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.user)
+
+  return useMutation({
+    mutationFn: ({ branchKey, address }: { branchKey: string; address: string }) =>
+      customBranchConfigService.saveBranchAddress(
+        branchKey,
+        address,
+        currentUser?.username || currentUser?.name || 'admin',
+      ),
+    onSuccess: (savedConfig) => {
+      queryClient.setQueryData(queryKeys.customBranchConfig.config(), savedConfig)
+      queryClient.invalidateQueries({ queryKey: queryKeys.customBranchConfig.all })
+      notify('Đã cập nhật địa chỉ chi nhánh thành công!', { type: 'success' })
+    },
+    onError: (err: any) => {
+      console.error('Lỗi khi lưu địa chỉ chi nhánh:', err)
+      notify(err.message || 'Không thể lưu địa chỉ chi nhánh. Vui lòng thử lại.', {
+        type: 'warning',
+      })
+    },
+  })
+}
